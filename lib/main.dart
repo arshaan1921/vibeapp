@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import 'theme.dart';
 import 'screens/feed.dart';
 import 'screens/questions_screen.dart';
@@ -19,7 +20,6 @@ import 'screens/splash_screen.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 
-// ✅ Notification Channel
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'v1be_channel',
   'V1BE Notifications',
@@ -30,41 +30,62 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
 
+/// ✅ SAVE DEVICE TOKEN
+Future<void> saveDeviceToken() async {
+  final user = Supabase.instance.client.auth.currentUser;
+
+  if (user == null) {
+    print("❌ No user logged in");
+    return;
+  }
+
+  final token = await FirebaseMessaging.instance.getToken();
+  print("📱 FCM TOKEN: $token");
+
+  if (token != null) {
+    await Supabase.instance.client.from('device_tokens').upsert({
+      'user_id': user.id,
+      'token': token,
+    }, onConflict: 'user_id');
+
+    print("✅ Token saved");
+  }
+}
+
 /// ✅ BACKGROUND HANDLER
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 
   final data = message.data;
-  final title = data['title'];
-  final body = data['body'];
 
-  if (title != null && body != null) {
-    final FlutterLocalNotificationsPlugin localPlugin =
-    FlutterLocalNotificationsPlugin();
+  final title = data['title'] ?? "V1BE";
+  final body = data['body'] ?? "New notification";
 
-    const AndroidInitializationSettings initSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
+  final FlutterLocalNotificationsPlugin localPlugin =
+  FlutterLocalNotificationsPlugin();
 
-    await localPlugin.initialize(
-      const InitializationSettings(android: initSettingsAndroid),
-    );
+  const AndroidInitializationSettings initSettingsAndroid =
+  AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const AndroidNotificationDetails androidDetails =
-    AndroidNotificationDetails(
-      'v1be_channel',
-      'V1BE Notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
+  await localPlugin.initialize(
+    const InitializationSettings(android: initSettingsAndroid),
+  );
 
-    await localPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      const NotificationDetails(android: androidDetails),
-    );
-  }
+  const AndroidNotificationDetails androidDetails =
+  AndroidNotificationDetails(
+    'v1be_channel',
+    'V1BE Notifications',
+    importance: Importance.max,
+    priority: Priority.high,
+  );
+
+  await localPlugin.show(
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    title,
+    body,
+    const NotificationDetails(android: androidDetails),
+  );
 }
 
 void main() async {
@@ -72,23 +93,18 @@ void main() async {
 
   await Firebase.initializeApp();
 
-  // ✅ Request permission
-  await FirebaseMessaging.instance.requestPermission();
+  final settings = await FirebaseMessaging.instance.requestPermission();
+  print("🔐 Permission: ${settings.authorizationStatus}");
 
-  // ✅ GET FCM TOKEN
-  final fcmToken = await FirebaseMessaging.instance.getToken();
-  print("🔥 FCM TOKEN: $fcmToken");
+  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+    alert: false,
+    badge: false,
+    sound: false,
+  );
 
-  // ✅ TOKEN REFRESH LISTENER
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-    print("🔄 NEW FCM TOKEN: $newToken");
-  });
-
-  // ✅ Register background handler
   FirebaseMessaging.onBackgroundMessage(
       _firebaseMessagingBackgroundHandler);
 
-  // ✅ Init local notifications
   const AndroidInitializationSettings initializationSettingsAndroid =
   AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -101,42 +117,56 @@ void main() async {
       AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  /// ✅ FOREGROUND HANDLER
+  /// ✅ FOREGROUND HANDLER (🔥 FINAL FIX)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     final data = message.data;
 
-    final title = data['title'];
-    final body = data['body'];
+    final title = data['title'] ?? "V1BE";
 
-    if (title != null && body != null) {
-      flutterLocalNotificationsPlugin.show(
-        DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        title,
-        body,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'v1be_channel',
-            'V1BE Notifications',
-            importance: Importance.max,
-            priority: Priority.high,
-          ),
+    final body = data['body'] ??
+        message.notification?.body ??
+        "New notification";
+
+    flutterLocalNotificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'v1be_channel',
+          'V1BE Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
         ),
-      );
-    }
+      ),
+    );
   });
 
-  /// ✅ CLICK HANDLER (WHEN USER TAPS NOTIFICATION)
+  /// ✅ CLICK HANDLER
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    print("📲 Notification clicked: ${message.data}");
+    print("📲 Clicked: ${message.data}");
   });
 
-  // ✅ Supabase (UNCHANGED)
   await Supabase.initialize(
     url: "https://litammrxzsndissedizt.supabase.co",
     anonKey:
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpdGFtbXJ4enNuZGlzc2VkaXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzE1MzIsImV4cCI6MjA4NzUwNzUzMn0._MqAAWpExMvi0vMHFhegqmx_gDPiJZWtUIbjJKvzfoQ",
-    authOptions: const FlutterAuthClientOptions(autoRefreshToken: true),
   );
+
+  await saveDeviceToken();
+
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user != null) {
+      await Supabase.instance.client.from('device_tokens').upsert({
+        'user_id': user.id,
+        'token': newToken,
+      }, onConflict: 'user_id');
+
+      print("🔄 Token updated");
+    }
+  });
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -228,8 +258,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                 tabIndexNotifier.value = i;
               },
               type: BottomNavigationBarType.fixed,
-              backgroundColor:
-              isDark ? const Color(0xFF1E1E1E) : Theme.of(context).primaryColor,
+              backgroundColor: isDark
+                  ? const Color(0xFF1E1E1E)
+                  : Theme.of(context).primaryColor,
               selectedItemColor:
               isDark ? Colors.blueAccent : const Color(0xFF9FD3FF),
               unselectedItemColor:
