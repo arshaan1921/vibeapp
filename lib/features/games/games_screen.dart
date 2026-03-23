@@ -1,0 +1,136 @@
+import 'package:flutter/material.dart';
+import 'active_games_screen.dart';
+import 'most_likely_screen.dart';
+import 'truth_lie_screen.dart';
+import 'roast_me_screen.dart';
+import 'would_you_rather_screen.dart';
+import 'alphabet_game_screen.dart';
+
+class GamesScreen extends StatelessWidget {
+  const GamesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('GAMES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          _GameCard(
+            title: 'Rate Me Brutally',
+            description: 'Start a rating game with your friends!',
+            icon: Icons.star_outline_rounded,
+            color: Colors.orangeAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ActiveGamesScreen())),
+          ),
+          _GameCard(
+            title: 'Who Is Most Likely To',
+            description: 'Tag friends and vote on fun scenarios!',
+            icon: Icons.people_outline_rounded,
+            color: Colors.pinkAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MostLikelyScreen())),
+          ),
+          _GameCard(
+            title: 'Two Truths and One Lie',
+            description: 'Can your friends spot the fake statement?',
+            icon: Icons.fact_check_outlined,
+            color: Colors.blueAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TruthLieScreen())),
+          ),
+          _GameCard(
+            title: 'Roast Me',
+            description: 'Ask for the best roasts from your friends.',
+            icon: Icons.local_fire_department_rounded,
+            color: Colors.redAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoastMeScreen())),
+          ),
+          _GameCard(
+            title: 'Would You Rather',
+            description: 'Choose between two difficult options.',
+            icon: Icons.compare_arrows_rounded,
+            color: Colors.purpleAccent,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WouldYouRatherScreen())),
+          ),
+          _GameCard(
+            title: 'Alphabet Game',
+            description: 'Word battle! Quick answers or you lose.',
+            icon: Icons.sort_by_alpha_rounded,
+            color: Colors.tealAccent[700]!,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlphabetGameScreen())),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GameCard extends StatelessWidget {
+  final String title;
+  final String description;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _GameCard({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 32),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18, 
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        color: Colors.grey, 
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
