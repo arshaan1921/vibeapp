@@ -30,7 +30,7 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
 
-/// ✅ BACKGROUND HANDLER (FIXED)
+/// ✅ BACKGROUND HANDLER
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -75,6 +75,15 @@ void main() async {
   // ✅ Request permission
   await FirebaseMessaging.instance.requestPermission();
 
+  // ✅ GET FCM TOKEN
+  final fcmToken = await FirebaseMessaging.instance.getToken();
+  print("🔥 FCM TOKEN: $fcmToken");
+
+  // ✅ TOKEN REFRESH LISTENER
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+    print("🔄 NEW FCM TOKEN: $newToken");
+  });
+
   // ✅ Register background handler
   FirebaseMessaging.onBackgroundMessage(
       _firebaseMessagingBackgroundHandler);
@@ -92,7 +101,7 @@ void main() async {
       AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  /// ✅ FOREGROUND HANDLER (FIXED FOR DATA)
+  /// ✅ FOREGROUND HANDLER
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     final data = message.data;
 
@@ -114,6 +123,11 @@ void main() async {
         ),
       );
     }
+  });
+
+  /// ✅ CLICK HANDLER (WHEN USER TAPS NOTIFICATION)
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    print("📲 Notification clicked: ${message.data}");
   });
 
   // ✅ Supabase (UNCHANGED)

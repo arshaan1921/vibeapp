@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         // Changed to match the package name in google-services.json
-        applicationId = "com.example.v1be"
+        applicationId = "com.v1be.v1be"
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode
