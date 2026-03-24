@@ -25,6 +25,60 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _handleForgotPassword() async {
+    final username = _usernameController.text.trim();
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter your username to reset password")),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      // 1. Fetch email associated with the username
+      final profileData = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', username)
+          .maybeSingle();
+
+      if (profileData == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("User not found")),
+          );
+        }
+        return;
+      }
+
+      final email = profileData['email'];
+
+      // ✅ FIXED: Added redirectTo
+      await supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'com.v1be.v1be://reset-password',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password reset email sent! ✅")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _handleLogin() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
@@ -60,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final email = profileData['email'];
 
-      // 2. Sign in with email and password
+      // 2. Sign in
       final response = await supabase.auth.signInWithPassword(
         email: email,
         password: password,
@@ -75,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const MainScaffold()),
-            (route) => false,
+                (route) => false,
           );
         }
       }
@@ -113,12 +167,13 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 "Welcome Back",
                 style: TextStyle(
-                  fontSize: 22, 
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: theme.textTheme.bodyLarge?.color,
                 ),
               ),
               const SizedBox(height: 32),
+
               TextField(
                 controller: _usernameController,
                 style: TextStyle(color: theme.textTheme.bodyLarge?.color),
@@ -129,7 +184,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   filled: true,
                 ),
               ),
+
               const SizedBox(height: 16),
+
               TextField(
                 controller: _passwordController,
                 obscureText: _obscure,
@@ -148,53 +205,74 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 8),
+
               Row(
                 children: [
-                  Checkbox(
-                    value: _keepLoggedIn,
-                    activeColor: theme.primaryColor,
-                    checkColor: Colors.white,
-                    side: BorderSide(color: isDark ? Colors.white54 : Colors.grey),
-                    onChanged: (val) => setState(() => _keepLoggedIn = val ?? false),
-                  ),
-                  Text(
-                    "Keep me logged in", 
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.textTheme.bodyMedium?.color,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          child: Checkbox(
+                            value: _keepLoggedIn,
+                            activeColor: theme.primaryColor,
+                            checkColor: Colors.white,
+                            side: BorderSide(
+                                color: isDark ? Colors.white54 : Colors.grey),
+                            onChanged: (val) =>
+                                setState(() => _keepLoggedIn = val ?? false),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: GestureDetector(
+                            onTap: () =>
+                                setState(() => _keepLoggedIn = !_keepLoggedIn),
+                            child: Text(
+                              "Keep me logged in",
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+
+                  TextButton(
+                    onPressed:
+                    _isLoading ? null : _handleForgotPassword,
+                    child: const Text("Forgot Password?"),
                   ),
                 ],
               ),
+
               const SizedBox(height: 24),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
                   child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
+                      ? const CircularProgressIndicator()
                       : const Text("LOGIN"),
                 ),
               ),
+
               const SizedBox(height: 24),
+
               Center(
                 child: TextButton(
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(builder: (_) => const SignupScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const SignupScreen()),
                     );
                   },
-                  child: Text(
+                  child: const Text(
                     "Don't have an account? Create one",
-                    style: TextStyle(
-                      color: isDark ? Colors.blueAccent : theme.primaryColor,
-                    ),
                   ),
                 ),
               ),

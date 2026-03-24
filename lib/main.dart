@@ -17,6 +17,7 @@ import 'features/games/games_screen.dart';
 import 'services/rate_game_service.dart';
 import 'services/block_service.dart';
 import 'screens/splash_screen.dart';
+import 'screens/auth/reset_password_page.dart'; // ✅ ADDED
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 
@@ -96,7 +97,8 @@ void main() async {
   final settings = await FirebaseMessaging.instance.requestPermission();
   print("🔐 Permission: ${settings.authorizationStatus}");
 
-  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+  await FirebaseMessaging.instance
+      .setForegroundNotificationPresentationOptions(
     alert: false,
     badge: false,
     sound: false,
@@ -117,7 +119,7 @@ void main() async {
       AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 
-  /// ✅ FOREGROUND HANDLER (🔥 FINAL FIX)
+  /// ✅ FOREGROUND HANDLER
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     final data = message.data;
 
@@ -152,6 +154,19 @@ void main() async {
     anonKey:
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpdGFtbXJ4enNuZGlzc2VkaXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzE1MzIsImV4cCI6MjA4NzUwNzUzMn0._MqAAWpExMvi0vMHFhegqmx_gDPiJZWtUIbjJKvzfoQ",
   );
+
+  /// 🔥 ✅ PASSWORD RECOVERY LISTENER (FIXED)
+  Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    final event = data.event;
+
+    if (event == AuthChangeEvent.passwordRecovery) {
+      NotificationService.navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => const ResetPasswordPage(),
+        ),
+      );
+    }
+  });
 
   await saveDeviceToken();
 
