@@ -611,7 +611,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: theme.iconTheme.color,
                         onPressed: () {
                           final username = profileData?['username'] ?? 'user';
-                          final message = "Check out @$username on V1BE\nhttps://v1be.app/u/$username";
+
+                          final message =
+                              "Check out @$username on V1BE 👀\n"
+                              "Username: $username\n"
+                              "Download app: https://shorturl.at/DdocE";
+
                           Share.share(message);
                         },
                       ),
