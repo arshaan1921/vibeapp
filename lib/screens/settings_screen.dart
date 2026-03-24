@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'privacy_policy.dart';
-import 'terms.dart';
+import '../utils/legal_links.dart';
 import 'auth/welcome.dart';
 import 'edit_profile.dart';
 import 'premium.dart';
@@ -69,6 +68,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .eq('id', user.id);
     } catch (e) {
       debugPrint("Error updating $column: $e");
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      final user = supabase.auth.currentUser;
+
+      if (user == null) {
+        throw Exception("User not logged in");
+      }
+
+      final session = supabase.auth.currentSession;
+
+      if (session == null) {
+        throw Exception("Session not found");
+      }
+
+      final response = await supabase.functions.invoke(
+        'delete-user',
+        headers: {
+          'Authorization': 'Bearer ${session.accessToken}', // 🔥 IMPORTANT
+          'Content-Type': 'application/json',
+        },
+        body: {
+          'user_id': user.id,
+        },
+      );
+
+      if (response.status != 200) {
+        throw Exception(response.data.toString());
+      }
+
+      // ✅ logout after delete
+      await supabase.auth.signOut();
+
+      print("✅ Account deleted");
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Account deleted successfully")),
+        );
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print("❌ DELETE ERROR: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
     }
   }
 
@@ -217,23 +273,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Card(
                       child: Column(
                         children: [
-                          _buildRow(Icons.description_outlined, "Terms of Service", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const TermsScreen(),
-                              ),
-                            );
-                          }),
+                          _buildRow(Icons.description_outlined, "Terms of Service", LegalLinks.launchTermsConditions),
                           const Divider(),
-                          _buildRow(Icons.privacy_tip_outlined, "Privacy Policy", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const PrivacyPolicyScreen(),
-                              ),
-                            );
-                          }),
+                          _buildRow(Icons.privacy_tip_outlined, "Privacy Policy", LegalLinks.launchPrivacyPolicy),
                         ],
                       ),
                     ),
@@ -244,7 +286,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         children: [
                           _buildActionRow("Log out", Colors.redAccent),
                           const Divider(),
-                          _buildActionRow("Delete account", Colors.redAccent),
+                          ListTile(
+                            title: const Text(
+                              "Delete account",
+                              style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
+                            ),
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text("Delete Account"),
+                                  content: const Text(
+                                    "This action is permanent. Are you sure you want to delete your account?",
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text("Cancel"),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        deleteAccount();
+                                      },
+                                      child: const Text(
+                                        "Delete",
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),

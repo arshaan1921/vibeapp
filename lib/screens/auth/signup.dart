@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../utils/legal_links.dart';
 import '../onboarding/onboarding.dart';
 import 'login.dart';
 
@@ -17,6 +18,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController nameController = TextEditingController();
   bool _obscure = true;
   bool _isLoading = false;
+  bool _agreeToTerms = false;
 
   @override
   void dispose() {
@@ -36,6 +38,13 @@ class _SignupScreenState extends State<SignupScreen> {
     if (email.isEmpty || username.isEmpty || password.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("All fields are required")),
+      );
+      return;
+    }
+
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please agree to Terms & Privacy Policy")),
       );
       return;
     }
@@ -173,7 +182,55 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _agreeToTerms,
+                    onChanged: (val) => setState(() => _agreeToTerms = val ?? false),
+                    activeColor: theme.primaryColor,
+                  ),
+                  Expanded(
+                    child: Wrap(
+                      children: [
+                        const Text(
+                          "I agree to the ",
+                          style: TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
+                        GestureDetector(
+                          onTap: LegalLinks.launchTermsConditions,
+                          child: Text(
+                            "Terms & Conditions",
+                            style: TextStyle(
+                              fontSize: 13, 
+                              color: theme.primaryColor, 
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                        const Text(
+                          " and ",
+                          style: TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
+                        GestureDetector(
+                          onTap: LegalLinks.launchPrivacyPolicy,
+                          child: Text(
+                            "Privacy Policy",
+                            style: TextStyle(
+                              fontSize: 13, 
+                              color: theme.primaryColor, 
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
