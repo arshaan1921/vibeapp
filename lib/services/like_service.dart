@@ -18,20 +18,32 @@ class LikeService {
       // Fetch answer owner to send notification
       final answerData = await _supabase
           .from('answers')
-          .select('user_id, profiles:user_id(username)')
+          .select('user_id')
           .eq('id', answerId)
           .maybeSingle();
       
       if (answerData != null && answerData['user_id'] != user.id) {
         final ownerId = answerData['user_id'];
-        final likerUsername = (await _supabase.from('profiles').select('username').eq('id', user.id).single())['username'];
         
-        NotificationService.sendNotification(
-          userId: ownerId,
-          title: "New Like!",
-          body: "@$likerUsername liked your answer",
-          data: {"type": "like", "answer_id": answerId},
-        );
+        // Use a try-catch for the profile fetch to prevent the entire like action from failing
+        try {
+          final profileData = await _supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', user.id)
+              .maybeSingle();
+              
+          final likerUsername = profileData?['username'] ?? 'Someone';
+          
+          NotificationService.sendNotification(
+            userId: ownerId,
+            title: "New Like!",
+            body: "@$likerUsername liked your answer",
+            data: {"type": "like", "answer_id": answerId},
+          );
+        } catch (profileError) {
+          debugPrint("Error fetching liker profile for notification: $profileError");
+        }
       }
     } catch (e) {
       debugPrint("Error in likeAnswer: $e");

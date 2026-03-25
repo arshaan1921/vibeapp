@@ -8,6 +8,7 @@ import '../utils/image_utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
+import 'package:http/http.dart' as http;
 
 class AnswerCard extends StatefulWidget {
   final AnswerModel answer;
@@ -48,10 +49,12 @@ class _AnswerCardState extends State<AnswerCard> {
   void didUpdateWidget(AnswerCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_isProcessing) {
-      setState(() {
-        _isLiked = widget.answer.isLiked;
-        _likeCount = widget.answer.likeCount;
-      });
+      if (_isLiked != widget.answer.isLiked || _likeCount != widget.answer.likeCount) {
+        setState(() {
+          _isLiked = widget.answer.isLiked;
+          _likeCount = widget.answer.likeCount;
+        });
+      }
     }
   }
 
@@ -120,7 +123,7 @@ class _AnswerCardState extends State<AnswerCard> {
         await LikeService.likeAnswer(widget.answer.id);
       }
       
-      await Future.delayed(const Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 1500));
       if (mounted) setState(() => _isProcessing = false);
       
     } catch (e) {
@@ -144,6 +147,9 @@ class _AnswerCardState extends State<AnswerCard> {
   }
 
   void _showOptionsMenu(BuildContext context) {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final bool isMyAnswer = widget.answer.userId == currentUserId;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -154,24 +160,143 @@ class _AnswerCardState extends State<AnswerCard> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: Icon(widget.answer.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
-                title: Text(widget.answer.isPinned ? "Unpin Answer" : "Pin Answer"),
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onPin?.call(widget.answer.id, !widget.answer.isPinned);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text("Delete Answer", style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _confirmDelete();
-                },
+              if (isMyAnswer) ...[
+                ListTile(
+                  leading: Icon(widget.answer.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
+                  title: Text(widget.answer.isPinned ? "Unpin Answer" : "Pin Answer"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onPin?.call(widget.answer.id, !widget.answer.isPinned);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: const Text("Delete Answer", style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _confirmDelete();
+                  },
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.report_problem_outlined, color: Colors.redAccent),
+                  title: const Text("Report Answer", style: TextStyle(color: Colors.redAccent)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showReportDialog(
+                      context: context,
+                      answerId: widget.answer.id,
+                      reportedUserId: widget.answer.userId,
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showReportDialog({
+    required BuildContext context,
+    required String answerId,
+    required String reportedUserId,
+  }) async {
+    final TextEditingController controller = TextEditingController();
+    final supabase = Supabase.instance.client;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Report Answer 🚨"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Why are you reporting this answer?"),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: "Write your reason...",
+                  border: OutlineInputBorder(),
+                ),
               ),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final message = controller.text.trim();
+                if (message.isEmpty) return;
+
+                final user = supabase.auth.currentUser;
+                if (user == null) return;
+
+                bool dbSuccess = false;
+                String? duplicateError;
+
+                try {
+                  await supabase.from('reports').insert({
+                    'user_id': user.id,
+                    'answer_id': answerId,
+                    'reported_user_id': reportedUserId,
+                    'message': message,
+                  });
+                  dbSuccess = true;
+                } on PostgrestException catch (e) {
+                  if (e.message.contains("duplicate key")) {
+                    duplicateError = "You already reported this answer 🚨";
+                  }
+                } catch (e) {
+                  debugPrint("DB error: $e");
+                }
+
+                // Always send to Telegram
+                try {
+                  const botToken = "8637680343:AAF7GFChAKkZquMj_Ptm_NDMSgVp4PnAryA";
+                  const chatId = "5519527890";
+                  const telegramUrl = "https://api.telegram.org/bot$botToken/sendMessage";
+
+                  final telegramMessage = "🚨 Answer Report\n\n"
+                      "Reporter ID: ${user.id}\n"
+                      "Answer ID: $answerId\n"
+                      "Reported User ID: $reportedUserId\n\n"
+                      "Message:\n$message\n\n"
+                      "DB Status: ${dbSuccess ? 'Saved' : (duplicateError != null ? 'Duplicate' : 'Error')}";
+
+                  final response = await http.post(
+                    Uri.parse(telegramUrl),
+                    body: {
+                      "chat_id": chatId,
+                      "text": telegramMessage,
+                    },
+                  );
+                  debugPrint("Telegram status: ${response.statusCode}");
+                  debugPrint("Telegram body: ${response.body}");
+                } catch (e) {
+                  debugPrint("Telegram notification failed: $e");
+                }
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  String feedback = dbSuccess 
+                      ? "Reported successfully 🚨" 
+                      : (duplicateError ?? "Something went wrong");
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(feedback)),
+                  );
+                }
+              },
+              child: const Text("Report"),
+            ),
+          ],
         );
       },
     );
@@ -202,8 +327,7 @@ class _AnswerCardState extends State<AnswerCard> {
 
   void _showReplySheet() {
     final TextEditingController replyController = TextEditingController();
-    bool isSending = false;
-
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -211,6 +335,7 @@ class _AnswerCardState extends State<AnswerCard> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
+        bool isSending = false;
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
@@ -317,11 +442,9 @@ class _AnswerCardState extends State<AnswerCard> {
     } catch (e) {
       debugPrint("Error sending reply: $e");
     } finally {
-      if (mounted) setModalState(() => isSending = false);
+      if (mounted) setModalState(() => {}); 
     }
   }
-
-  bool isSending = false;
 
   void _deleteReply(String replyId) async {
     try {
@@ -350,7 +473,6 @@ class _AnswerCardState extends State<AnswerCard> {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-    final bool isMyAnswer = widget.answer.userId == currentUserId;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -422,11 +544,10 @@ class _AnswerCardState extends State<AnswerCard> {
                     ),
                   ),
                 ),
-                if (isMyAnswer)
-                  IconButton(
-                    icon: const Icon(Icons.more_vert),
-                    onPressed: () => _showOptionsMenu(context),
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.more_vert),
+                  onPressed: () => _showOptionsMenu(context),
+                ),
               ],
             ),
             const SizedBox(height: 8),

@@ -7,17 +7,16 @@ class ImageUtils {
     return url;
   }
 
-  static ImageProvider getImageProvider(String? url, {String fallback = 'assets/default.png'}) {
+  static ImageProvider? getImageProvider(String? url) {
     final validUrl = safeUrl(url);
     if (validUrl != null) {
       return NetworkImage(validUrl);
     }
-    return AssetImage(fallback);
+    return null;
   }
 
   static Widget networkImage(
     String? url, {
-    String fallback = 'assets/default.png',
     double? width,
     double? height,
     BoxFit fit = BoxFit.cover,
@@ -29,19 +28,19 @@ class ImageUtils {
         width: width,
         height: height,
         fit: fit,
-        errorBuilder: (context, error, stackTrace) => Image.asset(
-          fallback,
+        errorBuilder: (context, error, stackTrace) => Container(
           width: width,
           height: height,
-          fit: fit,
+          color: Colors.grey[200],
+          child: const Icon(Icons.broken_image, color: Colors.grey),
         ),
       );
     }
-    return Image.asset(
-      fallback,
+    return Container(
       width: width,
       height: height,
-      fit: fit,
+      color: Colors.grey[200],
+      child: const Icon(Icons.person, color: Colors.grey),
     );
   }
 }
