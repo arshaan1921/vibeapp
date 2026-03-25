@@ -100,7 +100,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: const Text(
-                "V1BE ©  2026 Arshaan Khan",
+                "copyright ©  2026 V1be",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white70,
