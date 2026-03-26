@@ -7,6 +7,7 @@ import 'premium.dart';
 import 'blocked_users_screen.dart';
 import 'report_problem_screen.dart';
 import 'booster_pack_screen.dart';
+import 'delete_account_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -292,30 +293,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
                             ),
                             onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (_) => AlertDialog(
-                                  title: const Text("Delete Account"),
-                                  content: const Text(
-                                    "This action is permanent. Are you sure you want to delete your account?",
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text("Cancel"),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                        deleteAccount();
-                                      },
-                                      child: const Text(
-                                        "Delete",
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const DeleteAccountScreen()),
                               );
                             },
                           ),
