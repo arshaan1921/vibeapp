@@ -68,7 +68,11 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
             column: 'user_id',
             value: user.id,
           ),
-          callback: (payload) => fetchLikeNotificationsCount(),
+          callback: (payload) {
+            // 🚨 FIX: Ignore your own answers in realtime
+            if (payload.newRecord['type'] == 'answer' && payload.newRecord['source_user'] == user.id) return;
+            fetchLikeNotificationsCount();
+          },
         )
         .onPostgresChanges(
           event: PostgresChangeEvent.update,
@@ -109,26 +113,30 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
           .eq('type', 'like')
           .eq('seen', false);
 
-      // Count unread answer notifications
+      // Count unread answer notifications (excluding own answers)
       final answersRes = await supabase
           .from('notifications')
           .select('id')
           .eq('user_id', user.id)
           .eq('type', 'answer')
-          .eq('seen', false);
+          .eq('seen', false)
+          .neq('source_user', user.id); // 🚨 FIX
 
-      // Count pending questions
+      // Count pending questions (using existence of answers)
       final questionsRes = await supabase
           .from('questions')
-          .select('id')
-          .eq('to_user', user.id)
-          .eq('answered', false);
+          .select('id, answers(id)')
+          .eq('to_user', user.id);
+
+      final filteredQuestions = (questionsRes as List).where((q) {
+        return q['answers'] == null || (q['answers'] as List).isEmpty;
+      }).toList();
 
       if (mounted) {
         setState(() {
           likesCount = (likesRes as List).length;
           answersCount = (answersRes as List).length;
-          questionsCount = (questionsRes as List).length;
+          questionsCount = filteredQuestions.length;
         });
       }
     } catch (e) {

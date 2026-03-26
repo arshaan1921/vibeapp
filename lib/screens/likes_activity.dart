@@ -42,6 +42,8 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> {
   Future<void> _loadData() async {
     await blockService.refreshBlockedList();
     await _fetchLikes();
+    // Mark as read immediately when screen opens
+    await markLikesAsRead();
   }
 
   void _subscribeToRealtime() {
@@ -84,6 +86,8 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> {
                 _likes.removeWhere((item) => item['id'] == newLike['id']);
                 _likes.insert(0, newLike);
               });
+              // Automatically mark new incoming like as read if we are on this screen
+              markLikesAsRead();
             }
           } catch (e) {
             debugPrint("Error fetching profile for realtime like: $e");
@@ -124,7 +128,7 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> {
           .eq('type', 'like')
           .eq('seen', false);
     } catch (e) {
-      debugPrint("Error marking as read on exit: $e");
+      debugPrint("Error marking as read: $e");
     }
   }
 
@@ -207,87 +211,78 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return PopScope(
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-        await markLikesAsRead();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text("LIKES"),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-            onPressed: () async {
-              await markLikesAsRead();
-              if (mounted) Navigator.pop(context);
-            },
-          ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("LIKES"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
         ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _fetchLikes,
-                child: _likes.isEmpty
-                    ? Center(
-                        child: Text("No likes yet.", 
-                          style: TextStyle(color: theme.textTheme.bodySmall?.color)),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: _likes.length,
-                        separatorBuilder: (context, index) => Divider(height: 1, color: theme.dividerColor),
-                        itemBuilder: (context, index) {
-                          final item = _likes[index];
-                          final sender = item['profiles'] as Map<String, dynamic>?;
-                          final username = sender?['username'] ?? "User";
-                          final avatarUrl = sender?['avatar_url'];
-                          
-                          // New notifications highlighted
-                          final bool isNew = item['seen'] == false;
-
-                          return Container(
-                            color: isNew 
-                              ? (isDark ? Colors.blueAccent.withOpacity(0.1) : const Color(0xFFEAF3FF)) 
-                              : Colors.transparent,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                radius: 22,
-                                backgroundColor: Colors.grey.withOpacity(0.2),
-                                backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
-                                child: (avatarUrl == null || avatarUrl == '') ? Icon(Icons.person, color: theme.iconTheme.color) : null,
-                              ),
-                              title: RichText(
-                                text: TextSpan(
-                                  style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 14),
-                                  children: [
-                                    TextSpan(
-                                      text: "@$username",
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                    const TextSpan(text: " liked your answer"),
-                                  ],
-                                ),
-                              ),
-                              subtitle: Text(
-                                _formatTime(item['created_at']),
-                                style: TextStyle(fontSize: 11, color: theme.textTheme.bodySmall?.color),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => AnswerViewScreen(
-                                      answerId: item['source_id'].toString(),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
-              ),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _fetchLikes,
+              child: _likes.isEmpty
+                  ? Center(
+                      child: Text("No likes yet.", 
+                        style: TextStyle(color: theme.textTheme.bodySmall?.color)),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _likes.length,
+                      separatorBuilder: (context, index) => Divider(height: 1, color: theme.dividerColor),
+                      itemBuilder: (context, index) {
+                        final item = _likes[index];
+                        final sender = item['profiles'] as Map<String, dynamic>?;
+                        final username = sender?['username'] ?? "User";
+                        final avatarUrl = sender?['avatar_url'];
+                        
+                        // New notifications highlighted
+                        final bool isNew = item['seen'] == false;
+
+                        return Container(
+                          color: isNew 
+                            ? (isDark ? Colors.blueAccent.withOpacity(0.1) : const Color(0xFFEAF3FF)) 
+                            : Colors.transparent,
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Colors.grey.withOpacity(0.2),
+                              backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
+                              child: (avatarUrl == null || avatarUrl == '') ? Icon(Icons.person, color: theme.iconTheme.color) : null,
+                            ),
+                            title: RichText(
+                              text: TextSpan(
+                                style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 14),
+                                children: [
+                                  TextSpan(
+                                    text: "@$username",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  const TextSpan(text: " liked your answer"),
+                                ],
+                              ),
+                            ),
+                            subtitle: Text(
+                              _formatTime(item['created_at']),
+                              style: TextStyle(fontSize: 11, color: theme.textTheme.bodySmall?.color),
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AnswerViewScreen(
+                                    answerId: item['source_id'].toString(),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }

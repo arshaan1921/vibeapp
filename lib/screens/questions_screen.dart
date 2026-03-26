@@ -47,24 +47,28 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
   Future<void> _fetchQuestions() async {
     try {
       final supabase = Supabase.instance.client;
-      final currentUser = supabase.auth.currentUser;
-
-      if (currentUser == null) return;
+      final userId = supabase.auth.currentUser!.id;
 
       final response = await supabase
           .from('questions')
-          .select('id, text, image_url, from_user, is_anonymous, created_at, profiles:from_user(username)')
-          .eq('to_user', currentUser.id)
-          .eq('answered', false)
-          .order('created_at', ascending: false);
+          .select('*, answers(id), profiles:from_user(username)')
+          .eq('to_user', userId);
+
+      final filtered = (response as List).where((q) {
+        return q['answers'] == null || (q['answers'] as List).isEmpty;
+      }).toList();
 
       if (mounted) {
         setState(() {
           // Filter out questions from blocked users
-          _questions = List<Map<String, dynamic>>.from(response).where((q) {
+          _questions = List<Map<String, dynamic>>.from(filtered).where((q) {
             final fromUserId = q['from_user'];
             return fromUserId == null || !blockService.isBlocked(fromUserId);
           }).toList();
+          
+          // Sort by created_at descending
+          _questions.sort((a, b) => (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''));
+          
           _isLoading = false;
         });
       }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/question.dart';
+import '../services/notification_service.dart';
 
 class AnswerScreen extends StatefulWidget {
   final Question question;
@@ -20,23 +21,27 @@ class _AnswerScreenState extends State<AnswerScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.question.imageUrl == null || widget.question.imageUrl!.isEmpty) {
-      _loadFullQuestion();
-    } else {
-      _fullQuestion = {
-        'question_text': widget.question.text,
-        'image_url': widget.question.imageUrl,
-      };
-    }
+    _loadFullQuestion();
   }
 
   Future<void> _loadFullQuestion() async {
     setState(() => _isLoadingQuestion = true);
     try {
-      final data = await fetchQuestionById(widget.question.id);
+      final supabase = Supabase.instance.client;
+      final data = await supabase
+          .from('questions')
+          .select('id, text, image_url, from_user')
+          .eq('id', widget.question.id)
+          .single();
+
       if (mounted) {
         setState(() {
-          _fullQuestion = data;
+          _fullQuestion = {
+            'id': data['id'],
+            'question_text': data['text'],
+            'image_url': data['image_url'],
+            'from_user': data['from_user'],
+          };
           _isLoadingQuestion = false;
         });
       }
@@ -44,22 +49,6 @@ class _AnswerScreenState extends State<AnswerScreen> {
       debugPrint("Error loading question: $e");
       if (mounted) setState(() => _isLoadingQuestion = false);
     }
-  }
-
-  Future<Map<String, dynamic>> fetchQuestionById(String id) async {
-    final supabase = Supabase.instance.client;
-    final data = await supabase
-        .from('questions')
-        .select('id, text, image_url')
-        .eq('id', id)
-        .single();
-    
-    // Remap 'text' to 'question_text' to match request requirements
-    return {
-      'id': data['id'],
-      'question_text': data['text'],
-      'image_url': data['image_url'],
-    };
   }
 
   @override
@@ -85,23 +74,49 @@ class _AnswerScreenState extends State<AnswerScreen> {
       return;
     }
 
+    if (_fullQuestion == null) return;
+
     setState(() => _isSubmitting = true);
 
     try {
       // 1. Insert answer into answers table
-      await Supabase.instance.client.from('answers').insert({
+      final answerResponse = await Supabase.instance.client.from('answers').insert({
         'question_id': widget.question.id,
         'user_id': user.id,
         'answer_text': answerController.text.trim(),
-      });
+      }).select().single();
 
       // 2. Mark question as answered
       final questionId = widget.question.id;
-      
+
       await Supabase.instance.client
           .from('questions')
           .update({'answered': true})
           .eq('id', questionId);
+
+      // 3. Send notification to the person who asked the question
+      final askerId = _fullQuestion!['from_user'];
+      if (askerId != null && askerId != user.id) {
+        // Create notification record in DB
+        await Supabase.instance.client.from('notifications').insert({
+          'user_id': askerId,
+          'source_user': user.id,
+          'type': 'answer',
+          'source_id': answerResponse['id'],
+          'seen': false,
+        });
+
+        // Send push notification
+        await NotificationService.sendNotification(
+          userId: askerId,
+          title: "New Answer 💬",
+          body: "Someone answered your question",
+          data: {
+            'type': 'answer',
+            'answer_id': answerResponse['id'],
+          },
+        );
+      }
 
       if (mounted) {
         Navigator.pop(context, true);
@@ -122,7 +137,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
     final theme = Theme.of(context);
     final questionText = _fullQuestion?['question_text'] ?? widget.question.text;
     final imageUrl = _fullQuestion?['image_url'];
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -140,8 +155,8 @@ class _AnswerScreenState extends State<AnswerScreen> {
             Text(
               "QUESTION",
               style: TextStyle(
-                fontSize: 12, 
-                fontWeight: FontWeight.bold, 
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
                 color: theme.textTheme.bodySmall?.color ?? Colors.grey,
                 letterSpacing: 1.1,
               ),
@@ -165,7 +180,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
                       Text(
                         questionText,
                         style: TextStyle(
-                          fontWeight: FontWeight.w800, 
+                          fontWeight: FontWeight.w800,
                           fontSize: 16,
                           color: theme.textTheme.bodyLarge?.color,
                         ),
@@ -210,8 +225,8 @@ class _AnswerScreenState extends State<AnswerScreen> {
             Text(
               "YOUR ANSWER",
               style: TextStyle(
-                fontSize: 12, 
-                fontWeight: FontWeight.bold, 
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
                 color: theme.textTheme.bodySmall?.color ?? Colors.grey,
                 letterSpacing: 1.1,
               ),
@@ -247,9 +262,9 @@ class _AnswerScreenState extends State<AnswerScreen> {
                 ),
                 child: _isSubmitting
                     ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text("POST ANSWER", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
               ),
             ),

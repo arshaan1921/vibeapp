@@ -36,7 +36,7 @@ class AnswerModel {
   factory AnswerModel.fromMap(Map<String, dynamic> map, {bool? isLiked, int? likeCount}) {
     final profile = map['profiles'];
     final question = map['questions'];
-    
+
     // Handle nested asker profile
     final askerData = question?['asker'] ?? question?['profiles'];
     Map<String, dynamic>? asker;

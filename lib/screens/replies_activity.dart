@@ -35,7 +35,9 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
   void _onBlocksChanged() {
     if (mounted) {
       setState(() {
-        _notifications = _notifications.where((n) => !blockService.isBlocked(n['source_user'])).toList();
+        _notifications = _notifications
+            .where((n) => !blockService.isBlocked(n['source_user']))
+            .toList();
       });
     }
   }
@@ -64,12 +66,15 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
       callback: (payload) async {
         if (payload.newRecord['type'] != 'answer') return;
 
+        final senderId = payload.newRecord['source_user'];
+
+        // 🚨 FIX: Ignore your own answers
+        if (senderId == user.id) return;
+
+        if (blockService.isBlocked(senderId)) return;
+
         if (payload.eventType == PostgresChangeEvent.insert) {
           try {
-            // Fetch profile for the sender
-            final senderId = payload.newRecord['source_user'];
-            if (blockService.isBlocked(senderId)) return;
-
             final profileRes = await supabase
                 .from('profiles')
                 .select('id, username, avatar_url')
@@ -78,30 +83,38 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
 
             if (mounted) {
               setState(() {
-                final newNotification = Map<String, dynamic>.from(payload.newRecord);
+                final newNotification =
+                Map<String, dynamic>.from(payload.newRecord);
                 newNotification['profiles'] = profileRes;
-                
-                // Prevent duplicates
-                _notifications.removeWhere((item) => item['id'] == newNotification['id']);
+
+                _notifications.removeWhere(
+                        (item) => item['id'] == newNotification['id']);
                 _notifications.insert(0, newNotification);
               });
             }
           } catch (e) {
-            debugPrint("Error fetching profile for realtime answer: $e");
+            debugPrint("Realtime profile fetch error: $e");
           }
-        } else if (payload.eventType == PostgresChangeEvent.update) {
+        }
+
+        if (payload.eventType == PostgresChangeEvent.update) {
           if (mounted) {
             setState(() {
-              final index = _notifications.indexWhere((item) => item['id'] == payload.newRecord['id']);
+              final index = _notifications.indexWhere(
+                      (item) => item['id'] == payload.newRecord['id']);
               if (index != -1) {
-                _notifications[index]['seen'] = payload.newRecord['seen'];
+                _notifications[index]['seen'] =
+                payload.newRecord['seen'];
               }
             });
           }
-        } else if (payload.eventType == PostgresChangeEvent.delete) {
+        }
+
+        if (payload.eventType == PostgresChangeEvent.delete) {
           if (mounted) {
             setState(() {
-              _notifications.removeWhere((item) => item['id'] == payload.oldRecord['id']);
+              _notifications.removeWhere(
+                      (item) => item['id'] == payload.oldRecord['id']);
             });
           }
         }
@@ -122,7 +135,7 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
           .eq('type', 'answer')
           .eq('seen', false);
     } catch (e) {
-      debugPrint("Error marking as seen on exit: $e");
+      debugPrint("Error marking seen: $e");
     }
   }
 
@@ -134,7 +147,6 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
 
       setState(() => _isLoading = true);
 
-      // Step 1: Fetch notifications only
       final List<dynamic> notifications = await supabase
           .from('notifications')
           .select()
@@ -143,49 +155,47 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
           .order('created_at', ascending: false);
 
       if (notifications.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _notifications = [];
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _notifications = [];
+          _isLoading = false;
+        });
         return;
       }
 
-      // Step 2: Extract all source_user ids
       final List<String> userIds = notifications
           .where((n) => n['source_user'] != null)
           .map((n) => n['source_user'] as String)
           .toSet()
           .toList();
 
-      // Step 3: Fetch sender profiles
       Map<String, dynamic> profileMap = {};
+
       if (userIds.isNotEmpty) {
         final List<dynamic> profiles = await supabase
             .from('profiles')
             .select('id, username, avatar_url')
             .inFilter('id', userIds);
+
         profileMap = {for (var p in profiles) p['id']: p};
       }
 
-      // Step 4: Merge the profile data into the notifications list
+      // 🚨 FINAL FIX HERE
       final List<Map<String, dynamic>> mergedNotifications = notifications
-          .where((n) => !blockService.isBlocked(n['source_user']))
+          .where((n) =>
+      !blockService.isBlocked(n['source_user']) &&
+          n['source_user'] != user.id) // ❌ remove your own answers
           .map((n) {
-            final notification = Map<String, dynamic>.from(n);
-            notification['profiles'] = profileMap[n['source_user']];
-            return notification;
-          }).toList();
+        final notification = Map<String, dynamic>.from(n);
+        notification['profiles'] = profileMap[n['source_user']];
+        return notification;
+      }).toList();
 
-      if (mounted) {
-        setState(() {
-          _notifications = mergedNotifications;
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _notifications = mergedNotifications;
+        _isLoading = false;
+      });
     } catch (e) {
-      debugPrint("Error fetching answer notifications: $e");
+      debugPrint("Fetch error: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -216,67 +226,91 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _fetchNotifications,
-              child: _notifications.isEmpty
-                  ? Center(
-                      child: Text("No answer notifications yet.", 
-                        style: TextStyle(color: theme.textTheme.bodySmall?.color)),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _notifications.length,
-                      separatorBuilder: (context, index) => Divider(height: 1, color: theme.dividerColor),
-                      itemBuilder: (context, index) {
-                        final item = _notifications[index];
-                        final sender = item['profiles'] as Map<String, dynamic>?;
-                        final username = sender?['username'] ?? "User";
-                        final avatarUrl = sender?['avatar_url'];
-                        
-                        // New notifications highlighted
-                        final bool isNew = item['seen'] == false;
+        onRefresh: _fetchNotifications,
+        child: _notifications.isEmpty
+            ? Center(
+          child: Text(
+            "No answer notifications yet.",
+            style: TextStyle(
+                color: theme.textTheme.bodySmall?.color),
+          ),
+        )
+            : ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: _notifications.length,
+          separatorBuilder: (_, __) =>
+              Divider(height: 1, color: theme.dividerColor),
+          itemBuilder: (context, index) {
+            final item = _notifications[index];
+            final sender =
+            item['profiles'] as Map<String, dynamic>?;
+            final username = sender?['username'] ?? "User";
+            final avatarUrl = sender?['avatar_url'];
 
-                        return Container(
-                          color: isNew 
-                            ? (isDark ? Colors.blueAccent.withOpacity(0.1) : const Color(0xFFEAF3FF)) 
-                            : Colors.transparent,
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.grey.withOpacity(0.2),
-                              backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
-                              child: (avatarUrl == null || avatarUrl == '') ? Icon(Icons.person, color: theme.iconTheme.color) : null,
-                            ),
-                            title: RichText(
-                              text: TextSpan(
-                                style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 14),
-                                children: [
-                                  TextSpan(
-                                    text: "@$username",
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  const TextSpan(text: " answered your question"),
-                                ],
-                              ),
-                            ),
-                            subtitle: Text(
-                              _formatTime(item['created_at']),
-                              style: TextStyle(fontSize: 11, color: theme.textTheme.bodySmall?.color),
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AnswerViewScreen(
-                                    answerId: item['source_id'].toString(),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        );
-                      },
+            final bool isNew = item['seen'] == false;
+
+            return Container(
+              color: isNew
+                  ? (isDark
+                  ? Colors.blueAccent.withOpacity(0.1)
+                  : const Color(0xFFEAF3FF))
+                  : Colors.transparent,
+              child: ListTile(
+                leading: CircleAvatar(
+                  radius: 22,
+                  backgroundColor:
+                  Colors.grey.withOpacity(0.2),
+                  backgroundImage: (avatarUrl != null &&
+                      avatarUrl != '')
+                      ? NetworkImage(avatarUrl)
+                      : null,
+                  child: (avatarUrl == null ||
+                      avatarUrl == '')
+                      ? Icon(Icons.person,
+                      color: theme.iconTheme.color)
+                      : null,
+                ),
+                title: RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                        color:
+                        theme.textTheme.bodyLarge?.color,
+                        fontSize: 14),
+                    children: [
+                      TextSpan(
+                        text: "@$username",
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const TextSpan(
+                          text:
+                          " answered your question"),
+                    ],
+                  ),
+                ),
+                subtitle: Text(
+                  _formatTime(item['created_at']),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color:
+                      theme.textTheme.bodySmall?.color),
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AnswerViewScreen(
+                        answerId:
+                        item['source_id'].toString(),
+                      ),
                     ),
-            ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

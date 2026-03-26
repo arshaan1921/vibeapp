@@ -59,7 +59,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
             .select('answer_id')
             .eq('user_id', user.id)
             .eq('answer_id', widget.answerId);
-        
+
         if ((likesRes as List).isNotEmpty) {
           _likedAnswerIds.add(widget.answerId);
         }
@@ -108,7 +108,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
 
   Future<void> _toggleLike() async {
     if (_answer == null) return;
-    
+
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
     if (user == null) return;
@@ -306,217 +306,217 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _answer == null
-              ? const Center(child: Text("Answer not found"))
-              : Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Card(
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: Colors.grey[200]!),
+          ? const Center(child: Text("Answer not found"))
+          : Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey[200]!),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => _navigateToProfile(_answer!['profiles']?['id']),
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: PremiumUtils.buildProfileRing(_answer!['profiles']?['premium_plan']),
+                                  child: CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: Colors.grey[300],
+                                    backgroundImage: (_answer!['profiles']?['avatar_url'] != null && _answer!['profiles']?['avatar_url'] != '') ? NetworkImage(_answer!['profiles']?['avatar_url']) : null,
+                                    child: (_answer!['profiles']?['avatar_url'] == null || _answer!['profiles']?['avatar_url'] == '') ? const Icon(Icons.person, size: 20, color: Colors.white) : null,
+                                  ),
+                                ),
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _navigateToProfile(_answer!['profiles']?['id']),
+                                  child: Row(
+                                    children: [
+                                      PremiumUtils.buildBadge(_answer!['profiles']?['premium_plan']),
+                                      Flexible(
+                                        child: Text(
+                                          "@${_answer!['profiles']?['username'] ?? "User"}",
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _buildAskerText(),
+                          const SizedBox(height: 4),
+                          Text(
+                            _answer!['questions']?['text'] ?? "",
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _answer!['answer_text'] ?? "",
+                            style: const TextStyle(fontSize: 14, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 16),
+                          const Divider(height: 1),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: _toggleLike,
+                                child: Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        GestureDetector(
-                                          onTap: () => _navigateToProfile(_answer!['profiles']?['id']),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(2),
-                                            decoration: PremiumUtils.buildProfileRing(_answer!['profiles']?['premium_plan']),
-                                            child: CircleAvatar(
-                                              radius: 18,
-                                              backgroundColor: Colors.grey[300],
-                                              backgroundImage: (_answer!['profiles']?['avatar_url'] != null && _answer!['profiles']?['avatar_url'] != '') ? NetworkImage(_answer!['profiles']?['avatar_url']) : null,
-                                              child: (_answer!['profiles']?['avatar_url'] == null || _answer!['profiles']?['avatar_url'] == '') ? const Icon(Icons.person, size: 20, color: Colors.white) : null,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: GestureDetector(
-                                            onTap: () => _navigateToProfile(_answer!['profiles']?['id']),
-                                            child: Row(
-                                              children: [
-                                                PremiumUtils.buildBadge(_answer!['profiles']?['premium_plan']),
-                                                Flexible(
-                                                  child: Text(
-                                                    "@${_answer!['profiles']?['username'] ?? "User"}",
-                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                    Icon(
+                                      _likedAnswerIds.contains(widget.answerId) ? Icons.favorite : Icons.favorite_border,
+                                      color: _likedAnswerIds.contains(widget.answerId) ? Colors.red : Colors.grey,
+                                      size: 20,
                                     ),
-                                    const SizedBox(height: 8),
-                                    _buildAskerText(),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(width: 6),
                                     Text(
-                                      _answer!['questions']?['text'] ?? "",
-                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      _answer!['answer_text'] ?? "",
-                                      style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    const Divider(height: 1),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        GestureDetector(
-                                          onTap: _toggleLike,
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                _likedAnswerIds.contains(widget.answerId) ? Icons.favorite : Icons.favorite_border,
-                                                color: _likedAnswerIds.contains(widget.answerId) ? Colors.red : Colors.grey,
-                                                size: 20,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                '${_answer!['likes_count'] ?? 0}',
-                                                style: const TextStyle(color: Colors.grey, fontSize: 13),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 24),
-                                        GestureDetector(
-                                          onTap: _showReplySheet,
-                                          child: const Row(
-                                            children: [
-                                              Icon(Icons.chat_bubble_outline, size: 20, color: Colors.grey),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                "Reply",
-                                                style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        Text(
-                                          _formatTimeAgo(_answer!['created_at']),
-                                          style: const TextStyle(color: Colors.grey, fontSize: 11),
-                                        ),
-                                      ],
+                                      '${_answer!['likes_count'] ?? 0}',
+                                      style: const TextStyle(color: Colors.grey, fontSize: 13),
                                     ),
                                   ],
                                 ),
                               ),
-                            ),
-                            
-                            const SizedBox(height: 16),
-                            if (_replies.isNotEmpty) ...[
+                              const SizedBox(width: 24),
                               GestureDetector(
-                                onTap: () => setState(() => _showReplies = !_showReplies),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Text(
-                                    _showReplies ? "Hide replies" : "View replies (${_replies.length})",
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor, fontSize: 13),
-                                  ),
+                                onTap: _showReplySheet,
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.chat_bubble_outline, size: 20, color: Colors.grey),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "Reply",
+                                      style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              if (_showReplies) ...[
-                                const SizedBox(height: 12),
-                                if (_isLoadingReplies)
-                                  const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))))
-                                else
-                                  ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _replies.length,
-                                    itemBuilder: (context, index) {
-                                      final reply = _replies[index];
-                                      final profile = reply['profiles'];
-                                      return Padding(
-                                        padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                              const Spacer(),
+                              Text(
+                                _formatTimeAgo(_answer!['created_at']),
+                                style: const TextStyle(color: Colors.grey, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  if (_replies.isNotEmpty) ...[
+                    GestureDetector(
+                      onTap: () => setState(() => _showReplies = !_showReplies),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          _showReplies ? "Hide replies" : "View replies (${_replies.length})",
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    if (_showReplies) ...[
+                      const SizedBox(height: 12),
+                      if (_isLoadingReplies)
+                        const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))))
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _replies.length,
+                          itemBuilder: (context, index) {
+                            final reply = _replies[index];
+                            final profile = reply['profiles'];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _navigateToProfile(profile?['id']),
+                                    child: CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: Colors.grey[200],
+                                      backgroundImage: (profile?['avatar_url'] != null && profile?['avatar_url'] != '') ? NetworkImage(profile['avatar_url']) : null,
+                                      child: (profile?['avatar_url'] == null || profile?['avatar_url'] == '') ? const Icon(Icons.person, size: 16) : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
                                             GestureDetector(
                                               onTap: () => _navigateToProfile(profile?['id']),
-                                              child: CircleAvatar(
-                                                radius: 16,
-                                                backgroundColor: Colors.grey[200],
-                                                backgroundImage: (profile?['avatar_url'] != null && profile?['avatar_url'] != '') ? NetworkImage(profile['avatar_url']) : null,
-                                                child: (profile?['avatar_url'] == null || profile?['avatar_url'] == '') ? const Icon(Icons.person, size: 16) : null,
+                                              child: Text(
+                                                "@${profile?['username'] ?? 'User'}",
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                               ),
                                             ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    children: [
-                                                      GestureDetector(
-                                                        onTap: () => _navigateToProfile(profile?['id']),
-                                                        child: Text(
-                                                          "@${profile?['username'] ?? 'User'}",
-                                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      Text(
-                                                        _formatTimeAgo(reply['created_at']),
-                                                        style: const TextStyle(color: Colors.grey, fontSize: 10),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    reply['reply'] ?? "",
-                                                    style: const TextStyle(fontSize: 13),
-                                                  ),
-                                                ],
-                                              ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              _formatTimeAgo(reply['created_at']),
+                                              style: const TextStyle(color: Colors.grey, fontSize: 10),
                                             ),
                                           ],
                                         ),
-                                      );
-                                    },
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          reply['reply'] ?? "",
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                              ],
-                            ] else if (!_isLoadingReplies) ...[
-                               const Center(
-                                child: Padding(
-                                  padding: EdgeInsets.all(20.0),
-                                  child: Text("No replies yet.", style: TextStyle(color: Colors.grey)),
-                                ),
-                              )
-                            ],
-                          ],
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    ),
-                    SafeArea(
+                    ],
+                  ] else if (!_isLoadingReplies) ...[
+                    const Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: PrimaryButton(
-                          text: "Write a reply...",
-                          onPressed: _showReplySheet,
-                        ),
+                        padding: EdgeInsets.all(20.0),
+                        child: Text("No replies yet.", style: TextStyle(color: Colors.grey)),
                       ),
-                    ),
+                    )
                   ],
-                ),
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: PrimaryButton(
+                text: "Write a reply...",
+                onPressed: _showReplySheet,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -524,7 +524,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
     final question = _answer!['questions'];
     final isAnonymous = question?['is_anonymous'] ?? false;
     final askerData = question?['asker'];
-    
+
     Map<String, dynamic>? asker;
     if (askerData is List && askerData.isNotEmpty) {
       asker = askerData.first;

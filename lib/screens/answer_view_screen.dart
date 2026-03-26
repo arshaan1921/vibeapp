@@ -67,7 +67,7 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
             likes_count,
             user_id,
             profiles:profiles!answers_user_id_fkey(id, username, avatar_url, premium_plan),
-            questions:questions!answers_question_id_fkey(text)
+            questions:questions!answers_question_id_fkey(text, image_url)
           ''')
           .eq('id', widget.answerId)
           .single();
@@ -381,6 +381,39 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                                   color: isDark ? Colors.white : Colors.black,
                                 ),
                               ),
+
+                              // QUESTION IMAGE
+                              if (_answer!['questions']?['image_url'] != null) ...[
+                                const SizedBox(height: 10),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    _answer!['questions']['image_url'],
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        height: 150,
+                                        color: isDark ? Colors.white10 : Colors.black12,
+                                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        height: 100,
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: isDark ? Colors.grey[800] : Colors.grey[200],
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+
                               const SizedBox(height: 8),
                               Text(
                                 _answer!['answer_text'] ?? "",
