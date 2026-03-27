@@ -52,43 +52,48 @@ class _PremiumScreenState extends State<PremiumScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  const Text(
-                    "Choose Your Plan",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildPlanCard(
-                    context,
-                    plan: 'green',
-                    title: "Green Plan",
-                    price: "₹99 / month",
-                    features: ["50 questions per day", "Green badge", "Green profile ring"],
-                    months: 1,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildPlanCard(
-                    context,
-                    plan: 'blue',
-                    title: "Blue Plan",
-                    price: "₹249 / 3 months",
-                    features: ["Unlimited questions", "Blue badge", "Blue profile ring"],
-                    months: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildPlanCard(
-                    context,
-                    plan: 'gold',
-                    title: "Gold Plan",
-                    price: "₹799 / year",
-                    features: ["Unlimited questions", "Gold badge", "Gold profile ring", "Priority feed"],
-                    isBestValue: true,
-                    months: 12,
-                  ),
-                ],
+          : SafeArea(
+              bottom: true,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Choose Your Plan",
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildPlanCard(
+                      context,
+                      plan: 'green',
+                      title: "Green Plan",
+                      price: "₹99 / month",
+                      features: ["50 questions per day", "Green badge", "Green profile ring"],
+                      months: 1,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPlanCard(
+                      context,
+                      plan: 'blue',
+                      title: "Blue Plan",
+                      price: "₹249 / 3 months",
+                      features: ["Unlimited questions", "Blue badge", "Blue profile ring"],
+                      months: 3,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPlanCard(
+                      context,
+                      plan: 'gold',
+                      title: "Gold Plan",
+                      price: "₹799 / year",
+                      features: ["Unlimited questions", "Gold badge", "Gold profile ring"],
+                      isBestValue: true,
+                      months: 12,
+                    ),
+                    const SizedBox(height: 100), // Significant bottom padding to avoid nav bar overlap
+                  ],
+                ),
               ),
             ),
     );

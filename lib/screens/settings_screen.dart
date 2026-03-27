@@ -17,12 +17,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool allowAnonymous = true;
-  bool likesNotifications = true;
-  bool newQuestions = true;
-  bool newAnswers = true;
-  bool filterLanguage = true;
-  bool darkMode = false; // Local state for now
   bool _isLoading = true;
 
   @override
@@ -36,96 +30,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (user == null) return;
 
     try {
-      final data = await Supabase.instance.client
-          .from('profiles')
-          .select('allow_anonymous_questions, filter_strong_language, likes_notifications, questions_notifications, answers_notifications')
-          .eq('id', user.id)
-          .single();
-
+      // Just verifying session/user exists since we removed toggle states
       if (mounted) {
         setState(() {
-          allowAnonymous = data['allow_anonymous_questions'] ?? true;
-          filterLanguage = data['filter_strong_language'] ?? true;
-          likesNotifications = data['likes_notifications'] ?? true;
-          newQuestions = data['questions_notifications'] ?? true;
-          newAnswers = data['answers_notifications'] ?? true;
           _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint("Error fetching settings: $e");
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _updateSetting(String column, bool value) async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
-
-    try {
-      await Supabase.instance.client
-          .from('profiles')
-          .update({column: value})
-          .eq('id', user.id);
-    } catch (e) {
-      debugPrint("Error updating $column: $e");
-    }
-  }
-
-  Future<void> deleteAccount() async {
-    try {
-      final supabase = Supabase.instance.client;
-
-      final user = supabase.auth.currentUser;
-
-      if (user == null) {
-        throw Exception("User not logged in");
-      }
-
-      final session = supabase.auth.currentSession;
-
-      if (session == null) {
-        throw Exception("Session not found");
-      }
-
-      final response = await supabase.functions.invoke(
-        'delete-user',
-        headers: {
-          'Authorization': 'Bearer ${session.accessToken}', // 🔥 IMPORTANT
-          'Content-Type': 'application/json',
-        },
-        body: {
-          'user_id': user.id,
-        },
-      );
-
-      if (response.status != 200) {
-        throw Exception(response.data.toString());
-      }
-
-      // ✅ logout after delete
-      await supabase.auth.signOut();
-
-      print("✅ Account deleted");
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Account deleted successfully")),
-        );
-
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-          (route) => false,
-        );
-      }
-    } catch (e) {
-      print("❌ DELETE ERROR: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
-        );
-      }
     }
   }
 
@@ -173,45 +86,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    _buildSectionTitle("INTERACTION"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildToggle("Allow anonymous questions", allowAnonymous, (val) {
-                            setState(() => allowAnonymous = val);
-                            _updateSetting('allow_anonymous_questions', val);
-                          }),
-                          const Divider(),
-                          _buildToggle("Filter strong language", filterLanguage, (val) {
-                            setState(() => filterLanguage = val);
-                            _updateSetting('filter_strong_language', val);
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle("NOTIFICATIONS"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildToggle("Likes notifications", likesNotifications, (val) {
-                            setState(() => likesNotifications = val);
-                            _updateSetting('likes_notifications', val);
-                          }),
-                          const Divider(),
-                          _buildToggle("New questions", newQuestions, (val) {
-                            setState(() => newQuestions = val);
-                            _updateSetting('questions_notifications', val);
-                          }),
-                          const Divider(),
-                          _buildToggle("New answers", newAnswers, (val) {
-                            setState(() => newAnswers = val);
-                            _updateSetting('answers_notifications', val);
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     _buildSectionTitle("PRIVACY"),
                     Card(
                       child: Column(
@@ -228,17 +102,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               context,
                               MaterialPageRoute(builder: (context) => const ReportProblemScreen()),
                             );
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle("DISPLAY"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildToggle("Dark mode", darkMode, (val) {
-                            setState(() => darkMode = val);
                           }),
                         ],
                       ),
@@ -373,28 +236,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const Icon(Icons.chevron_right, size: 20, color: Colors.black12),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildToggle(String title, bool value, ValueChanged<bool> onChanged) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: const Color(0xFF2C4E6E),
-          ),
-        ],
       ),
     );
   }

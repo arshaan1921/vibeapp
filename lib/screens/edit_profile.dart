@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -105,6 +106,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final username = _usernameController.text.trim();
+    
+    if (username.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Username cannot be empty")),
+      );
+      return;
+    }
+
+    final usernameRegex = RegExp(r'^[a-z0-9_]+$');
+    if (!usernameRegex.hasMatch(username)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Username can only contain lowercase letters, numbers, and underscores")),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final user = Supabase.instance.client.auth.currentUser;
@@ -133,7 +151,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // Update Database
       await Supabase.instance.client.from('profiles').update({
         'name': _nameController.text.trim(),
-        'username': _usernameController.text.trim().toLowerCase(),
+        'username': username,
         'bio': _bioController.text.trim(),
         'avatar_url': imageUrl,
       }).eq('id', user.id);
@@ -235,6 +253,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _usernameController,
+                    inputFormatters: [
+                      LowerCaseTextFormatter(),
+                    ],
                     decoration: const InputDecoration(
                       labelText: "Username",
                       fillColor: Colors.white,
@@ -257,5 +278,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
     );
+  }
+}
+
+class LowerCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(text: newValue.text.toLowerCase());
   }
 }

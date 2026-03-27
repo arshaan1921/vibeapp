@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'most_likely_game.dart';
 import 'truth_lie_game.dart';
-import 'would_you_rather_game.dart';
-import 'alphabet_game.dart';
 
 class GamesScreen extends StatelessWidget {
   const GamesScreen({super.key});
@@ -35,26 +33,6 @@ class GamesScreen extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TruthLieLobby()),
-            ),
-          ),
-          _GameCard(
-            title: 'Would You Rather',
-            description: 'Choose between two difficult options.',
-            icon: Icons.compare_arrows_rounded,
-            color: Colors.purpleAccent,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const WouldYouRatherLobby()),
-            ),
-          ),
-          _GameCard(
-            title: 'Alphabet Game',
-            description: 'Word battle! Quick answers or you lose.',
-            icon: Icons.sort_by_alpha_rounded,
-            color: Colors.tealAccent[700]!,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AlphabetLobby()),
             ),
           ),
         ],

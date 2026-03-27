@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/legal_links.dart';
 import '../onboarding/onboarding.dart';
@@ -38,6 +39,14 @@ class _SignupScreenState extends State<SignupScreen> {
     if (email.isEmpty || username.isEmpty || password.isEmpty || name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("All fields are required")),
+      );
+      return;
+    }
+
+    final usernameRegex = RegExp(r'^[a-z0-9_]+$');
+    if (!usernameRegex.hasMatch(username)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Username can only contain lowercase letters, numbers, and underscores")),
       );
       return;
     }
@@ -156,6 +165,9 @@ class _SignupScreenState extends State<SignupScreen> {
               TextField(
                 controller: usernameController,
                 style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                inputFormatters: [
+                  LowerCaseTextFormatter(),
+                ],
                 decoration: InputDecoration(
                   hintText: "Username",
                   hintStyle: TextStyle(color: theme.textTheme.bodySmall?.color),
@@ -266,5 +278,13 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       ),
     );
+  }
+}
+
+class LowerCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(text: newValue.text.toLowerCase());
   }
 }
