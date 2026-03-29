@@ -83,7 +83,7 @@ class _FeedScreenState extends State<FeedScreen> {
               setState(() {
                 _feedItems.removeWhere((item) => item.id == newAnswer.id);
                 _feedItems.insert(0, newAnswer);
-                _sortFeed();
+                // No automatic sort here to keep the new one at top
               });
             }
           } catch (_) {}
@@ -146,10 +146,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _sortFeed() {
     _feedItems.sort((a, b) {
-      final planA = a.premiumPlan ?? 'free';
-      final planB = b.premiumPlan ?? 'free';
-      if (planA == 'gold' && planB != 'gold') return -1;
-      if (planA != 'gold' && planB == 'gold') return 1;
+      // Prioritize by creation time (descending) so new content is first
       return b.createdAt.compareTo(a.createdAt);
     });
   }

@@ -120,6 +120,7 @@ class _TruthLieScreenState extends State<TruthLieScreen> {
   }
 
   void _showCreateDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -138,6 +139,17 @@ class _TruthLieScreenState extends State<TruthLieScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.grey,
+                        borderRadius: const BorderRadius.all(Radius.circular(2)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   const Text('Create 2 Truths & 1 Lie', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 20),
                   _buildStatementInput('Statement 1', _s1Controller),
@@ -160,7 +172,7 @@ class _TruthLieScreenState extends State<TruthLieScreen> {
                     )).toList(),
                   ),
                   const SizedBox(height: 20),
-                  const Text('SHARE WITH FRIENDS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                  Text('SHARE WITH FRIENDS', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.grey)),
                   TextButton.icon(
                     onPressed: () async {
                       final res = await Supabase.instance.client.from('profiles').select().limit(20);
@@ -212,6 +224,7 @@ class _TruthLieScreenState extends State<TruthLieScreen> {
   }
 
   Widget _buildStatementInput(String label, TextEditingController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
@@ -220,11 +233,12 @@ class _TruthLieScreenState extends State<TruthLieScreen> {
         decoration: InputDecoration(
           labelText: label,
           hintText: 'Enter a statement...',
-          labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
-          hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
+          labelStyle: TextStyle(color: isDark ? Colors.white70 : Theme.of(context).textTheme.bodySmall?.color),
+          hintStyle: TextStyle(color: isDark ? Colors.white54 : Theme.of(context).textTheme.bodySmall?.color),
           filled: true,
-          fillColor: Theme.of(context).cardColor,
+          fillColor: isDark ? const Color(0xFF1E1E1E) : Theme.of(context).cardColor,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: isDark ? const BorderSide(color: Colors.white12) : BorderSide.none),
         ),
       ),
     );
@@ -233,11 +247,13 @@ class _TruthLieScreenState extends State<TruthLieScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('Two Truths & One Lie'), centerTitle: true),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateDialog,
         label: const Text('New Game'),
         icon: const Icon(Icons.add),
+        backgroundColor: Colors.blueAccent,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -347,6 +363,7 @@ class _TruthLieCardState extends State<_TruthLieCard> {
     final plan = profile?['premium_plan'] ?? 'free';
     final userId = widget.game['user_id'];
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -377,7 +394,7 @@ class _TruthLieCardState extends State<_TruthLieCard> {
                         decoration: PremiumUtils.buildProfileRing(plan),
                         child: CircleAvatar(
                           radius: 18,
-                          backgroundColor: Colors.grey[300],
+                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
                           backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
                           child: avatarUrl == null 
                             ? Text(username[0].toUpperCase(), style: const TextStyle(fontSize: 12)) 
@@ -443,6 +460,7 @@ class _TruthLieCardState extends State<_TruthLieCard> {
     final isLie = widget.game['lie_index'] == index;
     final isMyVote = _myVote == index;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -488,7 +506,7 @@ class _TruthLieCardState extends State<_TruthLieCard> {
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: percent,
-                            backgroundColor: theme.dividerColor.withOpacity(0.1),
+                            backgroundColor: isDark ? Colors.white12 : theme.dividerColor.withOpacity(0.1),
                             color: isLie ? Colors.red : Colors.blue,
                             minHeight: 6,
                           ),

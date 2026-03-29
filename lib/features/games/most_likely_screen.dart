@@ -184,6 +184,7 @@ class _MostLikelyScreenState extends State<MostLikelyScreen> {
   }
 
   void _showCreateDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -206,7 +207,10 @@ class _MostLikelyScreenState extends State<MostLikelyScreen> {
                     child: Container(
                       width: 40,
                       height: 4,
-                      decoration: const BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.all(Radius.circular(2))),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : Colors.grey, 
+                        borderRadius: const BorderRadius.all(Radius.circular(2)),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -214,10 +218,12 @@ class _MostLikelyScreenState extends State<MostLikelyScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _questionController,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     decoration: InputDecoration(
                       hintText: 'e.g. Become a billionaire?',
+                      hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.grey[100],
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                     ),
                   ),
@@ -227,7 +233,7 @@ class _MostLikelyScreenState extends State<MostLikelyScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Flexible(child: Text('VOTE OPTIONS (MAX 5)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))),
+                      Flexible(child: Text('VOTE OPTIONS (MAX 5)', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.grey))),
                       TextButton.icon(
                         onPressed: () => _pickUsers(context, _selectedOptions, setModalState, max: 5, title: "Who can be voted for?"),
                         icon: const Icon(Icons.add),
@@ -250,7 +256,7 @@ class _MostLikelyScreenState extends State<MostLikelyScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Flexible(child: Text('ADDITIONAL VIEWERS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey))),
+                      Flexible(child: Text('ADDITIONAL VIEWERS', style: TextStyle(fontWeight: FontWeight.bold, color: isDark ? Colors.white54 : Colors.grey))),
                       TextButton.icon(
                         onPressed: () => _pickUsers(context, _selectedAudience, setModalState, max: 20, title: "Who else can see this?"),
                         icon: const Icon(Icons.visibility_outlined),
@@ -258,7 +264,7 @@ class _MostLikelyScreenState extends State<MostLikelyScreen> {
                       ),
                     ],
                   ),
-                  const Text('The creator and options are included automatically.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  Text('The creator and options are included automatically.', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.grey)),
                   Wrap(
                     spacing: 8,
                     children: _selectedAudience.map((f) => Chip(
@@ -435,6 +441,7 @@ class _GameVotingCardState extends State<_GameVotingCard> {
     final user = Supabase.instance.client.auth.currentUser;
     final isCreator = widget.game['created_by'] == user?.id;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -558,7 +565,7 @@ class _GameVotingCardState extends State<_GameVotingCard> {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: _hasVoted ? percent : 0,
-                          backgroundColor: theme.dividerColor.withOpacity(0.1),
+                          backgroundColor: isDark ? Colors.white12 : theme.dividerColor.withOpacity(0.1),
                           color: isMyVote ? Colors.blue : Colors.blue.withOpacity(0.3),
                           minHeight: 10,
                         ),

@@ -67,14 +67,16 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = supabase.auth.currentUser?.id;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("MOST LIKELY TO", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: theme.primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -90,9 +92,9 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.videogame_asset_outlined, size: 64, color: Colors.grey[300]),
+                          Icon(Icons.videogame_asset_outlined, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
                           const SizedBox(height: 16),
-                          const Text("No active games. Start one with friends!", style: TextStyle(color: Colors.grey)),
+                          Text("No active games. Start one with friends!", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
                         ],
                       ),
                     )
@@ -112,6 +114,7 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
                           margin: const EdgeInsets.only(bottom: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: isUnseen ? 4 : 1,
+                          color: theme.cardColor,
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                             title: Row(
@@ -121,10 +124,21 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
                                     padding: EdgeInsets.only(right: 8.0),
                                     child: CircleAvatar(radius: 4, backgroundColor: Colors.red),
                                   ),
-                                Expanded(child: Text("Game ${index + 1}", style: const TextStyle(fontWeight: FontWeight.bold))),
+                                Expanded(
+                                  child: Text(
+                                    "Game ${index + 1}", 
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.textTheme.titleMedium?.color,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                            subtitle: Text(isExpired ? "Game ended - See results" : "Started on ${game['created_at'].toString().split('T')[0]}"),
+                            subtitle: Text(
+                              isExpired ? "Game ended - See results" : "Started on ${game['created_at'].toString().split('T')[0]}",
+                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -151,7 +165,7 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
                                       );
                                     },
                                   ),
-                                Icon(isExpired ? Icons.bar_chart : Icons.chevron_right),
+                                Icon(isExpired ? Icons.bar_chart : Icons.chevron_right, color: isDark ? Colors.white24 : Colors.black26),
                               ],
                             ),
                             onTap: () => Navigator.push(
@@ -171,7 +185,7 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: const Color(0xFF2C4E6E),
+              backgroundColor: theme.primaryColor,
             ),
             child: const Text("NEW GAME", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ),
@@ -254,11 +268,15 @@ class _MostLikelyFriendSelectState extends State<MostLikelyFriendSelect> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("SELECT FRIENDS", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         centerTitle: true,
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: theme.primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -272,16 +290,16 @@ class _MostLikelyFriendSelectState extends State<MostLikelyFriendSelect> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.person_search_rounded, size: 64, color: Colors.grey[300]),
+                      Icon(Icons.person_search_rounded, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
                       const SizedBox(height: 16),
-                      const Text("No saved profiles found.", style: TextStyle(color: Colors.grey)),
+                      Text("No saved profiles found.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
                     ],
                   ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: _friends.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
                   itemBuilder: (context, index) {
                     final f = _friends[index];
                     final isSelected = _selectedIds.contains(f.id);
@@ -290,10 +308,16 @@ class _MostLikelyFriendSelectState extends State<MostLikelyFriendSelect> {
                         backgroundImage: (f.avatarUrl != null && f.avatarUrl!.isNotEmpty) ? NetworkImage(f.avatarUrl!) : null,
                         child: (f.avatarUrl == null || f.avatarUrl!.isEmpty) ? const Icon(Icons.person) : null,
                       ),
-                      title: Text(f.username.isNotEmpty ? f.username : (f.name ?? "User"), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(
+                        f.username.isNotEmpty ? f.username : (f.name ?? "User"), 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                      ),
                       trailing: Icon(
                         isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: isSelected ? const Color(0xFF2C4E6E) : Colors.grey,
+                        color: isSelected ? theme.primaryColor : (isDark ? Colors.white24 : Colors.grey),
                       ),
                       onTap: () => setState(() => isSelected ? _selectedIds.remove(f.id) : _selectedIds.add(f.id)),
                     );
@@ -309,8 +333,8 @@ class _MostLikelyFriendSelectState extends State<MostLikelyFriendSelect> {
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: const Color(0xFF2C4E6E),
-              disabledBackgroundColor: Colors.grey[300],
+              backgroundColor: theme.primaryColor,
+              disabledBackgroundColor: isDark ? Colors.white10 : Colors.grey[300],
             ),
             child: Text("CONTINUE (${_selectedIds.length})", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ),
@@ -420,10 +444,14 @@ class _MostLikelySetupState extends State<MostLikelySetup> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("SETUP GAME"),
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: theme.primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -440,10 +468,15 @@ class _MostLikelySetupState extends State<MostLikelySetup> {
               const SizedBox(height: 12),
               TextField(
                 controller: _questionCtrl,
-                decoration: const InputDecoration(
+                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                decoration: InputDecoration(
                   hintText: "Who is most likely to...",
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.all(16),
+                  hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                  border: const OutlineInputBorder(),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12)),
+                  contentPadding: const EdgeInsets.all(16),
                 ),
                 maxLines: 2,
               ),
@@ -468,9 +501,14 @@ class _MostLikelySetupState extends State<MostLikelySetup> {
                   padding: const EdgeInsets.only(bottom: 12.0),
                   child: TextField(
                     controller: ctrl,
+                    style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                     decoration: InputDecoration(
                       hintText: "Option ${idx + 1}",
+                      hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       border: const OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       suffixIcon: _optionCtrls.length > 2
                           ? IconButton(
@@ -495,7 +533,7 @@ class _MostLikelySetupState extends State<MostLikelySetup> {
             onPressed: _isLoading ? null : _launchGame,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 54),
-              backgroundColor: const Color(0xFF2C4E6E),
+              backgroundColor: theme.primaryColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: _isLoading 
@@ -681,6 +719,8 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
 
     final currentUserId = supabase.auth.currentUser?.id;
     final isCreator = _game!['creator_id'] == currentUserId;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     String? winner;
     if (_isExpired && _voteCounts.isNotEmpty) {
@@ -694,9 +734,10 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
     }
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(_isExpired ? "RESULTS" : "VOTE"), 
-        backgroundColor: const Color(0xFF2C4E6E), 
+        backgroundColor: theme.primaryColor, 
         foregroundColor: Colors.white,
         actions: [
           if (isCreator)
@@ -734,6 +775,7 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
                   if (_creatorProfile != null) ...[
                     CircleAvatar(
                       radius: 30,
+                      backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
                       backgroundImage: (_creatorProfile!['avatar_url'] != null && _creatorProfile!['avatar_url'] != '')
                           ? NetworkImage(_creatorProfile!['avatar_url'])
                           : null,
@@ -744,18 +786,26 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
                     const SizedBox(height: 8),
                     Text(
                       "@${_creatorProfile!['username'] ?? 'User'}",
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                      style: TextStyle(fontSize: 14, color: isDark ? Colors.white54 : Colors.grey),
                     ),
                     const SizedBox(height: 16),
                   ],
-                  Text(_question ?? "Most Likely To...", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                  Text(
+                    _question ?? "Most Likely To...", 
+                    style: TextStyle(
+                      fontSize: 22, 
+                      fontWeight: FontWeight.bold,
+                      color: theme.textTheme.bodyLarge?.color,
+                    ), 
+                    textAlign: TextAlign.center,
+                  ),
                   
                   if (!_isExpired) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
+                        color: isDark ? Colors.red.withOpacity(0.1) : Colors.red.shade50,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: Colors.red.shade200),
                       ),
@@ -775,7 +825,7 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
 
                   const SizedBox(height: 32),
                   if (_isExpired) ...[
-                     Text("The winner is:", style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                     Text("The winner is:", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey[600], fontSize: 14)),
                      const SizedBox(height: 4),
                      Text(winner ?? "No votes yet", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue)),
                      const SizedBox(height: 32),
@@ -791,14 +841,20 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
                         final isWinner = winner == opt;
 
                         return Card(
-                          color: isWinner ? Colors.blue.shade50 : (isSelected ? Colors.blue.shade50.withOpacity(0.5) : null),
+                          color: isWinner ? Colors.blue.withOpacity(0.1) : (isSelected ? Colors.blue.withOpacity(0.05) : theme.cardColor),
                           shape: isWinner ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.blue, width: 2)) : null,
                           child: Column(
                             children: [
                               ListTile(
-                                title: Text(opt, style: TextStyle(fontWeight: FontWeight.bold, color: isWinner ? Colors.blue : null)),
+                                title: Text(
+                                  opt, 
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold, 
+                                    color: isWinner ? Colors.blue : theme.textTheme.bodyLarge?.color,
+                                  ),
+                                ),
                                 trailing: _isExpired 
-                                  ? Text("$voteCount votes", style: const TextStyle(fontWeight: FontWeight.bold))
+                                  ? Text("$voteCount votes", style: TextStyle(fontWeight: FontWeight.bold, color: theme.textTheme.bodyLarge?.color))
                                   : (isSelected ? const Icon(Icons.check_circle, color: Colors.blue) : null),
                                 onTap: () => _vote(opt),
                               ),
@@ -809,7 +865,7 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
                                     borderRadius: BorderRadius.circular(4),
                                     child: LinearProgressIndicator(
                                       value: percentage,
-                                      backgroundColor: Colors.grey[200],
+                                      backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
                                       color: isWinner ? Colors.blue : Colors.blue.withOpacity(0.3),
                                       minHeight: 8,
                                     ),
@@ -824,7 +880,13 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
                   if (_isExpired) 
                     Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Text("Total Votes: $_totalVotes", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                      child: Text(
+                        "Total Votes: $_totalVotes", 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          color: isDark ? Colors.white54 : Colors.grey,
+                        ),
+                      ),
                     )
                 ],
               ),

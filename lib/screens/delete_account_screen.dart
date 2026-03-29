@@ -186,6 +186,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   }
 
   Widget _buildRequestForm() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -197,13 +198,19 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         TextField(
           controller: _reasonController,
           maxLines: 6,
+          style: TextStyle(color: isDark ? Colors.white : Colors.black87),
           decoration: InputDecoration(
             hintText: "Tell us why you want to delete your account...",
-            fillColor: Colors.white,
+            hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+            fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
             filled: true,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.black12),
+              borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
             ),
           ),
         ),

@@ -44,8 +44,11 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F8),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("BOOSTER PACKS"),
         centerTitle: true,
@@ -56,15 +59,19 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  const Text(
+                  Text(
                     "Get More Questions",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2C4E6E)),
+                    style: TextStyle(
+                      fontSize: 24, 
+                      fontWeight: FontWeight.bold, 
+                      color: isDark ? Colors.white : const Color(0xFF2C4E6E),
+                    ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     "Daily limit reached? Buy a booster pack to keep vibing!",
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
                   ),
                   const SizedBox(height: 32),
                   _buildBoosterCard(
@@ -94,6 +101,7 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
   }
 
   Widget _buildBoosterCard(BuildContext context, {required int questions, required String price, required VoidCallback onTap}) {
+    final theme = Theme.of(context);
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -110,9 +118,18 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
                 children: [
                   Text(
                     "$questions Questions",
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 20, 
+                      fontWeight: FontWeight.bold,
+                      color: theme.textTheme.titleLarge?.color,
+                    ),
                   ),
                   const SizedBox(height: 4),
+                  const Text(
+                    "Available instantly",
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
                   Text(
                     price,
                     style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.w600),

@@ -30,7 +30,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (user == null) return;
 
     try {
-      // Just verifying session/user exists since we removed toggle states
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -44,6 +43,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -187,6 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildRow(IconData icon, String title, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -194,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: const Color(0xFF2C4E6E)),
+            Icon(icon, size: 22, color: isDark ? Colors.blueAccent : const Color(0xFF2C4E6E)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -202,7 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
             ),
-            const Icon(Icons.chevron_right, size: 20, color: Colors.black12),
+            Icon(Icons.chevron_right, size: 20, color: isDark ? Colors.white24 : Colors.black12),
           ],
         ),
       ),
@@ -210,13 +212,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildRowWithSubtitle(IconData icon, String title, String subtitle, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: const Color(0xFF2C4E6E)),
+            Icon(icon, size: 22, color: isDark ? Colors.blueAccent : const Color(0xFF2C4E6E)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -228,12 +231,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 20, color: Colors.black12),
+            Icon(Icons.chevron_right, size: 20, color: isDark ? Colors.white24 : Colors.black12),
           ],
         ),
       ),
@@ -340,6 +343,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: const Text("CHANGE PASSWORD"),
@@ -348,25 +352,55 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             TextField(
               controller: _currentPasswordController,
-              decoration: const InputDecoration(labelText: "Current Password"),
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                labelText: "Current Password",
+                labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                filled: true,
+                border: const OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                ),
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _newPasswordController,
-              decoration: const InputDecoration(labelText: "New Password"),
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                labelText: "New Password",
+                labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                filled: true,
+                border: const OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                ),
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _confirmPasswordController,
-              decoration: const InputDecoration(labelText: "Confirm New Password"),
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+              decoration: InputDecoration(
+                labelText: "Confirm New Password",
+                labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                filled: true,
+                border: const OutlineInputBorder(),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                ),
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 32),

@@ -572,8 +572,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       joinedText = "Joined $formatted";
     }
 
-    final bool hideCounter = (plan == 'blue' || plan == 'gold');
-
     return RefreshIndicator(
       onRefresh: _loadData,
       child: SafeArea(
@@ -698,11 +696,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
 
-              if (isMe && !hideCounter)
+              if (isMe)
                 Padding(
                   padding: const EdgeInsets.only(left: 20, top: 12),
                   child: Text(
-                    "Today's remaining questions: $_remainingQuestions",
+                    (plan == 'blue' || plan == 'gold') 
+                      ? "Today's questions: Unlimited" 
+                      : "Today's remaining questions: $_remainingQuestions",
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.primaryColor),
                   ),
                 ),

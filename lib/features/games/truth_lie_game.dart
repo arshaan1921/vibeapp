@@ -67,14 +67,16 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = supabase.auth.currentUser?.id;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("TWO TRUTHS & ONE LIE", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: theme.primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -90,9 +92,9 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.fact_check_outlined, size: 64, color: Colors.grey[300]),
+                          Icon(Icons.fact_check_outlined, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
                           const SizedBox(height: 16),
-                          const Text("No active games. Start one with friends!", style: TextStyle(color: Colors.grey)),
+                          Text("No active games. Start one with friends!", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
                         ],
                       ),
                     )
@@ -109,6 +111,7 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
                           margin: const EdgeInsets.only(bottom: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: isUnseen ? 4 : 1,
+                          color: theme.cardColor,
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                             title: Row(
@@ -118,10 +121,21 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
                                     padding: EdgeInsets.only(right: 8.0),
                                     child: CircleAvatar(radius: 4, backgroundColor: Colors.red),
                                   ),
-                                Expanded(child: Text("Game ${index + 1}", style: const TextStyle(fontWeight: FontWeight.bold))),
+                                Expanded(
+                                  child: Text(
+                                    "Game ${index + 1}", 
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.textTheme.titleMedium?.color,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                            subtitle: Text("Started on ${game['created_at'].toString().split('T')[0]}"),
+                            subtitle: Text(
+                              "Started on ${game['created_at'].toString().split('T')[0]}",
+                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -148,7 +162,7 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
                                       );
                                     },
                                   ),
-                                const Icon(Icons.chevron_right),
+                                Icon(Icons.chevron_right, color: isDark ? Colors.white24 : Colors.black26),
                               ],
                             ),
                             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TruthLiePlay(gameId: game['id']))).then((_) => _fetchGames()),
@@ -165,7 +179,7 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: const Color(0xFF2C4E6E),
+              backgroundColor: theme.primaryColor,
             ),
             child: const Text("NEW GAME", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ),
@@ -248,11 +262,15 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("SELECT FRIENDS", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         centerTitle: true,
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: theme.primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -266,16 +284,16 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.person_search_rounded, size: 64, color: Colors.grey[300]),
+                      Icon(Icons.person_search_rounded, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
                       const SizedBox(height: 16),
-                      const Text("No saved profiles found.", style: TextStyle(color: Colors.grey)),
+                      Text("No saved profiles found.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
                     ],
                   ),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: _friends.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
                   itemBuilder: (context, index) {
                     final f = _friends[index];
                     final isSelected = _selectedIds.contains(f.id);
@@ -284,10 +302,16 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
                         backgroundImage: (f.avatarUrl != null && f.avatarUrl!.isNotEmpty) ? NetworkImage(f.avatarUrl!) : null,
                         child: (f.avatarUrl == null || f.avatarUrl!.isEmpty) ? const Icon(Icons.person) : null,
                       ),
-                      title: Text(f.username.isNotEmpty ? f.username : (f.name ?? "User"), style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(
+                        f.username.isNotEmpty ? f.username : (f.name ?? "User"), 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: theme.textTheme.bodyLarge?.color,
+                        ),
+                      ),
                       trailing: Icon(
                         isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: isSelected ? const Color(0xFF2C4E6E) : Colors.grey,
+                        color: isSelected ? theme.primaryColor : (isDark ? Colors.white24 : Colors.grey),
                       ),
                       onTap: () => setState(() => isSelected ? _selectedIds.remove(f.id) : _selectedIds.add(f.id)),
                     );
@@ -303,8 +327,8 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: const Color(0xFF2C4E6E),
-              disabledBackgroundColor: Colors.grey[300],
+              backgroundColor: theme.primaryColor,
+              disabledBackgroundColor: isDark ? Colors.white10 : Colors.grey[300],
             ),
             child: Text("NEW GAME (${_selectedIds.length})", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           ),
@@ -414,12 +438,15 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("SETUP GAME", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         centerTitle: true,
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: theme.primaryColor,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
@@ -441,21 +468,38 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
                     : null,
               ),
               const SizedBox(height: 12),
-              Text("@${_userProfile!['username'] ?? 'User'}", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                "@${_userProfile!['username'] ?? 'User'}", 
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 32),
             ],
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text("Add two truths about yourself", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              child: Text(
+                "Add two truths about yourself", 
+                style: TextStyle(
+                  fontSize: 16, 
+                  fontWeight: FontWeight.w500,
+                  color: theme.textTheme.bodyLarge?.color,
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             _buildInput(_optCtrls[0], "Truth 1"),
             const SizedBox(height: 12),
             _buildInput(_optCtrls[1], "Truth 2"),
             const SizedBox(height: 32),
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text("Add one lie", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              child: Text(
+                "Add one lie", 
+                style: TextStyle(
+                  fontSize: 16, 
+                  fontWeight: FontWeight.w500,
+                  color: theme.textTheme.bodyLarge?.color,
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             _buildInput(_optCtrls[2], "The Lie", isLie: true),
@@ -463,7 +507,7 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
             ElevatedButton(
               onPressed: _isLoading ? null : _launchGame,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2C4E6E),
+                backgroundColor: theme.primaryColor,
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 54),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -479,17 +523,22 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
   }
 
   Widget _buildInput(TextEditingController ctrl, String hint, {bool isLie = false}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isLie ? Colors.redAccent.withOpacity(0.3) : Colors.greenAccent.withOpacity(0.3)),
+        border: Border.all(color: isLie ? Colors.redAccent.withOpacity(0.3) : (isDark ? Colors.white12 : Colors.greenAccent.withOpacity(0.3))),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
       ),
       child: TextField(
         controller: ctrl,
+        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
         decoration: InputDecoration(
           hintText: hint,
+          hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
@@ -671,12 +720,14 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
 
     final currentUserId = supabase.auth.currentUser?.id;
     final isCreator = _game!['creator_id'] == currentUserId;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(_isExpired ? "RESULTS" : "GUESS THE LIE"), 
-        backgroundColor: const Color(0xFF2C4E6E), 
+        backgroundColor: theme.primaryColor, 
         foregroundColor: Colors.white,
         centerTitle: true,
       ),
@@ -695,7 +746,10 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
                     : null,
               ),
               const SizedBox(height: 8),
-              Text("@${_creatorProfile!['username'] ?? 'User'}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                "@${_creatorProfile!['username'] ?? 'User'}", 
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 16),
             ],
             
@@ -703,7 +757,7 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: isDark ? Colors.red.withOpacity(0.1) : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.red.shade200),
                 ),
@@ -712,7 +766,10 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
                   children: [
                     Icon(Icons.timer_outlined, size: 16, color: Colors.red.shade700),
                     const SizedBox(width: 4),
-                    Text("Ends in: $_timeRemaining", style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(
+                      "Ends in: $_timeRemaining", 
+                      style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
                   ],
                 ),
               ),
@@ -736,12 +793,12 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.cardColor,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: _isExpired 
-                          ? (isLie ? Colors.green : (isVoted ? Colors.red : Colors.grey.shade200))
-                          : (isVoted ? Colors.blue : Colors.grey.shade200),
+                          ? (isLie ? Colors.green : (isVoted ? Colors.red : (isDark ? Colors.white12 : Colors.grey.shade200)))
+                          : (isVoted ? Colors.blue : (isDark ? Colors.white12 : Colors.grey.shade200)),
                         width: 2,
                       ),
                       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
@@ -752,7 +809,12 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: Text(statement, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))),
+                            Expanded(
+                              child: Text(
+                                statement, 
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                              ),
+                            ),
                             if (_isExpired && isLie) const Icon(Icons.check_circle, color: Colors.green),
                             if (_isExpired && !isLie && isVoted) const Icon(Icons.cancel, color: Colors.red),
                             if (!_isExpired && isVoted) const Icon(Icons.check_circle, color: Colors.blue),
@@ -764,13 +826,16 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
                             borderRadius: BorderRadius.circular(4),
                             child: LinearProgressIndicator(
                               value: percentage,
-                              backgroundColor: Colors.grey[100],
+                              backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
                               color: isLie ? Colors.green : Colors.blue.withOpacity(0.5),
                               minHeight: 8,
                             ),
                           ),
                           const SizedBox(height: 4),
-                          Text("$voteCount votes (${(percentage * 100).toInt()}%)", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          Text(
+                            "$voteCount votes (${(percentage * 100).toInt()}%)", 
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600),
+                          ),
                         ],
                       ],
                     ),

@@ -122,8 +122,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   @override
   Widget build(BuildContext context) {
     final isUserReport = widget.reportedUserId != null;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(isUserReport ? "REPORT USER" : "REPORT A PROBLEM"),
         leading: IconButton(
@@ -151,13 +154,19 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               TextField(
                 controller: _controller,
                 maxLines: 6,
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                 decoration: InputDecoration(
                   hintText: isUserReport ? "Please provide details about the violation..." : "Describe the problem...",
-                  fillColor: Colors.white,
+                  hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
+                  fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                   filled: true,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: Colors.black12),
+                    borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
                   ),
                 ),
               ),
@@ -167,8 +176,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                 icon: const Icon(Icons.attach_file, size: 20),
                 label: const Text("Attach Screenshot"),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Theme.of(context).primaryColor,
-                  side: BorderSide(color: Theme.of(context).primaryColor),
+                  foregroundColor: isDark ? Colors.blueAccent : theme.primaryColor,
+                  side: BorderSide(color: isDark ? Colors.blueAccent : theme.primaryColor),
                 ),
               ),
               if (_selectedImage != null)

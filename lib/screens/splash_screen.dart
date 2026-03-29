@@ -77,40 +77,34 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF2C5D8C),
-      body: Stack(
-        children: [
-          Center(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Text(
-                "a real meaning of socialising",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.dancingScript(
+      body: Center(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "V1BE",
+                style: GoogleFonts.poppins(
                   color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.w400,
+                  fontSize: 64,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 8,
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            bottom: 50,
-            left: 0,
-            right: 0,
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: const Text(
-                "copyright ©  2026 V1be",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                  letterSpacing: 1.0,
+              const SizedBox(height: 10),
+              Text(
+                "Ask, Answer, Play",
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w300,
+                  letterSpacing: 2,
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

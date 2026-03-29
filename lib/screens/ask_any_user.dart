@@ -121,11 +121,18 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
       final currentUser = supabase.auth.currentUser;
       if (currentUser == null) return;
 
+      // Fetch user profile to check plan
+      final profile = await supabase.from('profiles').select('premium_plan').eq('id', currentUser.id).single();
+      final plan = profile['premium_plan'] ?? 'free';
+
       // 1. Check permissions / limits
       final bool canAsk = await supabase.rpc('can_ask_question', params: {'uid': currentUser.id});
 
       if (!canAsk) {
-        if (mounted) _showLimitReachedDialog();
+        // Only show warning for green and free users
+        if (mounted && (plan == 'free' || plan == 'green')) {
+          _showLimitReachedDialog();
+        }
         setState(() => _isLoading = false);
         return;
       }
@@ -197,8 +204,8 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
 
       // 4. Insert question
       await supabase.from('questions').insert({
-        'from_user': isAnonymous ? null : currentUser.id, // Using from_user as sender_id per existing schema
-        'to_user': selectedUserId, // Using to_user as receiver_id per existing schema
+        'from_user': isAnonymous ? null : currentUser.id, 
+        'to_user': selectedUserId, 
         'text': text,
         'is_anonymous': isAnonymous,
         'image_url': imageUrl,

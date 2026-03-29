@@ -71,7 +71,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _pickImage() async {
     try {
-      // Permission Handling
       if (Platform.isAndroid) {
         final status = await Permission.photos.request();
         if (!status.isGranted) {
@@ -130,7 +129,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       String? imageUrl = _avatarUrl;
 
-      // Handle Image Upload
       if (_selectedImage != null) {
         setState(() => _isUploading = true);
         final fileExtension = _selectedImage!.path.split('.').last;
@@ -148,7 +146,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() => _isUploading = false);
       }
 
-      // Update Database
       await Supabase.instance.client.from('profiles').update({
         'name': _nameController.text.trim(),
         'username': username,
@@ -181,6 +178,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -213,7 +212,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           children: [
                             CircleAvatar(
                               radius: 55,
-                              backgroundColor: Colors.grey[300],
+                              backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
                               backgroundImage: _selectedImage != null
                                   ? FileImage(_selectedImage!)
                                   : (_avatarUrl != null
@@ -243,35 +242,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(height: 24),
                   TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
                       labelText: "Name",
-                      fillColor: Colors.white,
+                      labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       filled: true,
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _usernameController,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     inputFormatters: [
                       LowerCaseTextFormatter(),
                     ],
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: "Username",
-                      fillColor: Colors.white,
+                      labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       filled: true,
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _bioController,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     maxLines: 3,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: "Bio",
-                      fillColor: Colors.white,
+                      labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+                      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                       filled: true,
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+                      ),
                     ),
                   ),
                 ],
