@@ -44,6 +44,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
             user_id,
             profiles:profiles!answers_user_id_fkey(id, username, avatar_url, premium_plan),
             questions:questions!answers_question_id_fkey(
+              id,
               text,
               is_anonymous,
               from_user,
@@ -146,6 +147,30 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
             'type': 'like',
             'seen': false,
           });
+
+          // PUSH FOR LIKE (Consistency)
+          try {
+            final session = supabase.auth.currentSession;
+            final accessToken = session?.accessToken;
+            final profile = await supabase.from('profiles').select('username').eq('id', user.id).single();
+            final username = profile['username'] ?? "Someone";
+
+            if (accessToken != null) {
+              await supabase.functions.invoke(
+                'supabase-functions-new-send-push-notification',
+                body: {
+                  "user_id": _answer!['user_id'],
+                  "title": "New Like ❤️",
+                  "body": "@$username liked your answer",
+                  "data": {
+                    "type": "like",
+                    "answer_id": widget.answerId
+                  }
+                },
+                headers: { "Authorization": "Bearer $accessToken" },
+              );
+            }
+          } catch (e) { debugPrint("Like push failed: $e"); }
         }
       }
     } catch (e) {
@@ -217,7 +242,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
                   ),
                   const SizedBox(height: 16),
                   PrimaryButton(
-                    text: "SEND REPLY",
+                    text: isSending ? "SENDING..." : "SEND REPLY",
                     onPressed: isSending ? () {} : () {
                       final text = replyController.text.trim();
                       if (text.isEmpty) return;
@@ -241,20 +266,67 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
+      // 1. Insert reply
       await supabase.from('answer_replies').insert({
         'answer_id': widget.answerId,
         'user_id': user.id,
         'reply': text,
       });
+      print("REPLY INSERT DONE");
 
-      if (_answer!['user_id'] != user.id) {
+      // 2. Fetch answer owner directly from "answers" table
+      final answerRes = await supabase
+          .from('answers')
+          .select('user_id')
+          .eq('id', widget.answerId)
+          .single();
+      
+      final String answerOwnerId = answerRes['user_id'];
+      print("answerOwnerId: $answerOwnerId");
+
+      // 3. Prevent self-notification
+      if (answerOwnerId != user.id) {
+        print("SENDING REPLY PUSH");
+        
+        // 4. Insert into notifications table
         await supabase.from('notifications').insert({
-          'user_id': _answer!['user_id'],
+          'user_id': answerOwnerId,
           'source_user': user.id,
           'source_id': widget.answerId,
-          'type': 'answer',
+          'type': 'reply',
           'seen': false,
         });
+
+        // 5. Send PUSH notification via Edge Function
+        try {
+          final session = supabase.auth.currentSession;
+          final accessToken = session?.accessToken;
+
+          // Fetch replier username
+          final profile = await supabase.from('profiles').select('username').eq('id', user.id).single();
+          final String username = profile['username'] ?? "Someone";
+
+          if (accessToken != null) {
+            await supabase.functions.invoke(
+              'supabase-functions-new-send-push-notification',
+              body: {
+                "user_id": answerOwnerId,
+                "title": "New Reply 💬",
+                "body": "@$username replied on your answer",
+                "data": {
+                  "type": "reply",
+                  "answer_id": widget.answerId
+                }
+              },
+              headers: {
+                "Authorization": "Bearer $accessToken",
+              },
+            );
+            print("REPLY PUSH SENT SUCCESS");
+          }
+        } catch (e) {
+          debugPrint("Push notification failed: $e");
+        }
       }
 
       if (mounted) {

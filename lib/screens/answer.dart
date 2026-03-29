@@ -58,7 +58,8 @@ class _AnswerScreenState extends State<AnswerScreen> {
   }
 
   Future<void> _postAnswer() async {
-    final user = Supabase.instance.client.auth.currentUser;
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
 
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +81,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
 
     try {
       // 1. Insert answer into answers table
-      final answerResponse = await Supabase.instance.client.from('answers').insert({
+      final answerResponse = await supabase.from('answers').insert({
         'question_id': widget.question.id,
         'user_id': user.id,
         'answer_text': answerController.text.trim(),
@@ -89,7 +90,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
       // 2. Mark question as answered
       final questionId = widget.question.id;
 
-      await Supabase.instance.client
+      await supabase
           .from('questions')
           .update({'answered': true})
           .eq('id', questionId);
@@ -98,7 +99,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
       final askerId = _fullQuestion!['from_user'];
       if (askerId != null && askerId != user.id) {
         // Create notification record in DB
-        await Supabase.instance.client.from('notifications').insert({
+        await supabase.from('notifications').insert({
           'user_id': askerId,
           'source_user': user.id,
           'type': 'answer',
@@ -106,16 +107,39 @@ class _AnswerScreenState extends State<AnswerScreen> {
           'seen': false,
         });
 
-        // Send push notification
-        await NotificationService.sendNotification(
-          userId: askerId,
-          title: "New Answer 💬",
-          body: "Someone answered your question",
-          data: {
-            'type': 'answer',
-            'answer_id': answerResponse['id'],
-          },
-        );
+        // Send push notification using Supabase Edge Function
+        try {
+          final session = supabase.auth.currentSession;
+          final accessToken = session?.accessToken;
+
+          if (accessToken != null) {
+            // Fetch current user's username for notification body
+            final profile = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', user.id)
+                .single();
+            final username = profile['username'] ?? "Someone";
+
+            await supabase.functions.invoke(
+              'supabase-functions-new-send-push-notification',
+              body: {
+                "user_id": askerId,
+                "title": "New Answer 💬",
+                "body": "@$username answered your question",
+                "data": {
+                  "type": "answer",
+                  "answer_id": answerResponse['id']
+                }
+              },
+              headers: {
+                "Authorization": "Bearer $accessToken",
+              },
+            );
+          }
+        } catch (e) {
+          debugPrint("Push failed: $e");
+        }
       }
 
       if (mounted) {

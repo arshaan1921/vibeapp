@@ -185,12 +185,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _toggleSave() async {
-    final currentUser = Supabase.instance.client.auth.currentUser;
+    final supabase = Supabase.instance.client;
+    final currentUser = supabase.auth.currentUser;
     if (currentUser == null || widget.userId == null) return;
 
     try {
       if (isSaved) {
-        await Supabase.instance.client
+        await supabase
             .from('saved_profiles')
             .delete()
             .eq('user_id', currentUser.id)
@@ -202,18 +203,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
       } else {
-        await Supabase.instance.client.from('saved_profiles').insert({
+        await supabase.from('saved_profiles').insert({
           'user_id': currentUser.id,
           'saved_user_id': widget.userId!,
         });
 
-        final saverProfile = await Supabase.instance.client.from('profiles').select('username').eq('id', currentUser.id).single();
-        NotificationService.sendNotification(
-          userId: widget.userId!,
-          title: "Profile Saved!",
-          body: "@${saverProfile['username']} saved your profile to their V1BEs!",
-          data: {"type": "profile_save"},
-        );
+        final saverProfile = await supabase.from('profiles').select('username').eq('id', currentUser.id).single();
+        
+        // PUSH ONLY (Edge Function)
+        try {
+          final session = supabase.auth.currentSession;
+          final accessToken = session?.accessToken;
+
+          if (accessToken != null) {
+            await supabase.functions.invoke(
+              'supabase-functions-new-send-push-notification',
+              body: {
+                "user_id": widget.userId!,
+                "title": "Profile Saved!",
+                "body": "@${saverProfile['username']} saved your profile to their V1BEs!",
+                "data": {"type": "profile_save"}
+              },
+              headers: {
+                "Authorization": "Bearer $accessToken",
+              },
+            );
+          }
+        } catch (e) {
+          debugPrint("Push failed: $e");
+        }
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

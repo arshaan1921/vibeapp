@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../services/notification_service.dart';
+import 'package:flutter/foundation.dart';
 
 class RoastService {
   static final _supabase = Supabase.instance.client;
@@ -22,13 +22,30 @@ class RoastService {
       
       // Notify invited users
       final creatorProfile = await _supabase.from('profiles').select('username').eq('id', user.id).single();
+      final username = creatorProfile['username'] ?? "Someone";
+
       for (var invitedId in invitedUserIds) {
-        NotificationService.sendNotification(
-          userId: invitedId,
-          title: "Roast Invitation!",
-          body: "@${creatorProfile['username']} invited you to a roast: $text",
-          data: {"type": "roast_invite", "roast_id": post['id']},
-        );
+        try {
+          final session = _supabase.auth.currentSession;
+          final accessToken = session?.accessToken;
+
+          if (accessToken != null) {
+            await _supabase.functions.invoke(
+              'supabase-functions-new-send-push-notification',
+              body: {
+                "user_id": invitedId,
+                "title": "Roast Invitation!",
+                "body": "@$username invited you to a roast: $text",
+                "data": {"type": "roast_invite", "roast_id": post['id']}
+              },
+              headers: {
+                "Authorization": "Bearer $accessToken",
+              },
+            );
+          }
+        } catch (e) {
+          debugPrint("Push failed: $e");
+        }
       }
     }
   }
@@ -74,12 +91,29 @@ class RoastService {
     final roastData = await _supabase.from('roast_posts').select('user_id, text').eq('id', roastId).single();
     if (roastData['user_id'] != user.id) {
       final replierProfile = await _supabase.from('profiles').select('username').eq('id', user.id).single();
-      NotificationService.sendNotification(
-        userId: roastData['user_id'],
-        title: "New Roast Reply!",
-        body: "@${replierProfile['username']} replied to your roast",
-        data: {"type": "roast_reply", "roast_id": roastId},
-      );
+      final username = replierProfile['username'] ?? "Someone";
+
+      try {
+        final session = _supabase.auth.currentSession;
+        final accessToken = session?.accessToken;
+
+        if (accessToken != null) {
+          await _supabase.functions.invoke(
+            'supabase-functions-new-send-push-notification',
+            body: {
+              "user_id": roastData['user_id'],
+              "title": "New Roast Reply!",
+              "body": "@$username replied to your roast",
+              "data": {"type": "roast_reply", "roast_id": roastId}
+            },
+            headers: {
+              "Authorization": "Bearer $accessToken",
+            },
+          );
+        }
+      } catch (e) {
+        debugPrint("Push failed: $e");
+      }
     }
   }
 
@@ -96,12 +130,29 @@ class RoastService {
     final replyData = await _supabase.from('roast_replies').select('user_id, roast_id').eq('id', replyId).single();
     if (replyData['user_id'] != user.id) {
        final likerProfile = await _supabase.from('profiles').select('username').eq('id', user.id).single();
-       NotificationService.sendNotification(
-          userId: replyData['user_id'],
-          title: "Roast Like!",
-          body: "@${likerProfile['username']} liked your roast reply",
-          data: {"type": "roast_like", "roast_id": replyData['roast_id']},
-        );
+       final username = likerProfile['username'] ?? "Someone";
+
+       try {
+         final session = _supabase.auth.currentSession;
+         final accessToken = session?.accessToken;
+
+         if (accessToken != null) {
+           await _supabase.functions.invoke(
+             'supabase-functions-new-send-push-notification',
+             body: {
+               "user_id": replyData['user_id'],
+               "title": "Roast Like!",
+               "body": "@$username liked your roast reply",
+               "data": {"type": "roast_like", "roast_id": replyData['roast_id']}
+             },
+             headers: {
+               "Authorization": "Bearer $accessToken",
+             },
+           );
+         }
+       } catch (e) {
+         debugPrint("Push failed: $e");
+       }
     }
   }
 

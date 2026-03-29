@@ -217,12 +217,24 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
         final accessToken = session?.accessToken;
 
         if (accessToken != null) {
+          String senderName = "Someone";
+          if (!isAnonymous) {
+            final senderProfile = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', currentUser.id)
+                .single();
+            senderName = senderProfile['username'] ?? "Someone";
+          }
+
           await supabase.functions.invoke(
             'supabase-functions-new-send-push-notification',
             body: {
               "user_id": selectedUserId,
               "title": "New Question 👀",
-              "body": "Someone asked you a question on V1BE",
+              "body": isAnonymous 
+                  ? "Someone asked you a question on V1BE" 
+                  : "@$senderName asked you a question on V1BE",
               "data": {
                 "type": "question"
               }
@@ -382,7 +394,7 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: theme.dividerColor),
-                  ),
+                    ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: theme.dividerColor),

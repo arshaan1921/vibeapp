@@ -17,7 +17,7 @@ import 'features/games/games_screen.dart';
 import 'services/rate_game_service.dart';
 import 'services/block_service.dart';
 import 'screens/splash_screen.dart';
-import 'screens/auth/reset_password_page.dart'; // ✅ ADDED
+import 'screens/auth/reset_password_page.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 
@@ -31,62 +31,14 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
 
-/// ✅ SAVE DEVICE TOKEN
-Future<void> saveDeviceToken() async {
-  final user = Supabase.instance.client.auth.currentUser;
-
-  if (user == null) {
-    print("❌ No user logged in");
-    return;
-  }
-
-  final token = await FirebaseMessaging.instance.getToken();
-  print("📱 FCM TOKEN: $token");
-
-  if (token != null) {
-    await Supabase.instance.client.from('device_tokens').upsert({
-      'user_id': user.id,
-      'token': token,
-    }, onConflict: 'user_id');
-
-    print("✅ Token saved");
-  }
-}
-
-/// ✅ BACKGROUND HANDLER
+/// ✅ Centralized Background Handler
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-
-  final data = message.data;
-
-  final title = data['title'] ?? "V1BE";
-  final body = data['body'] ?? "New notification";
-
-  final FlutterLocalNotificationsPlugin localPlugin =
-  FlutterLocalNotificationsPlugin();
-
-  const AndroidInitializationSettings initSettingsAndroid =
-  AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  await localPlugin.initialize(
-    const InitializationSettings(android: initSettingsAndroid),
-  );
-
-  const AndroidNotificationDetails androidDetails =
-  AndroidNotificationDetails(
-    'v1be_channel',
-    'V1BE Notifications',
-    importance: Importance.max,
-    priority: Priority.high,
-  );
-
-  await localPlugin.show(
-    DateTime.now().millisecondsSinceEpoch ~/ 1000,
-    title,
-    body,
-    const NotificationDetails(android: androidDetails),
-  );
+  // Notification body is handled by the system if it contains a 'notification' payload.
+  // Data-only messages in background should be handled here if needed, 
+  // but we avoid manual show() to prevent duplicates.
+  debugPrint("📩 Background message received: ${message.messageId}");
 }
 
 void main() async {
@@ -94,60 +46,13 @@ void main() async {
 
   await Firebase.initializeApp();
 
-  final settings = await FirebaseMessaging.instance.requestPermission();
-  print("🔐 Permission: ${settings.authorizationStatus}");
-
-  await FirebaseMessaging.instance
-      .setForegroundNotificationPresentationOptions(
-    alert: false,
-    badge: false,
-    sound: false,
-  );
-
-  FirebaseMessaging.onBackgroundMessage(
-      _firebaseMessagingBackgroundHandler);
-
-  const AndroidInitializationSettings initializationSettingsAndroid =
-  AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  await flutterLocalNotificationsPlugin.initialize(
-    const InitializationSettings(android: initializationSettingsAndroid),
-  );
+  // Background handler registration
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
       AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
-
-  /// ✅ FOREGROUND HANDLER
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    final data = message.data;
-
-    final title = data['title'] ?? "V1BE";
-
-    final body = data['body'] ??
-        message.notification?.body ??
-        "New notification";
-
-    flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'v1be_channel',
-          'V1BE Notifications',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
-    );
-  });
-
-  /// ✅ CLICK HANDLER
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    print("📲 Clicked: ${message.data}");
-  });
 
   await Supabase.initialize(
     url: "https://litammrxzsndissedizt.supabase.co",
@@ -155,7 +60,7 @@ void main() async {
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpdGFtbXJ4enNuZGlzc2VkaXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzE1MzIsImV4cCI6MjA4NzUwNzUzMn0._MqAAWpExMvi0vMHFhegqmx_gDPiJZWtUIbjJKvzfoQ",
   );
 
-  /// 🔥 ✅ PASSWORD RECOVERY LISTENER (FIXED)
+  /// 🔥 PASSWORD RECOVERY LISTENER
   Supabase.instance.client.auth.onAuthStateChange.listen((data) {
     final event = data.event;
 
@@ -165,21 +70,6 @@ void main() async {
           builder: (_) => const ResetPasswordPage(),
         ),
       );
-    }
-  });
-
-  await saveDeviceToken();
-
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-    final user = Supabase.instance.client.auth.currentUser;
-
-    if (user != null) {
-      await Supabase.instance.client.from('device_tokens').upsert({
-        'user_id': user.id,
-        'token': newToken,
-      }, onConflict: 'user_id');
-
-      print("🔄 Token updated");
     }
   });
 
