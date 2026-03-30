@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'most_likely_game.dart';
 import 'truth_lie_game.dart';
+import 'meme_mania_lobby.dart';
 
 class GamesScreen extends StatelessWidget {
   const GamesScreen({super.key});
@@ -33,6 +34,16 @@ class GamesScreen extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TruthLieLobby()),
+            ),
+          ),
+          _GameCard(
+            title: 'Memes Mania',
+            description: 'Upload memes and let friends vote on the best comments!',
+            icon: Icons.emoji_emotions_outlined,
+            color: Colors.orangeAccent,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MemeManiaLobby()),
             ),
           ),
         ],
