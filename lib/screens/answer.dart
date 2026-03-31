@@ -87,15 +87,15 @@ class _AnswerScreenState extends State<AnswerScreen> {
         'answer_text': answerController.text.trim(),
       }).select().single();
 
-      // 🔴 STREAK LOGIC: Call RPC when an answer is posted
-      final askerId = _fullQuestion!['from_user'];
-      if (askerId != null && askerId != user.id) {
+      // 🔴 STREAK LOGIC: Call RPC after answer is successfully saved
+      final questionSenderId = _fullQuestion!['from_user'];
+      if (questionSenderId != null && questionSenderId != user.id) {
         try {
-          await supabase.rpc('update_streak', params: {
-            'sender_id': user.id,    // Person answering
-            'receiver_id': askerId,  // Person who asked
+          await supabase.rpc('update_streak_on_answer', params: {
+            'sender_id': supabase.auth.currentUser!.id,
+            'receiver_id': questionSenderId,
           });
-          debugPrint("🔥 Streak updated on answer");
+          print("STREAK CALLED");
         } catch (e) {
           debugPrint("⚠️ Streak failed: $e");
         }
@@ -109,9 +109,9 @@ class _AnswerScreenState extends State<AnswerScreen> {
           .eq('id', questionId);
 
       // 3. Send notification
-      if (askerId != null && askerId != user.id) {
+      if (questionSenderId != null && questionSenderId != user.id) {
         await supabase.from('notifications').insert({
-          'user_id': askerId,
+          'user_id': questionSenderId,
           'source_user': user.id,
           'type': 'answer',
           'source_id': answerResponse['id'],
@@ -128,7 +128,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
             await supabase.functions.invoke(
               'supabase-functions-new-send-push-notification',
               body: {
-                "user_id": askerId,
+                "user_id": questionSenderId,
                 "title": "New Answer 💬",
                 "body": "@$username answered your question",
                 "data": {"type": "answer", "answer_id": answerResponse['id']}
