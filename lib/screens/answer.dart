@@ -87,18 +87,29 @@ class _AnswerScreenState extends State<AnswerScreen> {
         'answer_text': answerController.text.trim(),
       }).select().single();
 
+      // 🔴 STREAK LOGIC: Call RPC when an answer is posted
+      final askerId = _fullQuestion!['from_user'];
+      if (askerId != null && askerId != user.id) {
+        try {
+          await supabase.rpc('update_streak', params: {
+            'sender_id': user.id,    // Person answering
+            'receiver_id': askerId,  // Person who asked
+          });
+          debugPrint("🔥 Streak updated on answer");
+        } catch (e) {
+          debugPrint("⚠️ Streak failed: $e");
+        }
+      }
+
       // 2. Mark question as answered
       final questionId = widget.question.id;
-
       await supabase
           .from('questions')
           .update({'answered': true})
           .eq('id', questionId);
 
-      // 3. Send notification to the person who asked the question
-      final askerId = _fullQuestion!['from_user'];
+      // 3. Send notification
       if (askerId != null && askerId != user.id) {
-        // Create notification record in DB
         await supabase.from('notifications').insert({
           'user_id': askerId,
           'source_user': user.id,
@@ -107,18 +118,11 @@ class _AnswerScreenState extends State<AnswerScreen> {
           'seen': false,
         });
 
-        // Send push notification using Supabase Edge Function
         try {
           final session = supabase.auth.currentSession;
           final accessToken = session?.accessToken;
-
           if (accessToken != null) {
-            // Fetch current user's username for notification body
-            final profile = await supabase
-                .from('profiles')
-                .select('username')
-                .eq('id', user.id)
-                .single();
+            final profile = await supabase.from('profiles').select('username').eq('id', user.id).single();
             final username = profile['username'] ?? "Someone";
 
             await supabase.functions.invoke(
@@ -127,14 +131,9 @@ class _AnswerScreenState extends State<AnswerScreen> {
                 "user_id": askerId,
                 "title": "New Answer 💬",
                 "body": "@$username answered your question",
-                "data": {
-                  "type": "answer",
-                  "answer_id": answerResponse['id']
-                }
+                "data": {"type": "answer", "answer_id": answerResponse['id']}
               },
-              headers: {
-                "Authorization": "Bearer $accessToken",
-              },
+              headers: {"Authorization": "Bearer $accessToken"},
             );
           }
         } catch (e) {
@@ -142,14 +141,10 @@ class _AnswerScreenState extends State<AnswerScreen> {
         }
       }
 
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${e.toString()}")),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: ${e.toString()}")));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

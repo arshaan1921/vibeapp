@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/meme_mania.dart';
 import '../../services/meme_mania_service.dart';
+import '../../providers/game_provider.dart';
 
 class MemeGameScreen extends StatefulWidget {
   final String gameId;
@@ -23,6 +25,14 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
     super.initState();
     _gameFuture = _service.getGameDetails(widget.gameId);
     _loadComments();
+    _markAsSeenAndDecrement();
+  }
+
+  Future<void> _markAsSeenAndDecrement() async {
+    await _service.markAsSeen(widget.gameId);
+    if (mounted) {
+      Provider.of<GameProvider>(context, listen: false).decrementCount();
+    }
   }
 
   Future<void> _loadComments() async {
@@ -76,8 +86,6 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
 
     try {
       await _service.toggleLike(comment.id);
-      // Optional: reload to ensure sync with server count/state
-      // await _loadComments(); 
     } catch (e) {
       debugPrint('Toggle like error: $e');
       // Rollback on error

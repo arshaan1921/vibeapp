@@ -13,6 +13,7 @@ class SavedScreen extends StatefulWidget {
 
 class _SavedScreenState extends State<SavedScreen> {
   List<Map<String, dynamic>> _savedProfiles = [];
+  Map<String, int> _userStreaks = {};
   bool _isLoading = true;
 
   @override
@@ -57,6 +58,7 @@ class _SavedScreenState extends State<SavedScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
+      // 1. Fetch saved user IDs
       final savedRows = await supabase
           .from('saved_profiles')
           .select('saved_user_id')
@@ -70,22 +72,45 @@ class _SavedScreenState extends State<SavedScreen> {
         if (mounted) {
           setState(() {
             _savedProfiles = [];
+            _userStreaks = {};
             _isLoading = false;
           });
         }
         return;
       }
 
-      final profilesResponse = await supabase
-          .from('profiles')
-          .select('id, username, name, avatar_url')
-          .inFilter('id', savedUserIds);
+      // 2. Fetch profiles and streaks in parallel for performance
+      final results = await Future.wait([
+        supabase
+            .from('profiles')
+            .select('id, username, name, avatar_url')
+            .inFilter('id', savedUserIds),
+        supabase
+            .from('user_streaks')
+            .select('user1_id, user2_id, streak_count')
+            .or('user1_id.eq.${user.id},user2_id.eq.${user.id}'),
+      ]);
+
+      final profilesResponse = results[0] as List;
+      final streaksResponse = results[1] as List;
+
+      // 3. Map streaks efficiently: key is the "other" user ID
+      final Map<String, int> streaksMap = {};
+      for (var row in streaksResponse) {
+        final u1 = row['user1_id'] as String;
+        final u2 = row['user2_id'] as String;
+        final count = row['streak_count'] as int;
+        
+        final otherId = (u1 == user.id) ? u2 : u1;
+        streaksMap[otherId] = count;
+      }
 
       if (mounted) {
         setState(() {
           _savedProfiles = List<Map<String, dynamic>>.from(profilesResponse)
               .where((p) => !blockService.isBlocked(p['id']))
               .toList();
+          _userStreaks = streaksMap;
           _isLoading = false;
         });
       }
@@ -127,6 +152,7 @@ class _SavedScreenState extends State<SavedScreen> {
                       itemBuilder: (context, index) {
                         final profile = _savedProfiles[index];
                         final avatarUrl = profile['avatar_url'];
+                        final streak = _userStreaks[profile['id']] ?? 0;
 
                         return ListTile(
                           tileColor: Theme.of(context).cardColor,
@@ -140,12 +166,31 @@ class _SavedScreenState extends State<SavedScreen> {
                                 ? Icon(Icons.person, color: Theme.of(context).iconTheme.color)
                                 : null,
                           ),
-                          title: Text(
-                            profile['name'] ?? profile['username'] ?? "User",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).textTheme.bodyLarge?.color,
-                            ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  profile['name'] ?? profile['username'] ?? "User",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (streak > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8.0),
+                                  child: Text(
+                                    "🔥 $streak",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orangeAccent,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                           subtitle: Text(
                             "@${profile['username']}",

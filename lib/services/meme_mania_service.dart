@@ -43,6 +43,21 @@ class MemeManiaService {
     return MemeGame.fromJson(response);
   }
 
+  Future<int> getUnreadGamesCount() async {
+    try {
+      final response = await _supabase
+          .from('meme_participants')
+          .select('id')
+          .eq('user_id', currentUserId)
+          .eq('is_seen', false);
+      
+      return (response as List).length;
+    } catch (e) {
+      print('Error getting unread memes count: $e');
+      return 0;
+    }
+  }
+
   Future<void> createMemeGame({
     required File imageFile,
     String? caption,
@@ -68,15 +83,22 @@ class MemeManiaService {
     
     final participants = allParticipantIds.map((id) => {
       'meme_id': memeId, 
-      'user_id': id
+      'user_id': id,
+      'is_seen': id == userId,
     }).toList();
 
     await _supabase.from('meme_participants').insert(participants);
   }
 
+  Future<void> markAsSeen(String memeId) async {
+    await _supabase
+        .from('meme_participants')
+        .update({'is_seen': true})
+        .match({'meme_id': memeId, 'user_id': currentUserId});
+  }
+
   Future<void> deleteMemeGame(String memeId) async {
     final userId = currentUserId;
-    // RLS will also handle this, but we match for safety
     await _supabase
         .from('meme_games')
         .delete()

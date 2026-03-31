@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:rxdart/rxdart.dart';
 import '../models/rate_game.dart';
 import '../models/user.dart';
 
@@ -83,6 +84,16 @@ class RateGameService {
     }
   }
 
+  Future<void> markAllAsSeen() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await _supabase
+        .from('rate_game_participants')
+        .update({'is_seen': true})
+        .eq('user_id', userId)
+        .eq('is_seen', false);
+  }
+
   Future<void> vote(String gameId, String rating) async {
     try {
       final userId = _supabase.auth.currentUser!.id;
@@ -140,14 +151,75 @@ class RateGameService {
     }
   }
 
+  /// ✅ DEBUG: Manual Fetch for Unread Count
+  Future<int> getUnreadGamesCount() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return 0;
+    final userId = user.id;
+
+    try {
+      // 1. Check meme_participants
+      final memeResponse = await _supabase
+          .from('meme_participants')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('is_seen', false);
+
+      // 2. Check rate_game_participants
+      final rateResponse = await _supabase
+          .from('rate_game_participants')
+          .select('game_id')
+          .eq('user_id', userId)
+          .eq('is_seen', false);
+
+      print("DEBUG: USER ID: $userId");
+      print("DEBUG: MEME RESPONSE: $memeResponse");
+      print("DEBUG: RATE RESPONSE: $rateResponse");
+
+      final totalCount = (memeResponse as List).length + (rateResponse as List).length;
+      print("DEBUG: FINAL UNREAD COUNT: $totalCount");
+
+      return totalCount;
+    } catch (e) {
+      print("DEBUG: ERROR FETCHING COUNT: $e");
+      return 0;
+    }
+  }
+
   Stream<int> streamUnseenGamesCount() {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return Stream.value(0);
 
-    return _supabase
+    print('📡 DEBUG: Setting up unseen games stream for user: $userId');
+
+    final rateGames = _supabase
         .from('rate_game_participants')
         .stream(primaryKey: ['game_id', 'user_id'])
         .eq('user_id', userId)
-        .map((data) => data.where((row) => row['is_seen'] == false).length);
+        .map((data) {
+          final count = data.where((row) => row['is_seen'] == false).length;
+          print('🎮 DEBUG: RateGames unseen count: $count');
+          return count;
+        });
+
+    final memeGames = _supabase
+        .from('meme_participants')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
+        .map((data) {
+          final count = data.where((row) => row['is_seen'] == false).length;
+          print('🤡 DEBUG: MemeGames unseen count: $count');
+          return count;
+        });
+
+    return Rx.combineLatest2<int, int, int>(
+      rateGames,
+      memeGames,
+      (a, b) {
+        final total = a + b;
+        print('🔔 DEBUG: Total unseen games badge: $total');
+        return total;
+      },
+    ).asBroadcastStream();
   }
 }
