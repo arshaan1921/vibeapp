@@ -4,10 +4,17 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'onboarding/onboarding.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic>? initialData;
-  const EditProfileScreen({super.key, this.initialData});
+  final bool isSignupFlow;
+  
+  const EditProfileScreen({
+    super.key, 
+    this.initialData,
+    this.isSignupFlow = false,
+  });
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -157,7 +164,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Profile updated!")),
         );
-        Navigator.pop(context, true);
+        
+        if (widget.isSignupFlow) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          );
+        } else {
+          Navigator.pop(context, true);
+        }
       }
     } catch (e) {
       debugPrint('Error saving profile: $e');
@@ -183,7 +198,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("EDIT PROFILE"),
+        title: Text(widget.isSignupFlow ? "COMPLETE PROFILE" : "EDIT PROFILE"),
+        automaticallyImplyLeading: !widget.isSignupFlow,
+        leading: widget.isSignupFlow ? null : IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           if (_isLoading)
             const Padding(
@@ -231,6 +251,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                           ],
                         ),
+                        const SizedBox(height: 8),
                         TextButton(
                           onPressed: _isUploading ? null : _pickImage,
                           child: const Text("Change Photo", 
@@ -288,6 +309,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 32),
+                  if (widget.isSignupFlow)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: _isLoading ? null : _saveProfile,
+                        child: const Text("SAVE & CONTINUE"),
+                      ),
+                    ),
                 ],
               ),
             ),

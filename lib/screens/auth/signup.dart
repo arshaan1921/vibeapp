@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/legal_links.dart';
-import '../onboarding/onboarding.dart';
+import '../edit_profile.dart';
 import 'login.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -32,29 +32,17 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleSignup() async {
     final name = nameController.text.trim();
-    final email = emailController.text.trim();
-    final username = usernameController.text.trim();
+    final email = emailController.text.trim().toLowerCase();
+    final username = usernameController.text.trim().toLowerCase();
     final password = passwordController.text.trim();
 
     if (email.isEmpty || username.isEmpty || password.isEmpty || name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("All fields are required")),
-      );
-      return;
-    }
-
-    final usernameRegex = RegExp(r'^[a-z0-9_]+$');
-    if (!usernameRegex.hasMatch(username)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Username can only contain lowercase letters, numbers, and underscores")),
-      );
+      _showError("All fields are required");
       return;
     }
 
     if (!_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please agree to Terms & Privacy Policy")),
-      );
+      _showError("Please agree to Terms & Privacy Policy");
       return;
     }
 
@@ -63,58 +51,81 @@ class _SignupScreenState extends State<SignupScreen> {
     try {
       final supabase = Supabase.instance.client;
 
-      final response = await supabase.auth.signUp(
+      // 1. Call auth.signUp
+      final AuthResponse res = await supabase.auth.signUp(
         email: email,
         password: password,
-        data: {
-          'username': username,
-          'name': name,
-        },
+        data: {'username': username, 'name': name},
       );
 
-      final user = response.user;
+      // 2. Wait until session is established (Polling loop)
+      Session? session = res.session ?? supabase.auth.currentSession;
+      int retries = 0;
+      while (session == null && retries < 10) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        session = supabase.auth.currentSession;
+        retries++;
+      }
 
-      if (user != null) {
+      if (session == null || session.user == null) {
+        throw AuthException("Auth session not established. Please try logging in.");
+      }
+
+      final user = session.user!;
+
+      // 3. Insert into profiles (using .insert() to respect RLS and confirmed constraints)
+      try {
         await supabase.from('profiles').insert({
           'id': user.id,
           'email': email,
           'username': username,
           'name': name,
-          'joined_at': DateTime.now().toIso8601String(),
-          'is_public': true,
-          'is_premium': false,
-          'vibes_count': 0,
-          'vibing_count': 0,
-          'report_count': 0,
         });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Account created successfully")),
-          );
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-          );
+      } on PostgrestException catch (pgError) {
+        // Log the real database error
+        debugPrint("Database Error: ${pgError.message} (Code: ${pgError.code})");
+        
+        // Handle specific unique constraint violation (username or email taken)
+        if (pgError.code == '23505') {
+          throw "This username or email is already taken. Please use a different one.";
         }
+        rethrow;
       }
-    } catch (e) {
+
+      // 4. Success - Navigate
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Signup failed: $e")),
+          const SnackBar(content: Text("Account created successfully!")),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EditProfileScreen(
+              isSignupFlow: true,
+              initialData: {'name': name, 'username': username},
+            ),
+          ),
         );
       }
+    } on AuthException catch (e) {
+      debugPrint("Auth Error: ${e.message}");
+      _showError(e.message);
+    } catch (e) {
+      debugPrint("Signup Flow Error: $e");
+      _showError(e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -130,66 +141,30 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Join V 1 B E",
-                style: TextStyle(
-                  fontSize: 22, 
-                  fontWeight: FontWeight.bold,
-                  color: theme.textTheme.bodyLarge?.color,
-                ),
-              ),
+              const Text("Join V 1 B E",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 32),
-              TextField(
-                controller: nameController,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                decoration: InputDecoration(
-                  hintText: "Name",
-                  hintStyle: TextStyle(color: theme.textTheme.bodySmall?.color),
-                  fillColor: theme.cardColor,
-                  filled: true,
-                ),
-              ),
+              _buildField(nameController, "Name",
+                  cap: TextCapitalization.words),
               const SizedBox(height: 16),
-              TextField(
-                controller: emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                decoration: InputDecoration(
-                  hintText: "Email",
-                  hintStyle: TextStyle(color: theme.textTheme.bodySmall?.color),
-                  fillColor: theme.cardColor,
-                  filled: true,
-                ),
-              ),
+              _buildField(emailController, "Email",
+                  type: TextInputType.emailAddress),
               const SizedBox(height: 16),
-              TextField(
-                controller: usernameController,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                inputFormatters: [
-                  LowerCaseTextFormatter(),
-                ],
-                decoration: InputDecoration(
-                  hintText: "Username",
-                  hintStyle: TextStyle(color: theme.textTheme.bodySmall?.color),
-                  fillColor: theme.cardColor,
-                  filled: true,
-                ),
-              ),
+              _buildField(usernameController, "Username", formatters: [
+                LowerCaseTextFormatter(),
+                FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9_]')),
+              ]),
               const SizedBox(height: 16),
               TextField(
                 controller: passwordController,
                 obscureText: _obscure,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                 decoration: InputDecoration(
                   hintText: "Password",
-                  hintStyle: TextStyle(color: theme.textTheme.bodySmall?.color),
                   fillColor: theme.cardColor,
                   filled: true,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscure ? Icons.visibility_off : Icons.visibility,
-                      color: theme.iconTheme.color,
-                    ),
+                        _obscure ? Icons.visibility_off : Icons.visibility),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
@@ -199,47 +174,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 children: [
                   Checkbox(
                     value: _agreeToTerms,
-                    onChanged: (val) => setState(() => _agreeToTerms = val ?? false),
-                    activeColor: theme.primaryColor,
+                    onChanged: (val) =>
+                        setState(() => _agreeToTerms = val ?? false),
                   ),
-                  Expanded(
-                    child: Wrap(
-                      children: [
-                        const Text(
-                          "I agree to the ",
-                          style: TextStyle(fontSize: 13, color: Colors.grey),
-                        ),
-                        GestureDetector(
-                          onTap: LegalLinks.launchTermsConditions,
-                          child: Text(
-                            "Terms & Conditions",
-                            style: TextStyle(
-                              fontSize: 13, 
-                              color: theme.primaryColor, 
-                              fontWeight: FontWeight.bold,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                        const Text(
-                          " and ",
-                          style: TextStyle(fontSize: 13, color: Colors.grey),
-                        ),
-                        GestureDetector(
-                          onTap: LegalLinks.launchPrivacyPolicy,
-                          child: Text(
-                            "Privacy Policy",
-                            style: TextStyle(
-                              fontSize: 13, 
-                              color: theme.primaryColor, 
-                              fontWeight: FontWeight.bold,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const Expanded(
+                      child: Text("I agree to the Terms & Privacy Policy")),
                 ],
               ),
               const SizedBox(height: 24),
@@ -251,32 +190,29 @@ class _SignupScreenState extends State<SignupScreen> {
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Text("CREATE ACCOUNT"),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
-                  },
-                  child: Text(
-                    "Already have account? Login",
-                    style: TextStyle(
-                      color: isDark ? Colors.blueAccent : theme.primaryColor,
-                    ),
-                  ),
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildField(TextEditingController controller, String hint,
+      {TextInputType? type,
+      List<TextInputFormatter>? formatters,
+      TextCapitalization cap = TextCapitalization.none}) {
+    return TextField(
+      controller: controller,
+      keyboardType: type,
+      inputFormatters: formatters,
+      textCapitalization: cap,
+      decoration: InputDecoration(
+          hintText: hint, fillColor: Theme.of(context).cardColor, filled: true),
     );
   }
 }
