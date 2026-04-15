@@ -83,7 +83,6 @@ class _FeedScreenState extends State<FeedScreen> {
               setState(() {
                 _feedItems.removeWhere((item) => item.id == newAnswer.id);
                 _feedItems.insert(0, newAnswer);
-                // No automatic sort here to keep the new one at top
               });
             }
           } catch (_) {}
@@ -92,6 +91,7 @@ class _FeedScreenState extends State<FeedScreen> {
             setState(() {
               final index = _feedItems.indexWhere((item) => item.id == payload.newRecord['id'].toString());
               if (index != -1) {
+                // Keep the current isLiked state from the model to avoid overwriting optimistic state
                 _feedItems[index] = _feedItems[index].copyWith(
                   likeCount: payload.newRecord['likes_count'],
                 );
@@ -130,7 +130,6 @@ class _FeedScreenState extends State<FeedScreen> {
         },
       );
 
-      // Listen for blocks to filter content live
       _realtimeChannel!.onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
@@ -146,7 +145,6 @@ class _FeedScreenState extends State<FeedScreen> {
 
   void _sortFeed() {
     _feedItems.sort((a, b) {
-      // Prioritize by creation time (descending) so new content is first
       return b.createdAt.compareTo(a.createdAt);
     });
   }
@@ -173,7 +171,7 @@ class _FeedScreenState extends State<FeedScreen> {
         setState(() {
           _feedItems = rawData
               .map((map) => AnswerModel.fromMap(map, isLiked: likedIds.contains(map['id'].toString())))
-              .where((item) => !blockService.isBlocked(item.userId)) // Filter blocked
+              .where((item) => !blockService.isBlocked(item.userId))
               .toList();
           _sortFeed();
           _isLoading = false;
@@ -204,6 +202,19 @@ class _FeedScreenState extends State<FeedScreen> {
                               return AnswerCard(
                                 key: ValueKey(_feedItems[index].id),
                                 answer: _feedItems[index],
+                                onLikeChanged: () {
+                                  if (mounted) {
+                                    setState(() {
+                                      final current = _feedItems[index];
+                                      _feedItems[index] = current.copyWith(
+                                        isLiked: !current.isLiked,
+                                        likeCount: current.isLiked 
+                                            ? current.likeCount - 1 
+                                            : current.likeCount + 1,
+                                      );
+                                    });
+                                  }
+                                },
                               );
                             },
                           ),

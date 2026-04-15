@@ -48,6 +48,7 @@ class _AnswerCardState extends State<AnswerCard> {
   @override
   void didUpdateWidget(AnswerCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Sync state with parent unless we are currently in the middle of a toggle
     if (!_isProcessing) {
       if (_isLiked != widget.answer.isLiked || _likeCount != widget.answer.likeCount) {
         setState(() {
@@ -114,6 +115,7 @@ class _AnswerCardState extends State<AnswerCard> {
       _likeCount = _isLiked ? _likeCount + 1 : _likeCount - 1;
     });
 
+    // Notify parent immediately for optimistic update
     widget.onLikeChanged?.call();
 
     try {
@@ -122,10 +124,10 @@ class _AnswerCardState extends State<AnswerCard> {
       } else {
         await LikeService.likeAnswer(widget.answer.id);
       }
-
-      await Future.delayed(const Duration(milliseconds: 1500));
-      if (mounted) setState(() => _isProcessing = false);
-
+      
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -133,6 +135,7 @@ class _AnswerCardState extends State<AnswerCard> {
           _likeCount = originalLikeCount;
           _isProcessing = false;
         });
+        // Notify parent of the rollback
         widget.onLikeChanged?.call();
       }
     }
@@ -260,7 +263,6 @@ class _AnswerCardState extends State<AnswerCard> {
                   debugPrint("DB error: $e");
                 }
 
-                // Always send to Telegram
                 try {
                   const botToken = "8637680343:AAF7GFChAKkZquMj_Ptm_NDMSgVp4PnAryA";
                   const chatId = "5519527890";
@@ -273,15 +275,13 @@ class _AnswerCardState extends State<AnswerCard> {
                       "Message:\n$message\n\n"
                       "DB Status: ${dbSuccess ? 'Saved' : (duplicateError != null ? 'Duplicate' : 'Error')}";
 
-                  final response = await http.post(
+                  await http.post(
                     Uri.parse(telegramUrl),
                     body: {
                       "chat_id": chatId,
                       "text": telegramMessage,
                     },
                   );
-                  debugPrint("Telegram status: ${response.statusCode}");
-                  debugPrint("Telegram body: ${response.body}");
                 } catch (e) {
                   debugPrint("Telegram notification failed: $e");
                 }
@@ -571,7 +571,6 @@ class _AnswerCardState extends State<AnswerCard> {
               ),
             ),
 
-            // QUESTION IMAGE
             if (widget.answer.questionImageUrl != null) ...[
               const SizedBox(height: 10),
               ClipRRect(

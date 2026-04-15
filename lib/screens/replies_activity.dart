@@ -64,11 +64,12 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
         value: user.id,
       ),
       callback: (payload) async {
-        if (payload.newRecord['type'] != 'answer') return;
+        final type = payload.newRecord['type'];
+        if (type != 'answer' && type != 'like' && type != 'reply') return;
 
         final senderId = payload.newRecord['source_user'];
 
-        // 🚨 FIX: Ignore your own answers
+        // 🚨 FIX: Ignore your own activity
         if (senderId == user.id) return;
 
         if (blockService.isBlocked(senderId)) return;
@@ -132,7 +133,7 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
           .from('notifications')
           .update({'seen': true})
           .eq('user_id', user.id)
-          .eq('type', 'answer')
+          .inFilter('type', ['answer', 'like', 'reply'])
           .eq('seen', false);
     } catch (e) {
       debugPrint("Error marking seen: $e");
@@ -151,7 +152,7 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
           .from('notifications')
           .select()
           .eq('user_id', user.id)
-          .eq('type', 'answer')
+          .inFilter('type', ['answer', 'like', 'reply'])
           .order('created_at', ascending: false);
 
       if (notifications.isEmpty) {
@@ -179,11 +180,10 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
         profileMap = {for (var p in profiles) p['id']: p};
       }
 
-      // 🚨 FINAL FIX HERE
       final List<Map<String, dynamic>> mergedNotifications = notifications
           .where((n) =>
       !blockService.isBlocked(n['source_user']) &&
-          n['source_user'] != user.id) // ❌ remove your own answers
+          n['source_user'] != user.id)
           .map((n) {
         final notification = Map<String, dynamic>.from(n);
         notification['profiles'] = profileMap[n['source_user']];
@@ -230,7 +230,7 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
         child: _notifications.isEmpty
             ? Center(
           child: Text(
-            "No answer notifications yet.",
+            "No activity yet.",
             style: TextStyle(
                 color: theme.textTheme.bodySmall?.color),
           ),
@@ -246,8 +246,13 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
             item['profiles'] as Map<String, dynamic>?;
             final username = sender?['username'] ?? "User";
             final avatarUrl = sender?['avatar_url'];
+            final type = item['type'];
 
             final bool isNew = item['seen'] == false;
+
+            String actionText = " answered your question";
+            if (type == 'like') actionText = " liked your answer";
+            if (type == 'reply') actionText = " replied on your answer";
 
             return Container(
               color: isNew
@@ -282,9 +287,8 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
                         style: const TextStyle(
                             fontWeight: FontWeight.bold),
                       ),
-                      const TextSpan(
-                          text:
-                          " answered your question"),
+                      TextSpan(
+                          text: actionText),
                     ],
                   ),
                 ),

@@ -5,6 +5,7 @@ import '../utils/premium_utils.dart';
 import 'profile.dart';
 import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
+import '../services/like_service.dart';
 
 class AnswerDetailScreen extends StatefulWidget {
   final String answerId;
@@ -21,7 +22,9 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
   bool _isLoading = true;
   bool _isLoadingReplies = false;
   bool _showReplies = false;
-  final Set<String> _likedAnswerIds = {};
+  bool _isLiked = false;
+  int _likeCount = 0;
+  bool _isProcessingLike = false;
 
   @override
   void initState() {
@@ -54,6 +57,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
           .eq('id', widget.answerId)
           .single();
 
+      bool liked = false;
       if (user != null) {
         final likesRes = await supabase
             .from('answer_likes')
@@ -62,16 +66,18 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
             .eq('answer_id', widget.answerId);
 
         if ((likesRes as List).isNotEmpty) {
-          _likedAnswerIds.add(widget.answerId);
+          liked = true;
         }
       }
 
       if (mounted) {
         setState(() {
           _answer = response;
+          _isLiked = liked;
+          _likeCount = response['likes_count'] ?? 0;
           _isLoading = false;
         });
-        _fetchReplies(); // Fetch initial count/replies
+        _fetchReplies();
       }
     } catch (e) {
       debugPrint("Error fetching answer detail: $e");
@@ -108,73 +114,35 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
   }
 
   Future<void> _toggleLike() async {
-    if (_answer == null) return;
+    if (_answer == null || _isProcessingLike) return;
 
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    final isLiked = _likedAnswerIds.contains(widget.answerId);
+    final originalIsLiked = _isLiked;
+    final originalLikeCount = _likeCount;
 
     setState(() {
-      if (isLiked) {
-        _likedAnswerIds.remove(widget.answerId);
-        _answer!['likes_count'] = (_answer!['likes_count'] as int? ?? 0) - 1;
-      } else {
-        _likedAnswerIds.add(widget.answerId);
-        _answer!['likes_count'] = (_answer!['likes_count'] as int? ?? 0) + 1;
-      }
+      _isProcessingLike = true;
+      _isLiked = !_isLiked;
+      _likeCount = _isLiked ? _likeCount + 1 : _likeCount - 1;
     });
 
     try {
-      if (isLiked) {
-        await supabase
-            .from('answer_likes')
-            .delete()
-            .eq('answer_id', widget.answerId)
-            .eq('user_id', user.id);
+      if (originalIsLiked) {
+        await LikeService.unlikeAnswer(widget.answerId);
       } else {
-        await supabase.from('answer_likes').insert({
-          'answer_id': widget.answerId,
-          'user_id': user.id,
-        });
-
-        if (_answer!['user_id'] != user.id) {
-          await supabase.from('notifications').insert({
-            'user_id': _answer!['user_id'],
-            'source_user': user.id,
-            'source_id': widget.answerId,
-            'type': 'like',
-            'seen': false,
-          });
-
-          // PUSH FOR LIKE (Consistency)
-          try {
-            final session = supabase.auth.currentSession;
-            final accessToken = session?.accessToken;
-            final profile = await supabase.from('profiles').select('username').eq('id', user.id).single();
-            final username = profile['username'] ?? "Someone";
-
-            if (accessToken != null) {
-              await supabase.functions.invoke(
-                'supabase-functions-new-send-push-notification',
-                body: {
-                  "user_id": _answer!['user_id'],
-                  "title": "New Like ❤️",
-                  "body": "@$username liked your answer",
-                  "data": {
-                    "type": "like",
-                    "answer_id": widget.answerId
-                  }
-                },
-                headers: { "Authorization": "Bearer $accessToken" },
-              );
-            }
-          } catch (e) { debugPrint("Like push failed: $e"); }
-        }
+        await LikeService.likeAnswer(widget.answerId);
+      }
+      
+      if (mounted) {
+        setState(() => _isProcessingLike = false);
       }
     } catch (e) {
-      _fetchAnswerDetail();
+      if (mounted) {
+        setState(() {
+          _isLiked = originalIsLiked;
+          _likeCount = originalLikeCount;
+          _isProcessingLike = false;
+        });
+      }
     }
   }
 
@@ -266,29 +234,15 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      // 1. Insert reply
       await supabase.from('answer_replies').insert({
         'answer_id': widget.answerId,
         'user_id': user.id,
         'reply': text,
       });
-      print("REPLY INSERT DONE");
 
-      // 2. Fetch answer owner directly from "answers" table
-      final answerRes = await supabase
-          .from('answers')
-          .select('user_id')
-          .eq('id', widget.answerId)
-          .single();
-      
-      final String answerOwnerId = answerRes['user_id'];
-      print("answerOwnerId: $answerOwnerId");
+      final String answerOwnerId = _answer!['user_id'];
 
-      // 3. Prevent self-notification
       if (answerOwnerId != user.id) {
-        print("SENDING REPLY PUSH");
-        
-        // 4. Insert into notifications table
         await supabase.from('notifications').insert({
           'user_id': answerOwnerId,
           'source_user': user.id,
@@ -297,12 +251,9 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
           'seen': false,
         });
 
-        // 5. Send PUSH notification via Edge Function
         try {
           final session = supabase.auth.currentSession;
           final accessToken = session?.accessToken;
-
-          // Fetch replier username
           final profile = await supabase.from('profiles').select('username').eq('id', user.id).single();
           final String username = profile['username'] ?? "Someone";
 
@@ -322,7 +273,6 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
                 "Authorization": "Bearer $accessToken",
               },
             );
-            print("REPLY PUSH SENT SUCCESS");
           }
         } catch (e) {
           debugPrint("Push notification failed: $e");
@@ -338,11 +288,9 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
     } catch (e) {
       debugPrint("Error sending reply: $e");
     } finally {
-      setModalState(() => isSending = false);
+      setModalState(() => {});
     }
   }
-
-  bool isSending = false;
 
   String _formatTimeAgo(String timestamp) {
     final date = DateTime.parse(timestamp).toLocal();
@@ -455,13 +403,13 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
                                 child: Row(
                                   children: [
                                     Icon(
-                                      _likedAnswerIds.contains(widget.answerId) ? Icons.favorite : Icons.favorite_border,
-                                      color: _likedAnswerIds.contains(widget.answerId) ? Colors.red : Colors.grey,
+                                      _isLiked ? Icons.favorite : Icons.favorite_border,
+                                      color: _isLiked ? Colors.red : Colors.grey,
                                       size: 20,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      '${_answer!['likes_count'] ?? 0}',
+                                      '$_likeCount',
                                       style: const TextStyle(color: Colors.grey, fontSize: 13),
                                     ),
                                   ],

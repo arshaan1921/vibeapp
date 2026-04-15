@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/question.dart';
-import '../services/notification_service.dart';
 
 class AnswerScreen extends StatefulWidget {
   final Question question;
@@ -87,28 +86,26 @@ class _AnswerScreenState extends State<AnswerScreen> {
         'answer_text': answerController.text.trim(),
       }).select().single();
 
-      // 🔴 STREAK LOGIC: Call RPC after answer is successfully saved
+      // 2. STREAK LOGIC: Call RPC after answer is successfully saved
       final questionSenderId = _fullQuestion!['from_user'];
       if (questionSenderId != null && questionSenderId != user.id) {
         try {
           await supabase.rpc('update_streak_on_answer', params: {
-            'sender_id': supabase.auth.currentUser!.id,
+            'sender_id': user.id,
             'receiver_id': questionSenderId,
           });
-          print("STREAK CALLED");
         } catch (e) {
           debugPrint("⚠️ Streak failed: $e");
         }
       }
 
-      // 2. Mark question as answered
-      final questionId = widget.question.id;
+      // 3. Mark question as answered
       await supabase
           .from('questions')
           .update({'answered': true})
-          .eq('id', questionId);
+          .eq('id', widget.question.id);
 
-      // 3. Send notification
+      // 4. Send notification & Push
       if (questionSenderId != null && questionSenderId != user.id) {
         await supabase.from('notifications').insert({
           'user_id': questionSenderId,
@@ -118,27 +115,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
           'seen': false,
         });
 
-        try {
-          final session = supabase.auth.currentSession;
-          final accessToken = session?.accessToken;
-          if (accessToken != null) {
-            final profile = await supabase.from('profiles').select('username').eq('id', user.id).single();
-            final username = profile['username'] ?? "Someone";
-
-            await supabase.functions.invoke(
-              'supabase-functions-new-send-push-notification',
-              body: {
-                "user_id": questionSenderId,
-                "title": "New Answer 💬",
-                "body": "@$username answered your question",
-                "data": {"type": "answer", "answer_id": answerResponse['id']}
-              },
-              headers: {"Authorization": "Bearer $accessToken"},
-            );
-          }
-        } catch (e) {
-          debugPrint("Push failed: $e");
-        }
+        _sendPushNotification(questionSenderId, answerResponse['id'], user.id);
       }
 
       if (mounted) Navigator.pop(context, true);
@@ -148,6 +125,31 @@ class _AnswerScreenState extends State<AnswerScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _sendPushNotification(String targetUserId, String answerId, String currentUserId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
+      final accessToken = session?.accessToken;
+      if (accessToken == null) return;
+
+      final profile = await supabase.from('profiles').select('username').eq('id', currentUserId).single();
+      final username = profile['username'] ?? "Someone";
+
+      await supabase.functions.invoke(
+        'supabase-functions-new-send-push-notification',
+        body: {
+          "user_id": targetUserId,
+          "title": "New Answer 💬",
+          "body": "@$username answered your question",
+          "data": {"type": "answer", "answer_id": answerId}
+        },
+        headers: {"Authorization": "Bearer $accessToken"},
+      );
+    } catch (e) {
+      debugPrint("Push notification failed: $e");
     }
   }
 
