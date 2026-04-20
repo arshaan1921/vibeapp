@@ -1,7 +1,7 @@
 name: v1be
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.8+9
+version: 1.0.9+10
 
 environment:
   sdk: ^3.11.0
@@ -24,6 +24,8 @@ dependencies:
   rxdart: ^0.27.7
   provider: ^6.1.1
   in_app_purchase: ^3.2.0
+  screenshot: ^3.0.0
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:
