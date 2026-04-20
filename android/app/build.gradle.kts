@@ -18,7 +18,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.v1be.v1be"
-    compileSdk = 36
+    compileSdk = 36 // Fixes build error: required by plugins
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -34,12 +34,11 @@ android {
     defaultConfig {
         applicationId = "com.v1be.v1be"
         minSdk = flutter.minSdkVersion
-        targetSdk = 36
+        targetSdk = 35 // Stable behavior for Android 15
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
-    // 🔐 Release signing config (SAFE VERSION)
     signingConfigs {
         create("release") {
             keyAlias = keystoreProperties["keyAlias"]?.toString()

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+import '../services/iap_service.dart';
 
 class BoosterPackScreen extends StatefulWidget {
   const BoosterPackScreen({super.key});
@@ -11,30 +12,14 @@ class BoosterPackScreen extends StatefulWidget {
 class _BoosterPackScreenState extends State<BoosterPackScreen> {
   bool _isLoading = false;
 
-  Future<void> _purchaseBooster(int questions, int price) async {
+  Future<void> _purchaseBooster(String productId) async {
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-
-      // Simulate purchase by adding questions to the question_boosters table
-      await supabase.from('question_boosters').insert({
-        'user_id': user.id,
-        'questions_added': questions,
-        'questions_used': 0,
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Successfully purchased $questions questions!")),
-        );
-        Navigator.pop(context, true);
-      }
+      await IAPService().buyProduct(productId);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${e.toString()}")),
+          SnackBar(content: Text("Error: $e")),
         );
       }
     } finally {
@@ -55,58 +40,78 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    "Get More Questions",
-                    style: TextStyle(
-                      fontSize: 24, 
-                      fontWeight: FontWeight.bold, 
-                      color: isDark ? Colors.white : const Color(0xFF2C4E6E),
-                    ),
+          : StreamBuilder<Map<String, ProductDetails>>(
+              stream: IAPService().productsStream,
+              builder: (context, snapshot) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Text(
+                        "Get More Questions",
+                        style: TextStyle(
+                          fontSize: 24, 
+                          fontWeight: FontWeight.bold, 
+                          color: isDark ? Colors.white : const Color(0xFF2C4E6E),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Daily limit reached? Buy a booster pack to keep vibing!",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
+                      ),
+                      const SizedBox(height: 32),
+                      _buildBoosterCard(
+                        context,
+                        id: IAPService.booster10,
+                        defaultQuestions: 10,
+                        defaultPrice: "₹29",
+                        products: snapshot.data,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildBoosterCard(
+                        context,
+                        id: IAPService.booster25,
+                        defaultQuestions: 25,
+                        defaultPrice: "₹59",
+                        products: snapshot.data,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildBoosterCard(
+                        context,
+                        id: IAPService.booster100,
+                        defaultQuestions: 100,
+                        defaultPrice: "₹149",
+                        products: snapshot.data,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Daily limit reached? Buy a booster pack to keep vibing!",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: isDark ? Colors.white70 : Colors.grey),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildBoosterCard(
-                    context,
-                    questions: 10,
-                    price: "₹29",
-                    onTap: () => _purchaseBooster(10, 29),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildBoosterCard(
-                    context,
-                    questions: 25,
-                    price: "₹59",
-                    onTap: () => _purchaseBooster(25, 59),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildBoosterCard(
-                    context,
-                    questions: 100,
-                    price: "₹149",
-                    onTap: () => _purchaseBooster(100, 149),
-                  ),
-                ],
-              ),
+                );
+              }
             ),
     );
   }
 
-  Widget _buildBoosterCard(BuildContext context, {required int questions, required String price, required VoidCallback onTap}) {
+  Widget _buildBoosterCard(
+    BuildContext context, {
+    required String id, 
+    required int defaultQuestions, 
+    required String defaultPrice,
+    Map<String, ProductDetails>? products,
+  }) {
     final theme = Theme.of(context);
+    final product = products?[id];
+    
+    // Use store price if available, otherwise use default
+    final displayPrice = product?.price ?? defaultPrice;
+    final displayTitle = product?.title.split('(').first.trim() ?? "$defaultQuestions Questions";
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        onTap: onTap,
+        onTap: () => _purchaseBooster(id),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -117,7 +122,7 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "$questions Questions",
+                    displayTitle,
                     style: TextStyle(
                       fontSize: 20, 
                       fontWeight: FontWeight.bold,
@@ -131,7 +136,7 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    price,
+                    displayPrice,
                     style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.w600),
                   ),
                 ],

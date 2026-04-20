@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/premium_utils.dart';
+import '../services/iap_service.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -12,26 +12,12 @@ class PremiumScreen extends StatefulWidget {
 class _PremiumScreenState extends State<PremiumScreen> {
   bool _isLoading = false;
 
-  Future<void> _upgradePlan(String plan, int months) async {
+  Future<void> _upgradePlan(String plan) async {
     setState(() => _isLoading = true);
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-
-      final expiresAt = DateTime.now().add(Duration(days: months * 30));
-
-      await supabase.from('profiles').update({
-        'premium_plan': plan,
-        'premium_expires_at': expiresAt.toIso8601String(),
-      }).eq('id', user.id);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Successfully upgraded to $plan plan!")),
-        );
-        Navigator.pop(context, true);
-      }
+      final productId = "${plan}_plan";
+      await IAPService().buyProduct(productId);
+      // The actual upgrade logic is handled in IAPService._deliverProduct upon success
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -68,30 +54,27 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       context,
                       plan: 'green',
                       title: "Green Plan",
-                      price: "₹99 / month",
+                      price: "₹100.00",
                       features: ["50 questions per day", "Green badge", "Green profile ring"],
-                      months: 1,
                     ),
                     const SizedBox(height: 16),
                     _buildPlanCard(
                       context,
                       plan: 'blue',
                       title: "Blue Plan",
-                      price: "₹249 / 3 months",
+                      price: "₹250.00",
                       features: ["Unlimited questions", "Blue badge", "Blue profile ring"],
-                      months: 3,
                     ),
                     const SizedBox(height: 16),
                     _buildPlanCard(
                       context,
                       plan: 'gold',
                       title: "Gold Plan",
-                      price: "₹799 / year",
+                      price: "₹800.00",
                       features: ["Unlimited questions", "Gold badge", "Gold profile ring"],
                       isBestValue: true,
-                      months: 12,
                     ),
-                    const SizedBox(height: 100), // Significant bottom padding to avoid nav bar overlap
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),
@@ -106,7 +89,6 @@ class _PremiumScreenState extends State<PremiumScreen> {
     required String price,
     required List<String> features,
     bool isBestValue = false,
-    required int months,
   }) {
     final color = PremiumUtils.getRingColor(plan);
 
@@ -158,7 +140,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    onPressed: () => _upgradePlan(plan, months),
+                    onPressed: () => _upgradePlan(plan),
                     child: const Text("UPGRADE NOW"),
                   ),
                 ),

@@ -18,6 +18,7 @@ import 'services/rate_game_service.dart';
 import 'services/block_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/reset_password_page.dart';
+import 'services/iap_service.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 
@@ -59,6 +60,9 @@ void main() async {
     anonKey:
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpdGFtbXJ4enNuZGlzc2VkaXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzE1MzIsImV4cCI6MjA4NzUwNzUzMn0._MqAAWpExMvi0vMHFhegqmx_gDPiJZWtUIbjJKvzfoQ",
   );
+
+  // Initialize In-App Purchases
+  IAPService().initialize();
 
   /// 🔥 PASSWORD RECOVERY LISTENER
   Supabase.instance.client.auth.onAuthStateChange.listen((data) {
