@@ -13,6 +13,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AnswerCard extends StatefulWidget {
   final AnswerModel answer;
@@ -518,6 +520,13 @@ class _AnswerCardState extends State<AnswerCard> {
     return DateFormat('MMM d').format(date);
   }
 
+  Future<void> _onOpen(LinkableElement link) async {
+    final Uri url = Uri.parse(link.url);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -655,12 +664,14 @@ class _AnswerCardState extends State<AnswerCard> {
                 ],
 
                 const SizedBox(height: 8),
-                Text(
-                  widget.answer.text,
+                Linkify(
+                  onOpen: _onOpen,
+                  text: widget.answer.text,
                   style: TextStyle(
                     fontSize: 14,
                     color: textTheme.bodyMedium?.color,
                   ),
+                  linkStyle: const TextStyle(color: Colors.blue),
                 ),
 
                 if (_replyCount > 0) ...[
@@ -741,9 +752,11 @@ class _AnswerCardState extends State<AnswerCard> {
                                         ],
                                       ),
                                       const SizedBox(height: 2),
-                                      Text(
-                                        reply['reply'] ?? "",
+                                      Linkify(
+                                        onOpen: _onOpen,
+                                        text: reply['reply'] ?? "",
                                         style: const TextStyle(fontSize: 13),
+                                        linkStyle: const TextStyle(color: Colors.blue),
                                       ),
                                     ],
                                   ),

@@ -631,7 +631,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           final message =
                               "Check out @$username on V1BE 👀\n"
                               "Username: $username\n"
-                              "Download app: https://shorturl.at/DdocE";
+                              "Download app: https://shorturl.at/1tf4k";
 
                           Share.share(message);
                         },
