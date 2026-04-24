@@ -4,6 +4,7 @@ import '../models/answer.dart';
 import '../widgets/v1be_top_bar.dart';
 import '../widgets/answer_card.dart';
 import '../services/block_service.dart';
+import '../widgets/stories_row.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -193,31 +194,34 @@ class _FeedScreenState extends State<FeedScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: _loadFeedData,
-                    child: _feedItems.isEmpty
-                        ? const Center(child: Text("No answers yet."))
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            itemCount: _feedItems.length,
-                            itemBuilder: (context, index) {
-                              return AnswerCard(
-                                key: ValueKey(_feedItems[index].id),
-                                answer: _feedItems[index],
-                                onLikeChanged: () {
-                                  if (mounted) {
-                                    setState(() {
-                                      final current = _feedItems[index];
-                                      _feedItems[index] = current.copyWith(
-                                        isLiked: !current.isLiked,
-                                        likeCount: current.isLiked 
-                                            ? current.likeCount - 1 
-                                            : current.likeCount + 1,
-                                      );
-                                    });
-                                  }
-                                },
-                              );
-                            },
-                          ),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: _feedItems.length + 1, // +1 for the StoriesRow
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return const StoriesRow();
+                        }
+                        
+                        final feedIndex = index - 1;
+                        return AnswerCard(
+                          key: ValueKey(_feedItems[feedIndex].id),
+                          answer: _feedItems[feedIndex],
+                          onLikeChanged: () {
+                            if (mounted) {
+                              setState(() {
+                                final current = _feedItems[feedIndex];
+                                _feedItems[feedIndex] = current.copyWith(
+                                  isLiked: !current.isLiked,
+                                  likeCount: current.isLiked 
+                                      ? current.likeCount - 1 
+                                      : current.likeCount + 1,
+                                );
+                              });
+                            }
+                          },
+                        );
+                      },
+                    ),
                   ),
           ),
         ],
