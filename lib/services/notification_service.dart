@@ -1,11 +1,11 @@
 import 'dart:convert';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../main.dart';
 import '../screens/profile.dart';
+import '../screens/chat_screen.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -34,7 +34,11 @@ class NotificationService {
     FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler);
 
-    final settings = await messaging.requestPermission();
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
     debugPrint("🔐 Permission: ${settings.authorizationStatus}");
 
     const androidInit =
@@ -53,9 +57,12 @@ class NotificationService {
     );
 
     const channel = AndroidNotificationChannel(
-      'v1be_channel',
-      'V1BE Notifications',
+      'messages', // Changed to "messages" as per requirement
+      'Messages',
+      description: 'Private chat messages',
       importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
     );
 
     await _localNotificationsPlugin
@@ -106,10 +113,26 @@ class NotificationService {
 
     if (type == 'question') {
       tabIndexNotifier.value = 1;
-
     } else if (type == 'like') {
       tabIndexNotifier.value = 0;
+    } else if (type == 'chat') {
+      final conversationId = data['conversation_id'];
+      final senderId = data['sender_id'];
+      final senderName = data['sender_name'] ?? 'Chat';
+      final avatarUrl = data['avatar_url'];
 
+      if (conversationId != null && senderId != null) {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              conversationId: conversationId,
+              otherUserId: senderId,
+              otherUserName: senderName,
+              otherUserAvatar: avatarUrl,
+            ),
+          ),
+        );
+      }
     } else if (type == 'vibe' || type == 'profile_save') {
       final userId = data['user_id'];
 
@@ -155,6 +178,7 @@ class NotificationService {
 
     debugPrint("💾 Saving token for user: ${user.id}");
 
+    // Upsert to device_tokens for multiple device support
     await supabase.from('device_tokens').upsert(
       {
         'user_id': user.id,
@@ -162,6 +186,11 @@ class NotificationService {
       },
       onConflict: 'user_id,token',
     );
+
+    // Also update profiles table as per requirement 5
+    await supabase.from('profiles').update({
+      'fcm_token': token,
+    }).eq('id', user.id);
 
     _lastToken = token;
   }
@@ -175,10 +204,12 @@ class NotificationService {
         Map<String, dynamic>? payload,
       }) async {
     const androidDetails = AndroidNotificationDetails(
-      'v1be_channel',
-      'V1BE Notifications',
+      'messages',
+      'Messages',
+      channelDescription: 'Private chat messages',
       importance: Importance.max,
       priority: Priority.high,
+      showWhen: true,
     );
 
     const details = NotificationDetails(android: androidDetails);
@@ -193,7 +224,7 @@ class NotificationService {
   }
 
   // ==============================
-  // 🔥 SEND CORE (FIXED)
+  // 🔥 SEND CORE
   // ==============================
   static Future<void> sendNotification({
     required String userId,
@@ -207,7 +238,7 @@ class NotificationService {
       debugPrint("🚀 Sending notification...");
       debugPrint("➡️ user_id: $userId");
 
-      final res = await supabase.functions.invoke(
+      await supabase.functions.invoke(
         'send-push-notification',
         body: {
           'user_id': userId,
@@ -216,62 +247,9 @@ class NotificationService {
           'data': data ?? {},
         },
       );
-
-      debugPrint("✅ RESPONSE: ${res.data}");
-
     } catch (e) {
       debugPrint("🔥 ERROR: $e");
     }
-  }
-
-  // ==============================
-  // 🔥 TYPES
-  // ==============================
-  static Future<void> sendLikeNotification({
-    required String receiverUserId,
-    required String senderUserId,
-    required String answerId,
-  }) async {
-    await sendNotification(
-      userId: receiverUserId,
-      title: "New Like ❤️",
-      body: "Someone liked your answer",
-      data: {
-        "type": "like",
-        "user_id": senderUserId,
-        "answer_id": answerId,
-      },
-    );
-  }
-
-  static Future<void> sendQuestionNotification({
-    required String receiverUserId,
-    required String senderUserId,
-  }) async {
-    await sendNotification(
-      userId: receiverUserId,
-      title: "New Question ❓",
-      body: "Someone asked you a question",
-      data: {
-        "type": "question",
-        "user_id": senderUserId,
-      },
-    );
-  }
-
-  static Future<void> sendVibeNotification({
-    required String receiverUserId,
-    required String senderUserId,
-  }) async {
-    await sendNotification(
-      userId: receiverUserId,
-      title: "New Vibe 🔥",
-      body: "Someone saved your profile",
-      data: {
-        "type": "vibe",
-        "user_id": senderUserId,
-      },
-    );
   }
 
   static void reset() {

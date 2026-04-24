@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart';
-import '../screens/ask_any_user.dart';
+import '../screens/chat_list_screen.dart';
 import '../screens/likes_activity.dart';
 import '../screens/replies_activity.dart';
 import '../screens/questions_screen.dart';
+import '../services/chat_service.dart';
 
 class V1BETopBar extends StatefulWidget {
   const V1BETopBar({super.key});
@@ -69,7 +69,6 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
             value: user.id,
           ),
           callback: (payload) {
-            // 🚨 FIX: Ignore your own answers in realtime
             if (payload.newRecord['type'] == 'answer' && payload.newRecord['source_user'] == user.id) return;
             fetchLikeNotificationsCount();
           },
@@ -105,7 +104,6 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      // Count unread like notifications
       final likesRes = await supabase
           .from('notifications')
           .select('id')
@@ -113,16 +111,14 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
           .eq('type', 'like')
           .eq('seen', false);
 
-      // Count unread answer notifications (excluding own answers)
       final answersRes = await supabase
           .from('notifications')
           .select('id')
           .eq('user_id', user.id)
           .eq('type', 'answer')
           .eq('seen', false)
-          .neq('source_user', user.id); // 🚨 FIX
+          .neq('source_user', user.id);
 
-      // Count pending questions (using existence of answers)
       final questionsRes = await supabase
           .from('questions')
           .select('id, answers(id)')
@@ -164,7 +160,7 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
                 ),
                 child: Center(
                   child: Text(
-                    count.toString(),
+                    count > 99 ? '99+' : count.toString(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
@@ -212,10 +208,7 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-
                 const Spacer(),
-
-                // CENTER ICONS
                 Row(
                   children: [
                     badgeIcon(Icons.favorite_border, likesCount, () {
@@ -252,24 +245,22 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
                     }),
                   ],
                 ),
-
                 const Spacer(),
-
-                // RIGHT COMPOSE
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.edit, color: Colors.white, size: 22),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AskAnyUserScreen(),
-                        ),
-                      );
-                    },
+                  child: StreamBuilder<int>(
+                    stream: chatService.getTotalUnreadCountStream(),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data ?? 0;
+                      return badgeIcon(Icons.chat_bubble_outline, count, () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChatListScreen(),
+                          ),
+                        ).then((_) => fetchLikeNotificationsCount());
+                      });
+                    }
                   ),
                 ),
               ],

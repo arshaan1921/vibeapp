@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/user.dart';
 
 class RealtimeService {
   static final RealtimeService _instance = RealtimeService._internal();
@@ -8,7 +9,7 @@ class RealtimeService {
   RealtimeService._internal();
 
   final _supabase = Supabase.instance.client;
-  RealtimeChannel? _channel;
+  RealtimeChannel? _mainChannel;
 
   // Stream controller to broadcast events to the UI
   final _eventController = StreamController<String>.broadcast();
@@ -19,10 +20,10 @@ class RealtimeService {
     if (user == null) return;
 
     // Use a single channel for all table changes
-    _channel = _supabase.channel('realtime');
+    _mainChannel = _supabase.channel('public:realtime');
 
     // questions -> refresh inbox screen and badge
-    _channel!.onPostgresChanges(
+    _mainChannel!.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'questions',
@@ -37,7 +38,7 @@ class RealtimeService {
     );
 
     // answers -> refresh profile answers
-    _channel!.onPostgresChanges(
+    _mainChannel!.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'answers',
@@ -52,7 +53,7 @@ class RealtimeService {
     );
 
     // answer_likes -> update like counters
-    _channel!.onPostgresChanges(
+    _mainChannel!.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'answer_likes',
@@ -62,7 +63,7 @@ class RealtimeService {
     );
 
     // notifications -> update notification badge
-    _channel!.onPostgresChanges(
+    _mainChannel!.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'notifications',
@@ -77,7 +78,7 @@ class RealtimeService {
     );
 
     // vibe_requests -> update vibe request badge
-    _channel!.onPostgresChanges(
+    _mainChannel!.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'vibe_requests',
@@ -91,11 +92,50 @@ class RealtimeService {
       },
     );
 
-    _channel!.subscribe();
+    _mainChannel!.subscribe();
   }
 
   void stopRealtime() {
-    _channel?.unsubscribe();
-    _channel = null;
+    _mainChannel?.unsubscribe();
+    _mainChannel = null;
+  }
+
+  Stream<AppUser?> getUserPresenceStream(String userId) {
+    StreamController<AppUser?> controller = StreamController<AppUser?>();
+    RealtimeChannel? channel;
+    
+    // Initial fetch
+    _supabase.from('profiles').select().eq('id', userId).maybeSingle().then((data) {
+      if (data != null && !controller.isClosed) {
+        controller.add(AppUser.fromJson(data));
+      }
+    }).catchError((e) => debugPrint('Error fetching user presence: $e'));
+
+    // Subscribe to changes for this specific user only
+    channel = _supabase.channel('presence:$userId');
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'profiles',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id',
+        value: userId,
+      ),
+      callback: (payload) {
+        if (payload.newRecord != null && !controller.isClosed) {
+          controller.add(AppUser.fromJson(payload.newRecord));
+        }
+      },
+    ).subscribe();
+
+    controller.onCancel = () {
+      channel?.unsubscribe();
+      if (!controller.isClosed) {
+        controller.close();
+      }
+    };
+
+    return controller.stream;
   }
 }

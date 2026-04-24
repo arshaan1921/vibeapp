@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import '../widgets/primary_button.dart';
 import 'ask_any_user.dart';
 import 'report_problem_screen.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
+import '../services/chat_service.dart';
+import 'chat_screen.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
@@ -20,6 +23,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   bool isLoading = true;
   bool isSaved = false;
   String? errorMessage;
+  int _likesCount = 0;
+  int _answersCount = 0;
+  int _v1beCount = 0;
 
   @override
   void initState() {
@@ -57,8 +63,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     await Future.wait([
       _fetchProfile(),
       _checkIfSaved(),
+      _fetchStats(),
     ]);
     if (mounted) setState(() => isLoading = false);
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      final answersRes = await supabase.from('answers').select('likes_count').eq('user_id', widget.userId);
+      final List answersList = answersRes as List;
+      
+      final v1besRes = await supabase.rpc('get_profile_v1bes', params: {'uid': widget.userId});
+
+      if (mounted) {
+        setState(() {
+          _answersCount = answersList.length;
+          _likesCount = answersList.fold(0, (sum, item) => sum + (item['likes_count'] as int));
+          _v1beCount = v1besRes as int;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching stats: $e");
+    }
   }
 
   Future<void> _fetchProfile() async {
@@ -131,6 +159,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       setState(() {
         isSaved = !isSaved;
       });
+      _fetchStats();
     } catch (e) {
       debugPrint("Error toggling save: $e");
     }
@@ -221,9 +250,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F8),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
@@ -278,107 +307,169 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     }
 
     final avatarUrl = profileData!['avatar_url'];
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final bool isMe = widget.userId == currentUserId;
+    
+    final joinedDate = profileData?['created_at'];
+    String joinedText = "";
+    if (joinedDate != null) {
+      final date = DateTime.parse(joinedDate).toLocal();
+      joinedText = "Joined ${DateFormat('MMMM yyyy').format(date)}";
+    }
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         children: [
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           Center(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 55,
-                  backgroundColor: Colors.white,
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFFFD700), width: 3),
+                  ),
                   child: CircleAvatar(
-                    radius: 52,
-                    backgroundColor: Colors.grey,
+                    radius: 55,
+                    backgroundColor: Colors.grey[200],
                     backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
                     child: (avatarUrl == null || avatarUrl == '') ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  profileData!['name'] ?? "No Name",
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.star, color: Color(0xFFFFD700), size: 18),
+                    const SizedBox(width: 4),
+                    Text(
+                      profileData!['username'] ?? "user",
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
                 Text(
                   "@${profileData!['username'] ?? 'username'}",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
-                const SizedBox(height: 12),
+                Text(
+                  joinedText,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Text(
                     profileData!['bio'] ?? "Ready to V 1 B E",
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
+          // Action Buttons Section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: PrimaryButton(
-              text: "ASK ME A QUESTION",
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AskAnyUserScreen(
-                      userId: widget.userId,
+            child: Row(
+              children: [
+                // "Question" Button
+                Expanded(
+                  child: PrimaryButton(
+                    text: "QUESTION",
+                    color: const Color(0xFF2C4E6E),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AskAnyUserScreen(
+                            userId: widget.userId,
+                          ),
+                        ),
+                      ).then((_) => _loadData());
+                    },
+                  ),
+                ),
+                
+                if (!isMe) ...[
+                  const SizedBox(width: 12),
+                  // "Message" Button
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2C4E6E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        try {
+                          final convId = await chatService.getOrCreateConversation(widget.userId);
+                          if (mounted) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  conversationId: convId,
+                                  otherUserId: widget.userId,
+                                  otherUserName: profileData!['username'] ?? 'User',
+                                  otherUserAvatar: avatarUrl,
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                           if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error starting chat: $e')),
+                              );
+                           }
+                        }
+                      },
+                      child: const Text("MESSAGE"),
                     ),
                   ),
-                ).then((_) {
-                  _loadData();
-                });
-              },
+                ],
+              ],
             ),
           ),
 
           const SizedBox(height: 32),
+          const Divider(height: 1),
+          const SizedBox(height: 16),
 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStat("Likes", "0"),
-              _buildStat("Answers", "0"),
+              _buildStat(_likesCount.toString(), "Likes"),
+              _buildStat(_answersCount.toString(), "Answers"),
+              _buildStat(_v1beCount.toString(), "V1BEs"),
             ],
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           const Divider(height: 1),
 
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            child: const Column(
+            padding: const EdgeInsets.all(20),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "ANSWERS",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                  ),
+                const Text(
+                  "MY ANSWERS",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
                 ),
-                SizedBox(height: 40),
-                Center(
+                const SizedBox(height: 40),
+                const Center(
                   child: Text(
                     "No answers yet.",
                     style: TextStyle(color: Colors.grey),
@@ -393,25 +484,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     );
   }
 
-  Widget _buildStat(String label, String value) {
+  Widget _buildStat(String value, String label) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       ],
     );
   }

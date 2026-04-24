@@ -19,6 +19,7 @@ import 'services/block_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/reset_password_page.dart';
 import 'services/iap_service.dart';
+import 'services/presence_service.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 
@@ -61,6 +62,9 @@ void main() async {
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpdGFtbXJ4enNuZGlzc2VkaXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzE1MzIsImV4cCI6MjA4NzUwNzUzMn0._MqAAWpExMvi0vMHFhegqmx_gDPiJZWtUIbjJKvzfoQ",
   );
 
+  // Initialize Notifications
+  await NotificationService.initialize();
+
   // Initialize In-App Purchases
   IAPService().initialize();
 
@@ -75,7 +79,23 @@ void main() async {
         ),
       );
     }
+    
+    if (event == AuthChangeEvent.signedIn) {
+      PresenceService().initialize();
+      RealtimeService().startRealtime();
+      NotificationService.setupToken();
+    } else if (event == AuthChangeEvent.signedOut) {
+      PresenceService().dispose();
+      RealtimeService().stopRealtime();
+      NotificationService.reset();
+    }
   });
+
+  // Initialize presence if user is already signed in
+  if (Supabase.instance.client.auth.currentUser != null) {
+    PresenceService().initialize();
+    RealtimeService().startRealtime();
+  }
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +14,8 @@ import '../widgets/answer_card.dart';
 import '../services/notification_service.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
+import '../services/chat_service.dart';
+import 'chat_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -729,18 +732,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (!isMe)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: PrimaryButton(
-                    text: "ASK ME A QUESTION",
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AskAnyUserScreen(
-                            userId: widget.userId,
-                          ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: PrimaryButton(
+                          text: "QUESTION",
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AskAnyUserScreen(
+                                  userId: widget.userId,
+                                ),
+                              ),
+                            ).then((_) => _loadData());
+                          },
                         ),
-                      ).then((_) => _loadData());
-                    },
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: PrimaryButton(
+                          text: "MESSAGE",
+                          onPressed: () async {
+                            try {
+                              final convId = await chatService.getOrCreateConversation(widget.userId!);
+                              if (mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChatScreen(
+                                      conversationId: convId,
+                                      otherUserId: widget.userId!,
+                                      otherUserName: profileData!['username'] ?? 'User',
+                                      otherUserAvatar: avatarUrl,
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                               if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error starting chat: $e')),
+                                  );
+                               }
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               if (isMe && plan == 'free')
