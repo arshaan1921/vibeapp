@@ -623,13 +623,15 @@ class _AnswerCardState extends State<AnswerCard> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  widget.answer.questionText,
+                Linkify(
+                  onOpen: _onOpen,
+                  text: widget.answer.questionText,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
                     color: textTheme.bodyLarge?.color,
                   ),
+                  linkStyle: const TextStyle(color: Colors.blue),
                 ),
 
                 if (widget.answer.questionImageUrl != null) ...[
