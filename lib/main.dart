@@ -45,6 +45,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ Enable Edge-to-Edge for Android 15+
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
   await Firebase.initializeApp();
 
   // Background handler registration
@@ -77,10 +80,13 @@ void main() async {
     }
   });
 
+  // ✅ Modern System UI Overlay Style for Android 15
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark, // Adjust based on background
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
 
@@ -157,9 +163,13 @@ class _MainScaffoldState extends State<MainScaffold> {
             SystemNavigator.pop();
           },
           child: Scaffold(
-            body: IndexedStack(
-              index: index,
-              children: _screens,
+            // ✅ Use SafeArea to prevent overlap with navigation bar
+            body: SafeArea(
+              top: false, // Top bar already handles its own SafeArea
+              child: IndexedStack(
+                index: index,
+                children: _screens,
+              ),
             ),
             bottomNavigationBar: BottomNavigationBar(
               currentIndex: index,
