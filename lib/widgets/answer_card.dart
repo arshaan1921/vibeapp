@@ -318,7 +318,17 @@ class _AnswerCardState extends State<AnswerCard> {
                   const chatId = "5519527890";
                   const telegramUrl = "https://api.telegram.org/bot$botToken/sendMessage";
 
+                  // Fetch profile for notification
+                  final profile = await supabase
+                      .from('profiles')
+                      .select('username, name')
+                      .eq('id', user.id)
+                      .single();
+                  final reporterName = profile['name'] ?? 'N/A';
+                  final reporterUsername = profile['username'] ?? 'N/A';
+
                   final telegramMessage = "🚨 Answer Report\n\n"
+                      "Reporter: $reporterName (@$reporterUsername)\n"
                       "Reporter ID: ${user.id}\n"
                       "Answer ID: $answerId\n"
                       "Reported User ID: $reportedUserId\n\n"

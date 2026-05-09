@@ -53,6 +53,15 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         throw Exception("User not authenticated");
       }
 
+      // Fetch reporter profile info
+      final profile = await supabase
+          .from('profiles')
+          .select('username, name')
+          .eq('id', user.id)
+          .single();
+      final reporterName = profile['name'] ?? 'N/A';
+      final reporterUsername = profile['username'] ?? 'N/A';
+
       String? imageUrl;
 
       if (_selectedImage != null) {
@@ -86,6 +95,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
         final typeLabel = widget.reportedUserId != null ? "👤 User Report" : "🚨 Support Report";
         final message = "$typeLabel\n\n"
+            "Reporter: $reporterName (@$reporterUsername)\n"
             "Reporter ID: ${user.id}\n"
             "${widget.reportedUserId != null ? "Reported User ID: ${widget.reportedUserId}\n" : ""}"
             "\nMessage:\n$reportText\n\n"

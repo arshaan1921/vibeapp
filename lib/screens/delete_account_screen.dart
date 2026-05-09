@@ -69,6 +69,15 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception("User not authenticated");
 
+      // Fetch user profile info for notification
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('username, name')
+          .eq('id', user.id)
+          .single();
+      final username = profile['username'] ?? 'N/A';
+      final name = profile['name'] ?? 'N/A';
+
       final now = DateTime.now();
       final deleteAt = now.add(const Duration(hours: 72));
 
@@ -83,6 +92,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       // Send Telegram notification
       await _sendTelegramNotification(
         "🚨 DELETE ACCOUNT REQUEST\n\n"
+        "Name: $name\n"
+        "Username: @$username\n"
         "User ID: ${user.id}\n"
         "Reason: $reason\n"
         "Time: ${now.toLocal()}"
@@ -108,6 +119,15 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception("User not authenticated");
 
+      // Fetch user profile info for notification
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('username, name')
+          .eq('id', user.id)
+          .single();
+      final username = profile['username'] ?? 'N/A';
+      final name = profile['name'] ?? 'N/A';
+
       final now = DateTime.now();
 
       await Supabase.instance.client
@@ -121,6 +141,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       // Send Telegram notification
       await _sendTelegramNotification(
         "❌ DELETE REQUEST CANCELLED\n\n"
+        "Name: $name\n"
+        "Username: @$username\n"
         "User ID: ${user.id}\n"
         "Reason: ${_pendingRequest!['reason']}\n"
         "Cancelled At: ${now.toLocal()}"
