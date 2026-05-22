@@ -63,7 +63,7 @@ class UpgradeScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          Icon(icon, color: const Color(0xFF2C4E6E), size: 24),
+          Icon(icon, color: const Color(0xFF0A3321), size: 24),
           const SizedBox(width: 16),
           Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
         ],

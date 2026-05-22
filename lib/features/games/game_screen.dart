@@ -169,7 +169,7 @@ class _GameScreenState extends State<GameScreen> {
         title: Text(_game!.gameType == 'most_likely' ? "MOST LIKELY TO" : "GAME", 
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
         elevation: 0,
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: const Color(0xFF0A3321),
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -327,7 +327,7 @@ class _GameScreenState extends State<GameScreen> {
         ElevatedButton(
           onPressed: _submitSetup,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2C4E6E),
+            backgroundColor: const Color(0xFF0A3321),
             foregroundColor: Colors.white,
             minimumSize: const Size(double.infinity, 54),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -197,7 +197,7 @@ class _FinishSentenceScreenState extends State<FinishSentenceScreen> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2C4E6E),
+                      backgroundColor: const Color(0xFF0A3321),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -230,7 +230,7 @@ class _FinishSentenceScreenState extends State<FinishSentenceScreen> {
         onPressed: _showCreateDialog,
         label: const Text('New Sentence'),
         icon: const Icon(Icons.add),
-        backgroundColor: const Color(0xFF2C4E6E),
+        backgroundColor: const Color(0xFF0A3321),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -475,7 +475,7 @@ class _SentenceDetailScreenState extends State<_SentenceDetailScreen> {
               children: [
                 Text(
                   widget.post['sentence_start'],
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF2C4E6E)),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0A3321)),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -587,7 +587,7 @@ class _SentenceDetailScreenState extends State<_SentenceDetailScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   onPressed: _postReply,
-                  icon: const Icon(Icons.send, color: Color(0xFF2C4E6E)),
+                  icon: const Icon(Icons.send, color: Color(0xFF0A3321)),
                 ),
               ],
             ),

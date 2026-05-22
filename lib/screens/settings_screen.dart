@@ -196,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: isDark ? Colors.blueAccent : const Color(0xFF2C4E6E)),
+            Icon(icon, size: 22, color: isDark ? Colors.green : const Color(0xFF0A3321)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -219,7 +219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: isDark ? Colors.blueAccent : const Color(0xFF2C4E6E)),
+            Icon(icon, size: 22, color: isDark ? Colors.green : const Color(0xFF0A3321)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

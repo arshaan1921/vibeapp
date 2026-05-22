@@ -55,7 +55,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   ? Icons.share
                                   : Icons.security,
                           size: 100,
-                          color: const Color(0xFF2C4E6E),
+                          color: const Color(0xFF0A3321),
                         ),
                         const SizedBox(height: 40),
                         Text(
@@ -63,7 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2C4E6E),
+                            color: Color(0xFF0A3321),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -91,7 +91,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         width: _currentPage == index ? 24 : 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2C4E6E),
+                          color: const Color(0xFF0A3321),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),

@@ -20,7 +20,7 @@ class WelcomeScreen extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: isDark 
               ? [const Color(0xFF121212), const Color(0xFF1E1E1E)]
-              : [const Color(0xFF2C4E6E), const Color(0xFF3F6E9A)],
+              : [const Color(0xFF0A3321), const Color(0xFF144D3A)],
           ),
         ),
         child: SafeArea(
@@ -36,7 +36,7 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                   children: [
                     TextSpan(text: "High", style: TextStyle(color: Colors.white)),
-                    TextSpan(text: "5", style: TextStyle(color: Color(0xFF5BC236))),
+                    TextSpan(text: "5", style: TextStyle(color: Color(0xFFB9F6CA))),
                   ],
                 ),
               ),
@@ -56,7 +56,7 @@ class WelcomeScreen extends StatelessWidget {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF5BC236),
+                          backgroundColor: const Color(0xFF0A3321),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28),

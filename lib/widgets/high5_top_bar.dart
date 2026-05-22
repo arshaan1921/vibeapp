@@ -193,8 +193,8 @@ class _High5TopBarState extends State<High5TopBar> with WidgetsBindingObserver {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xFF2C4E6E),
-                  Color(0xFF3F6E9A),
+                  Color(0xFF0A3321),
+                  Color(0xFF144D3A),
                 ],
               ),
             ),

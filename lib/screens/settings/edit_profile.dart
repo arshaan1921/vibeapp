@@ -127,7 +127,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       title: const Text("Public Profile"),
                       value: _isPublic,
                       onChanged: (val) => setState(() => _isPublic = val),
-                      activeColor: const Color(0xFF2C4E6E),
+                      activeColor: const Color(0xFF0A3321),
                     ),
                   ],
                 ),

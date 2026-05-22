@@ -52,7 +52,7 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
                         style: TextStyle(
                           fontSize: 24, 
                           fontWeight: FontWeight.bold, 
-                          color: isDark ? Colors.white : const Color(0xFF2C4E6E),
+                          color: isDark ? Colors.white : const Color(0xFF0A3321),
                         ),
                       ),
                       const SizedBox(height: 8),
