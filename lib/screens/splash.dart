@@ -16,7 +16,7 @@ class SplashScreen extends StatelessWidget {
             children: [
               const Spacer(),
               Text(
-                'V1BE',
+                'High5',
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.primary,

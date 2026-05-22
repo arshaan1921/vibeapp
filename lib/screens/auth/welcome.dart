@@ -32,12 +32,11 @@ class WelcomeScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 42,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 8,
+                    letterSpacing: 2,
                   ),
                   children: [
-                    TextSpan(text: "V  ", style: TextStyle(color: Colors.white)),
-                    TextSpan(text: "1", style: TextStyle(color: Color(0xFF5BC236))),
-                    TextSpan(text: "  B  E", style: TextStyle(color: Colors.white)),
+                    TextSpan(text: "High", style: TextStyle(color: Colors.white)),
+                    TextSpan(text: "5", style: TextStyle(color: Color(0xFF5BC236))),
                   ],
                 ),
               ),

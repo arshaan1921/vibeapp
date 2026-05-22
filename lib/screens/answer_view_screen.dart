@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../widgets/v1be_top_bar.dart';
+import '../widgets/high5_top_bar.dart';
 import '../utils/premium_utils.dart';
 import '../utils/image_utils.dart';
 import '../services/like_service.dart';

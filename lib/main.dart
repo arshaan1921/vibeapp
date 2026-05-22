@@ -23,8 +23,8 @@ import 'services/iap_service.dart';
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'v1be_channel',
-  'V1BE Notifications',
+  'high5_channel',
+  'High5 Notifications',
   description: 'Important notifications',
   importance: Importance.max,
 );
@@ -90,16 +90,16 @@ void main() async {
     ),
   );
 
-  runApp(const V1beApp());
+  runApp(const High5App());
 }
 
-class V1beApp extends StatelessWidget {
-  const V1beApp({super.key});
+class High5App extends StatelessWidget {
+  const High5App({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'V1BE',
+      title: 'High5',
       navigatorKey: NotificationService.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,

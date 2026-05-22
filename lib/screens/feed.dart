@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/answer.dart';
-import '../widgets/v1be_top_bar.dart';
+import '../widgets/high5_top_bar.dart';
 import '../widgets/answer_card.dart';
 import '../services/block_service.dart';
 
@@ -187,7 +187,7 @@ class _FeedScreenState extends State<FeedScreen> {
     return Scaffold(
       body: Column(
         children: [
-          const V1BETopBar(),
+          const High5TopBar(),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())

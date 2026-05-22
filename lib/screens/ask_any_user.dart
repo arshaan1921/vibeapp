@@ -214,8 +214,8 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
               "user_id": selectedUserId,
               "title": "New Question 👀",
               "body": isAnonymous 
-                  ? "Someone asked you a question on V1BE" 
-                  : "@$senderName asked you a question on V1BE",
+                  ? "Someone asked you a question on High5" 
+                  : "@$senderName asked you a question on High5",
               "data": {
                 "type": "question"
               }

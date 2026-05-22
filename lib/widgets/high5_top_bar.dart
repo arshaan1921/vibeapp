@@ -7,14 +7,14 @@ import '../screens/likes_activity.dart';
 import '../screens/replies_activity.dart';
 import '../screens/questions_screen.dart';
 
-class V1BETopBar extends StatefulWidget {
-  const V1BETopBar({super.key});
+class High5TopBar extends StatefulWidget {
+  const High5TopBar({super.key});
 
   @override
-  State<V1BETopBar> createState() => _V1BETopBarState();
+  State<High5TopBar> createState() => _High5TopBarState();
 }
 
-class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
+class _High5TopBarState extends State<High5TopBar> with WidgetsBindingObserver {
   int likesCount = 0;
   int questionsCount = 0;
   int answersCount = 0;
@@ -203,7 +203,7 @@ class _V1BETopBarState extends State<V1BETopBar> with WidgetsBindingObserver {
                 const Padding(
                   padding: EdgeInsets.only(left: 12),
                   child: Text(
-                    "V 1 B E",
+                    "H I G H 5",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 17,

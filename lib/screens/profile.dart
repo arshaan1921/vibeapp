@@ -31,7 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _likesCount = 0;
   bool isSaved = false;
   int _remainingQuestions = 0;
-  int _v1beCount = 0;
+  int _high5Count = 0;
   RealtimeChannel? _realtimeChannel;
 
   @override
@@ -129,11 +129,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _fetchAnswers(),
       _checkIfSaved(),
       _fetchRemainingQuestions(),
-      _fetchV1besCount(),
+      _fetchHigh5sCount(),
     ]);
   }
 
-  Future<void> _fetchV1besCount() async {
+  Future<void> _fetchHigh5sCount() async {
     try {
       final supabase = Supabase.instance.client;
       final targetId = widget.userId ?? supabase.auth.currentUser?.id;
@@ -142,11 +142,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final response = await supabase.rpc('get_profile_v1bes', params: {'uid': targetId});
       if (mounted) {
         setState(() {
-          _v1beCount = response as int;
+          _high5Count = response as int;
         });
       }
     } catch (e) {
-      debugPrint("Error fetching V1BEs count: $e");
+      debugPrint("Error fetching High5s count: $e");
     }
   }
 
@@ -221,7 +221,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               body: {
                 "user_id": widget.userId!,
                 "title": "Profile Saved!",
-                "body": "@${saverProfile['username']} saved your profile to their V1BEs!",
+                "body": "@${saverProfile['username']} saved your profile to their High5s!",
                 "data": {"type": "profile_save"}
               },
               headers: {
@@ -240,7 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
       if (mounted) setState(() => isSaved = !isSaved);
-      _fetchV1besCount();
+      _fetchHigh5sCount();
     } catch (e) {
       debugPrint("Toggle save error: $e");
     }
@@ -629,7 +629,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           final username = profileData?['username'] ?? 'user';
 
                           final message =
-                              "Check out @$username on V1BE 👀\n"
+                              "Check out @$username on High5 👀\n"
                               "Username: $username\n"
                               "Download app: https://shorturl.at/1tf4k";
 
@@ -709,7 +709,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  profileData!['bio'] ?? "Ready to V 1 B E",
+                  profileData!['bio'] ?? "Ready to H I G H 5",
                   style: TextStyle(fontSize: 14, color: theme.textTheme.bodyMedium?.color),
                 ),
               ),
@@ -766,7 +766,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Expanded(child: _buildStat("Likes", _likesCount.toString())),
                   Expanded(child: _buildStat("Answers", _answers.length.toString())),
-                  Expanded(child: _buildStat("V1BEs", _v1beCount.toString())),
+                  Expanded(child: _buildStat("High5s", _high5Count.toString())),
                 ],
               ),
 

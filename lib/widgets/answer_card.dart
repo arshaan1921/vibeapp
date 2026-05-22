@@ -174,12 +174,12 @@ class _AnswerCardState extends State<AnswerCard> {
       }
 
       final directory = await getTemporaryDirectory();
-      final imagePath = await File('${directory.path}/v1be_share_${DateTime.now().millisecondsSinceEpoch}.png').create();
+      final imagePath = await File('${directory.path}/high5_share_${DateTime.now().millisecondsSinceEpoch}.png').create();
       await imagePath.writeAsBytes(image);
 
       await Share.shareXFiles(
         [XFile(imagePath.path)],
-        text: 'Check out this answer on V1BE! 🔥\nDownload here: https://play.google.com/store/apps/details?id=com.v1be.v1be',
+        text: 'Check out this answer on High5! 🔥\nDownload here: https://play.google.com/store/apps/details?id=com.v1be.v1be',
       );
     } catch (e) {
       debugPrint("Error sharing card: $e");

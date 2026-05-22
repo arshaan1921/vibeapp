@@ -84,7 +84,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                "V1BE",
+                "High5",
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontSize: 64,

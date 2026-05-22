@@ -53,8 +53,8 @@ class NotificationService {
     );
 
     const channel = AndroidNotificationChannel(
-      'v1be_channel',
-      'V1BE Notifications',
+      'high5_channel',
+      'High5 Notifications',
       importance: Importance.max,
     );
 
@@ -175,8 +175,8 @@ class NotificationService {
         Map<String, dynamic>? payload,
       }) async {
     const androidDetails = AndroidNotificationDetails(
-      'v1be_channel',
-      'V1BE Notifications',
+      'high5_channel',
+      'High5 Notifications',
       importance: Importance.max,
       priority: Priority.high,
     );

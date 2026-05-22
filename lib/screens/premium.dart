@@ -33,7 +33,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("V1BE PREMIUM"),
+        title: const Text("HIGH5 PREMIUM"),
         centerTitle: true,
       ),
       body: _isLoading
