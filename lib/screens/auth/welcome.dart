@@ -27,6 +27,11 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
+              Image.asset(
+                'assets/logo.png',
+                height: 180,
+              ),
+              const SizedBox(height: 20),
               RichText(
                 text: const TextSpan(
                   style: TextStyle(
@@ -35,7 +40,7 @@ class WelcomeScreen extends StatelessWidget {
                     letterSpacing: 2,
                   ),
                   children: [
-                    TextSpan(text: "High", style: TextStyle(color: Colors.white)),
+                    TextSpan(text: "HIGH", style: TextStyle(color: Colors.white)),
                     TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
                   ],
                 ),

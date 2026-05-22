@@ -92,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     letterSpacing: 8,
                   ),
                   children: [
-                    const TextSpan(text: "High"),
+                    const TextSpan(text: "HIGH"),
                     const TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
                   ],
                 ),

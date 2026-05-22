@@ -141,8 +141,19 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Join V 1 B E",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                  children: const [
+                    TextSpan(text: "Join HIGH"),
+                    TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
+                  ],
+                ),
+              ),
               const SizedBox(height: 32),
               _buildField(nameController, "Name",
                   cap: TextCapitalization.words),
