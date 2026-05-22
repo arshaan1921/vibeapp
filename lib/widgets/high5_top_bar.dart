@@ -200,15 +200,20 @@ class _High5TopBarState extends State<High5TopBar> with WidgetsBindingObserver {
             ),
             child: Row(
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(left: 12),
-                  child: Text(
-                    "H I G H 5",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.1,
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: RichText(
+                    text: const TextSpan(
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.1,
+                      ),
+                      children: [
+                        TextSpan(text: "H I G H "),
+                        TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
+                      ],
                     ),
                   ),
                 ),

@@ -83,13 +83,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                "High5",
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 64,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 8,
+              RichText(
+                text: TextSpan(
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 64,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 8,
+                  ),
+                  children: [
+                    const TextSpan(text: "High"),
+                    const TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
+                  ],
                 ),
               ),
               const SizedBox(height: 10),

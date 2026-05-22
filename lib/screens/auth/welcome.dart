@@ -36,7 +36,7 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                   children: [
                     TextSpan(text: "High", style: TextStyle(color: Colors.white)),
-                    TextSpan(text: "5", style: TextStyle(color: Color(0xFFB9F6CA))),
+                    TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
                   ],
                 ),
               ),
