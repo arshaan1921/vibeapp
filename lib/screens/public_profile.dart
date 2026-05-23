@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/primary_button.dart';
+import '../utils/image_utils.dart';
 import 'ask_any_user.dart';
 import 'report_problem_screen.dart';
 import 'blocked_users_screen.dart';
@@ -286,14 +287,17 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           Center(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 55,
-                  backgroundColor: Colors.white,
+                GestureDetector(
+                  onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
                   child: CircleAvatar(
-                    radius: 52,
-                    backgroundColor: Colors.grey,
-                    backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
-                    child: (avatarUrl == null || avatarUrl == '') ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                    radius: 55,
+                    backgroundColor: Colors.white,
+                    child: CircleAvatar(
+                      radius: 52,
+                      backgroundColor: Colors.grey,
+                      backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
+                      child: (avatarUrl == null || avatarUrl == '') ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

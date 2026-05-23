@@ -180,8 +180,8 @@ class _MainScaffoldState extends State<MainScaffold> {
               backgroundColor: isDark
                   ? const Color(0xFF1E1E1E)
                   : Theme.of(context).primaryColor,
-              selectedItemColor: Colors.white,
-              unselectedItemColor: Colors.white.withOpacity(0.5),
+              selectedItemColor: const Color(0xFFFFD700),
+              unselectedItemColor: Colors.white.withOpacity(0.7),
               items: [
                 const BottomNavigationBarItem(
                   icon: Icon(Icons.home_rounded),

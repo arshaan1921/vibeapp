@@ -7,6 +7,7 @@ import '../widgets/primary_button.dart';
 import 'settings_screen.dart';
 import 'search_screen.dart';
 import '../utils/premium_utils.dart';
+import '../utils/image_utils.dart';
 import 'ask_any_user.dart';
 import 'premium.dart';
 import '../widgets/answer_card.dart';
@@ -592,39 +593,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: SafeArea(
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Column(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF0A3321),
+                  Color(0xFF144D3A),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    if (!isMe)
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    const Spacer(),
                     if (!isMe) ...[
                       IconButton(
-                        icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
-                        color: theme.iconTheme.color,
+                        icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border, color: Colors.white),
                         onPressed: _toggleSave,
                       ),
                       IconButton(
-                        icon: const Icon(Icons.more_vert),
-                        color: theme.iconTheme.color,
+                        icon: const Icon(Icons.more_vert, color: Colors.white),
                         onPressed: _showEllipsisMenu,
                       ),
                     ],
                     if (isMe) ...[
                       IconButton(
-                        icon: const Icon(Icons.search, size: 24),
-                        color: theme.iconTheme.color,
+                        icon: const Icon(Icons.search, size: 24, color: Colors.white),
                         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SearchScreen())),
                       ),
-                      const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.share_outlined, size: 24),
-                        color: theme.iconTheme.color,
+                        icon: const Icon(Icons.share_outlined, size: 24, color: Colors.white),
                         onPressed: () {
                           final username = profileData?['username'] ?? 'user';
 
@@ -636,10 +647,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Share.share(message);
                         },
                       ),
-                      const SizedBox(width: 8),
                       IconButton(
-                        icon: const Icon(Icons.settings_outlined, size: 24),
-                        color: theme.iconTheme.color,
+                        icon: const Icon(Icons.settings_outlined, size: 24, color: Colors.white),
                         onPressed: () async {
                           await Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
                           _loadData();
@@ -649,182 +658,188 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
-              
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: PremiumUtils.buildProfileRing(plan, width: 3),
-                      child: CircleAvatar(
-                        radius: 45,
-                        backgroundColor: theme.cardColor,
-                        child: CircleAvatar(
-                          radius: 42,
-                          backgroundColor: Colors.grey,
-                          backgroundImage: (avatarUrl != null && avatarUrl.toString().isNotEmpty) 
-                              ? NetworkImage(avatarUrl) 
-                              : null,
-                          child: (avatarUrl == null || avatarUrl.toString().isEmpty) 
-                              ? const Icon(Icons.person, size: 45, color: Colors.white) 
-                              : null,
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: PremiumUtils.buildProfileRing(plan, width: 3),
+                            child: CircleAvatar(
+                              radius: 45,
+                              backgroundColor: theme.cardColor,
+                              child: CircleAvatar(
+                                radius: 42,
+                                backgroundColor: Colors.grey,
+                                backgroundImage: (avatarUrl != null && avatarUrl.toString().isNotEmpty) 
+                                    ? NetworkImage(avatarUrl) 
+                                    : null,
+                                child: (avatarUrl == null || avatarUrl.toString().isEmpty) 
+                                    ? const Icon(Icons.person, size: 45, color: Colors.white) 
+                                    : null,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              PremiumUtils.buildBadge(plan),
-                              Flexible(
-                                child: Text(
-                                  profileData!['name'] ?? "No Name",
-                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.textTheme.bodyLarge?.color),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                              Row(
+                                children: [
+                                  PremiumUtils.buildBadge(plan),
+                                  Flexible(
+                                    child: Text(
+                                      profileData!['name'] ?? "No Name",
+                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.textTheme.bodyLarge?.color),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                "@${profileData!['username'] ?? 'username'}",
+                                style: TextStyle(fontSize: 15, color: theme.textTheme.bodySmall?.color),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                joinedText,
+                                style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
                               ),
                             ],
                           ),
-                          Text(
-                            "@${profileData!['username'] ?? 'username'}",
-                            style: TextStyle(fontSize: 15, color: theme.textTheme.bodySmall?.color),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            joinedText,
-                            style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
-                          ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      profileData!['bio'] ?? "Ready to H I G H 5",
+                      style: TextStyle(fontSize: 14, color: theme.textTheme.bodyMedium?.color),
+                    ),
+                  ),
+                  if (isMe)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, top: 12),
+                      child: Text(
+                        (plan == 'blue' || plan == 'gold') 
+                          ? "Today's questions: Unlimited" 
+                          : "Today's remaining questions: $_remainingQuestions",
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.primaryColor),
                       ),
                     ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  profileData!['bio'] ?? "Ready to H I G H 5",
-                  style: TextStyle(fontSize: 14, color: theme.textTheme.bodyMedium?.color),
-                ),
-              ),
-
-              if (isMe)
-                Padding(
-                  padding: const EdgeInsets.only(left: 20, top: 12),
-                  child: Text(
-                    (plan == 'blue' || plan == 'gold') 
-                      ? "Today's questions: Unlimited" 
-                      : "Today's remaining questions: $_remainingQuestions",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.primaryColor),
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-              if (!isMe)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: PrimaryButton(
-                    text: "ASK ME A QUESTION",
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AskAnyUserScreen(
-                            userId: widget.userId,
-                          ),
-                        ),
-                      ).then((_) => _loadData());
-                    },
-                  ),
-                ),
-              if (isMe && plan == 'free')
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: PrimaryButton(
-                    text: "GO PREMIUM",
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const PremiumScreen()),
-                      ).then((_) => _loadData());
-                    },
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-              Divider(height: 1, color: theme.dividerColor),
-              const SizedBox(height: 16),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Expanded(child: _buildStat("Likes", _likesCount.toString())),
-                  Expanded(child: _buildStat("Answers", _answers.length.toString())),
-                  Expanded(child: _buildStat("High5s", _high5Count.toString())),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-              Divider(height: 1, color: theme.dividerColor),
-              
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  const SizedBox(height: 24),
+                  if (!isMe)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Text("MY ANSWERS", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.textTheme.bodySmall?.color)),
-                    ),
-                    const SizedBox(height: 16),
-                    _loadingAnswers
-                        ? const Center(child: CircularProgressIndicator())
-                        : _answers.isEmpty
-                            ? Center(child: Padding(padding: const EdgeInsets.only(top: 24.0), child: Text("No answers yet.", style: TextStyle(color: theme.textTheme.bodySmall?.color))))
-                            : ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: _answers.length,
-                                itemBuilder: (context, index) {
-                                  return AnswerCard(
-                                    key: ValueKey(_answers[index].id),
-                                    answer: _answers[index],
-                                    onDelete: (id) => _deleteAnswer(id),
-                                    onPin: (id, pin) => _togglePin(id, pin),
-                                    onLikeChanged: () {
-                                      setState(() {
-                                        final current = _answers[index];
-                                        _answers[index] = current.copyWith(
-                                          isLiked: !current.isLiked,
-                                          likeCount: current.isLiked 
-                                              ? current.likeCount - 1 
-                                              : current.likeCount + 1,
-                                        );
-                                        
-                                        int total = 0;
-                                        for (var ans in _answers) {
-                                          total += ans.likeCount;
-                                        }
-                                        _likesCount = total;
-                                      });
-                                    },
-                                  );
-                                },
+                      child: PrimaryButton(
+                        text: "ASK ME A QUESTION",
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AskAnyUserScreen(
+                                userId: widget.userId,
                               ),
-                  ],
-                ),
+                            ),
+                          ).then((_) => _loadData());
+                        },
+                      ),
+                    ),
+                  if (isMe && plan == 'free')
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: PrimaryButton(
+                        text: "GO PREMIUM",
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const PremiumScreen()),
+                          ).then((_) => _loadData());
+                        },
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  Divider(height: 1, color: theme.dividerColor),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Expanded(child: _buildStat("Likes", _likesCount.toString())),
+                      Expanded(child: _buildStat("Answers", _answers.length.toString())),
+                      Expanded(child: _buildStat("High5s", _high5Count.toString())),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Divider(height: 1, color: theme.dividerColor),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Text("MY ANSWERS", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.textTheme.bodySmall?.color)),
+                        ),
+                        const SizedBox(height: 16),
+                        _loadingAnswers
+                            ? const Center(child: CircularProgressIndicator())
+                            : _answers.isEmpty
+                                ? Center(child: Padding(padding: const EdgeInsets.only(top: 24.0), child: Text("No answers yet.", style: TextStyle(color: theme.textTheme.bodySmall?.color))))
+                                : ListView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: _answers.length,
+                                    itemBuilder: (context, index) {
+                                      return AnswerCard(
+                                        key: ValueKey(_answers[index].id),
+                                        answer: _answers[index],
+                                        onDelete: (id) => _deleteAnswer(id),
+                                        onPin: (id, pin) => _togglePin(id, pin),
+                                        onLikeChanged: () {
+                                          setState(() {
+                                            final current = _answers[index];
+                                            _answers[index] = current.copyWith(
+                                              isLiked: !current.isLiked,
+                                              likeCount: current.isLiked 
+                                                  ? current.likeCount - 1 
+                                                  : current.likeCount + 1,
+                                            );
+                                            
+                                            int total = 0;
+                                            for (var ans in _answers) {
+                                              total += ans.likeCount;
+                                            }
+                                            _likesCount = total;
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

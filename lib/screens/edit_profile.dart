@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import '../utils/image_utils.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'onboarding/onboarding.dart';
 
@@ -230,18 +231,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       children: [
                         Stack(
                           children: [
-                            CircleAvatar(
-                              radius: 55,
-                              backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
-                              backgroundImage: _selectedImage != null
-                                  ? FileImage(_selectedImage!)
-                                  : (_avatarUrl != null
-                                      ? NetworkImage(_avatarUrl!)
-                                      : null) as ImageProvider?,
-                              child: _selectedImage == null && _avatarUrl == null
-                                  ? const Icon(Icons.person,
-                                      size: 55, color: Colors.white)
-                                  : null,
+                            GestureDetector(
+                              onTap: () {
+                                if (_selectedImage == null && _avatarUrl != null) {
+                                  ImageUtils.showImagePreview(context, _avatarUrl);
+                                }
+                              },
+                              child: CircleAvatar(
+                                radius: 55,
+                                backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
+                                backgroundImage: _selectedImage != null
+                                    ? FileImage(_selectedImage!)
+                                    : (_avatarUrl != null
+                                        ? NetworkImage(_avatarUrl!)
+                                        : null) as ImageProvider?,
+                                child: _selectedImage == null && _avatarUrl == null
+                                    ? const Icon(Icons.person,
+                                        size: 55, color: Colors.white)
+                                    : null,
+                              ),
                             ),
                             if (_isUploading)
                               const Positioned.fill(
