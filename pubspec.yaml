@@ -1,7 +1,7 @@
 name: high5
 description: "Ask anonymous questions, answer honestly, and play fun social games with friends."
 publish_to: 'none'
-version: 1.0.17+18
+version: 1.0.18+19
 
 environment:
   sdk: ^3.11.0
@@ -27,6 +27,9 @@ dependencies:
   screenshot: ^3.0.0
   path_provider: ^2.1.2
   flutter_linkify: ^6.0.0
+  package_info_plus: ^8.1.0
+  new_version_plus: ^0.1.0
+  http: ^1.2.1
 
 dev_dependencies:
   flutter_test:

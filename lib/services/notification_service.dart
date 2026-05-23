@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../main.dart';
 import '../screens/profile.dart';
+import 'update_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -65,6 +66,13 @@ class NotificationService {
 
     await setupToken();
 
+    // ✅ Automatic Topic Subscription
+    FirebaseMessaging.instance.subscribeToTopic('high5_updates').then((_) {
+      debugPrint("✅ Subscribed to high5_updates topic");
+    }).catchError((e) {
+      debugPrint("❌ Topic subscription error: $e");
+    });
+
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
       debugPrint("🔄 Token refreshed: $token");
       saveTokenToSupabase(token);
@@ -109,6 +117,10 @@ class NotificationService {
 
     } else if (type == 'like') {
       tabIndexNotifier.value = 0;
+
+    } else if (type == 'update') {
+      // ✅ Handle Update Notification Click
+      UpdateService.openPlayStore();
 
     } else if (type == 'vibe' || type == 'profile_save') {
       final userId = data['user_id'];

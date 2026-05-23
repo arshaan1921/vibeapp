@@ -19,6 +19,8 @@ import 'services/block_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/reset_password_page.dart';
 import 'services/iap_service.dart';
+import 'widgets/update_popup.dart';
+import 'services/update_service.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 
@@ -120,6 +122,20 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   DateTime? _lastBackPressed;
   final _gameService = RateGameService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 1. Check for Play Store updates (Priority)
+      await UpdateService.checkUpdate(context);
+      
+      // 2. Show rebrand announcement if no store update was shown
+      if (mounted) {
+        await UpdatePopup.showIfNeeded(context);
+      }
+    });
+  }
 
   final List<Widget> _screens = const [
     FeedScreen(),
