@@ -2,9 +2,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 class LegalLinks {
   static const String privacyPolicyUrl =
-      'https://sites.google.com/view/high5-app/privacy-policy';
+      'https://sites.google.com/view/v1be-app/privacy-policy?authuser=0';
   static const String termsConditionsUrl =
-      'https://sites.google.com/view/high5-app/terms-conditions';
+      'https://sites.google.com/view/v1be-app/terms-conditions';
 
   static Future<void> launchPrivacyPolicy() async {
     final Uri url = Uri.parse(privacyPolicyUrl);
