@@ -67,7 +67,12 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
             likes_count,
             user_id,
             profiles:profiles!answers_user_id_fkey(id, username, avatar_url, premium_plan),
-            questions:questions!answers_question_id_fkey(text, image_url)
+            questions:questions!answers_question_id_fkey(
+              text, 
+              image_url, 
+              is_anonymous,
+              asker:profiles!from_user(id, username)
+            )
           ''')
           .eq('id', widget.answerId)
           .single();
@@ -373,6 +378,27 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
+                              GestureDetector(
+                                onTap: () {
+                                  final question = _answer!['questions'];
+                                  final isAnonymous = question?['is_anonymous'] ?? false;
+                                  final askerId = question?['asker']?['id'];
+                                  if (!isAnonymous && askerId != null) {
+                                    _navigateToProfile(askerId);
+                                  }
+                                },
+                                child: Text(
+                                  (_answer!['questions']?['is_anonymous'] ?? false)
+                                      ? "@anonymously asked"
+                                      : "@${_answer!['questions']?['asker']?['username'] ?? 'User'} asked",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white54 : Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
                               Text(
                                 _answer!['questions']?['text'] ?? "",
                                 style: TextStyle(

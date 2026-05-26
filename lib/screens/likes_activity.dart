@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'answer_view_screen.dart';
+import 'profile.dart';
 import '../services/block_service.dart';
 
 class LikesActivityScreen extends StatefulWidget {
@@ -246,19 +247,44 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> {
                             ? (isDark ? Colors.blueAccent.withOpacity(0.1) : const Color(0xFFEAF3FF)) 
                             : Colors.transparent,
                           child: ListTile(
-                            leading: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.grey.withOpacity(0.2),
-                              backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
-                              child: (avatarUrl == null || avatarUrl == '') ? Icon(Icons.person, color: theme.iconTheme.color) : null,
+                            leading: GestureDetector(
+                              onTap: () {
+                                final userId = item['source_user'];
+                                if (userId != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => ProfileScreen(userId: userId)),
+                                  );
+                                }
+                              },
+                              child: CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Colors.grey.withOpacity(0.2),
+                                backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
+                                child: (avatarUrl == null || avatarUrl == '') ? Icon(Icons.person, color: theme.iconTheme.color) : null,
+                              ),
                             ),
                             title: RichText(
                               text: TextSpan(
                                 style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 14),
                                 children: [
-                                  TextSpan(
-                                    text: "@$username",
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        final userId = item['source_user'];
+                                        if (userId != null) {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(builder: (_) => ProfileScreen(userId: userId)),
+                                          );
+                                        }
+                                      },
+                                      child: Text(
+                                        "@$username",
+                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                      ),
+                                    ),
                                   ),
                                   const TextSpan(text: " liked your answer"),
                                 ],

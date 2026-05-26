@@ -546,27 +546,32 @@ class _AnswerCardState extends State<AnswerCard> {
     return Screenshot(
       controller: _screenshotController,
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         color: theme.scaffoldBackgroundColor,
-        child: Card(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          elevation: 0,
-          color: theme.cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.dividerColor),
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (widget.answer.isPinned)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
+                    padding: const EdgeInsets.only(bottom: 12.0),
                     child: Row(
                       children: [
                         const Icon(Icons.push_pin, size: 14, color: Colors.blueAccent),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 6),
                         Text(
                           "Pinned Answer",
                           style: TextStyle(
@@ -595,7 +600,7 @@ class _AnswerCardState extends State<AnswerCard> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: GestureDetector(
                         onTap: () => _navigateToProfile(widget.answer.userId),
@@ -607,7 +612,7 @@ class _AnswerCardState extends State<AnswerCard> {
                                 "@${widget.answer.username}",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                                  fontSize: 15,
                                   color: textTheme.bodyLarge?.color,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -620,32 +625,42 @@ class _AnswerCardState extends State<AnswerCard> {
                     IconButton(
                       icon: const Icon(Icons.more_vert),
                       onPressed: () => _showOptionsMenu(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  widget.answer.isAnonymous ? "@anonymously asked" : "@${widget.answer.askerUsername ?? 'User'} asked",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: textTheme.bodySmall?.color ?? Colors.grey,
-                    fontStyle: FontStyle.italic,
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () {
+                    if (!widget.answer.isAnonymous && widget.answer.askerId != null) {
+                      _navigateToProfile(widget.answer.askerId);
+                    }
+                  },
+                  child: Text(
+                    widget.answer.isAnonymous ? "@anonymously asked" : "@${widget.answer.askerUsername ?? 'User'} asked",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: textTheme.bodySmall?.color?.withOpacity(0.6) ?? Colors.grey,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Linkify(
                   onOpen: _onOpen,
                   text: widget.answer.questionText,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 15,
+                    fontSize: 16,
                     color: textTheme.bodyLarge?.color,
+                    height: 1.3,
                   ),
                   linkStyle: const TextStyle(color: Colors.blue),
                 ),
 
                 if (widget.answer.questionImageUrl != null) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 14),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.network(
@@ -675,19 +690,20 @@ class _AnswerCardState extends State<AnswerCard> {
                   ),
                 ],
 
-                const SizedBox(height: 8),
+                const SizedBox(height: 14),
                 Linkify(
                   onOpen: _onOpen,
                   text: widget.answer.text,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     color: textTheme.bodyMedium?.color,
+                    height: 1.4,
                   ),
                   linkStyle: const TextStyle(color: Colors.blue),
                 ),
 
                 if (_replyCount > 0) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   GestureDetector(
                     onTap: () {
                       setState(() => _showReplies = !_showReplies);
@@ -703,7 +719,7 @@ class _AnswerCardState extends State<AnswerCard> {
                     ),
                   ),
                   if (_showReplies) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     if (_isLoadingReplies)
                       const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))))
                     else
@@ -781,9 +797,9 @@ class _AnswerCardState extends State<AnswerCard> {
                   ],
                 ],
 
-                const SizedBox(height: 16),
-                Divider(height: 1, color: theme.dividerColor),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
+                Divider(height: 1, color: theme.dividerColor.withOpacity(0.5)),
+                const SizedBox(height: 14),
                 Row(
                   children: [
                     GestureDetector(
@@ -793,13 +809,13 @@ class _AnswerCardState extends State<AnswerCard> {
                           Icon(
                             _isLiked ? Icons.favorite : Icons.favorite_border,
                             color: _isLiked ? Colors.red : theme.iconTheme.color,
-                            size: 20,
+                            size: 22,
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
                           Text(
                             "$_likeCount",
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               color: textTheme.bodyMedium?.color,
                               fontWeight: FontWeight.w600,
                             ),
@@ -807,17 +823,17 @@ class _AnswerCardState extends State<AnswerCard> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 24),
+                    const SizedBox(width: 28),
                     GestureDetector(
                       onTap: _showReplySheet,
                       child: Row(
                         children: [
-                          Icon(Icons.chat_bubble_outline, size: 20, color: theme.iconTheme.color),
-                          const SizedBox(width: 6),
+                          Icon(Icons.chat_bubble_outline, size: 21, color: theme.iconTheme.color),
+                          const SizedBox(width: 8),
                           Text(
                             "$_replyCount",
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               color: textTheme.bodyMedium?.color,
                               fontWeight: FontWeight.w600,
                             ),

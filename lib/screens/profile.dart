@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../main.dart';
 import '../models/answer.dart';
 import '../widgets/primary_button.dart';
 import 'settings_screen.dart';
@@ -11,7 +14,6 @@ import '../utils/image_utils.dart';
 import 'ask_any_user.dart';
 import 'premium.dart';
 import '../widgets/answer_card.dart';
-import '../services/notification_service.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
 
@@ -547,9 +549,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _handleLinkClick(LinkableElement link) async {
+    if (link.url.startsWith('@')) {
+      // Resolve username to profile
+      final username = link.url.substring(1).toLowerCase();
+      try {
+        final data = await Supabase.instance.client
+            .from('profiles')
+            .select('id')
+            .eq('username', username)
+            .maybeSingle();
+
+        if (data != null && mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ProfileScreen(userId: data['id'])),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("User @$username not found")),
+          );
+        }
+      } catch (e) {
+        debugPrint("Error navigating to user: $e");
+      }
+    } else {
+      // Standard URL
+      final Uri url = Uri.parse(link.url);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        debugPrint('Could not launch $url');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _buildBody(),
     );
   }
@@ -578,11 +614,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (profileData == null) return const Center(child: Text("Profile data missing"));
 
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
     final isMe = widget.userId == null || widget.userId == currentUserId;
     final avatarUrl = profileData!['avatar_url'];
     final plan = profileData!['premium_plan'] ?? 'free';
     
+    final nameText = profileData!['name'] ?? "No Name";
+    double nameFontSize = 24; // Baseline
+    if (nameText.length > 18) {
+      nameFontSize = 18;
+    } else if (nameText.length > 14) {
+      nameFontSize = 20;
+    } else if (nameText.length > 10) {
+      nameFontSize = 22;
+    }
+
     final joinedDate = profileData?['created_at'];
     String joinedText = "Joined";
     if (joinedDate != null) {
@@ -591,252 +638,363 @@ class _ProfileScreenState extends State<ProfileScreen> {
       joinedText = "Joined $formatted";
     }
 
+    // Custom Ring Color logic to avoid circular-only shapes from PremiumUtils
+    final ringColor = PremiumUtils.getRingColor(plan);
+
     return RefreshIndicator(
       onRefresh: _loadData,
-      child: Column(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF0A3321),
-                  Color(0xFF144D3A),
-                ],
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    if (!isMe)
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    const Spacer(),
-                    if (!isMe) ...[
-                      IconButton(
-                        icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border, color: Colors.white),
-                        onPressed: _toggleSave,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.more_vert, color: Colors.white),
-                        onPressed: _showEllipsisMenu,
-                      ),
-                    ],
-                    if (isMe) ...[
-                      IconButton(
-                        icon: const Icon(Icons.search, size: 24, color: Colors.white),
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SearchScreen())),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.share_outlined, size: 24, color: Colors.white),
-                        onPressed: () {
-                          final username = profileData?['username'] ?? 'user';
-
-                          final message =
-                              "Check out @$username on High5 👀\n"
-                              "Username: $username\n"
-                              "Download app: https://shorturl.at/1tf4k";
-
-                          Share.share(message);
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.settings_outlined, size: 24, color: Colors.white),
-                        onPressed: () async {
-                          await Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
-                          _loadData();
-                        },
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: PremiumUtils.buildProfileRing(plan, width: 3),
-                            child: CircleAvatar(
-                              radius: 45,
-                              backgroundColor: theme.cardColor,
-                              child: CircleAvatar(
-                                radius: 42,
-                                backgroundColor: Colors.grey,
-                                backgroundImage: (avatarUrl != null && avatarUrl.toString().isNotEmpty) 
-                                    ? NetworkImage(avatarUrl) 
-                                    : null,
-                                child: (avatarUrl == null || avatarUrl.toString().isEmpty) 
-                                    ? const Icon(Icons.person, size: 45, color: Colors.white) 
-                                    : null,
-                              ),
-                            ),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          // 2. OVERLAPPING PREMIUM PROFILE CARD
+          SliverToBoxAdapter(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // 1. PREMIUM HEADER WITH GRADIENT
+                Container(
+                  height: 160,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF003E2E), // Premium Top Left
+                        Color(0xFF0B5B42), // Premium Bottom Right
+                      ],
+                    ),
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                            onPressed: () {
+                              if (Navigator.of(context).canPop()) {
+                                Navigator.pop(context);
+                              } else {
+                                tabIndexNotifier.value = 0; // Go to Home tab
+                              }
+                            },
                           ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
+                          const Spacer(),
+                          if (!isMe) ...[
+                            IconButton(
+                              icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border, color: Colors.white, size: 22),
+                              onPressed: _toggleSave,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.more_vert, color: Colors.white, size: 22),
+                              onPressed: _showEllipsisMenu,
+                            ),
+                          ],
+                          if (isMe) ...[
+                            IconButton(
+                              icon: const Icon(Icons.search, size: 24, color: Colors.white),
+                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SearchScreen())),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.share_outlined, size: 24, color: Colors.white),
+                              onPressed: () {
+                                final username = profileData?['username'] ?? 'user';
+                                final message = "Check out @$username on High5 👀\n"
+                                    "Username: $username\n"
+                                    "Download app: https://shorturl.at/1tf4k";
+                                Share.share(message);
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.settings_outlined, size: 24, color: Colors.white),
+                              onPressed: () async {
+                                await Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
+                                _loadData();
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 2. OVERLAPPING PREMIUM PROFILE CARD
+                Padding(
+                  padding: const EdgeInsets.only(top: 110), // Overlap calculation (160 - 50)
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 25,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.fromLTRB(12, 20, 8, 16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Avatar + Name Section
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  PremiumUtils.buildBadge(plan),
-                                  Flexible(
-                                    child: Text(
-                                      profileData!['name'] ?? "No Name",
-                                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.textTheme.bodyLarge?.color),
-                                      overflow: TextOverflow.ellipsis,
+                                  // Squircle Avatar (Premium Rounded Square)
+                                  GestureDetector(
+                                      onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
+                                    child: Container(
+                                      width: 92, // Reduced from 106 to give more space for text
+                                      height: 92,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(22),
+                                        border: ringColor != Colors.transparent 
+                                            ? Border.all(color: ringColor, width: 2.2) 
+                                            : Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+                                        boxShadow: [
+                                          if (ringColor != Colors.transparent)
+                                            BoxShadow(
+                                              color: ringColor.withOpacity(0.2),
+                                              blurRadius: 12,
+                                              spreadRadius: 0.2,
+                                            ),
+                                        ],
+                                      ),
+                                      child: Container(
+                                        margin: const EdgeInsets.all(2.2),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(19),
+                                          border: Border.all(color: isDark ? const Color(0xFF1A1A1A) : Colors.white, width: 2.2),
+                                          color: Colors.grey[200],
+                                          image: (avatarUrl != null && avatarUrl.toString().isNotEmpty)
+                                              ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover)
+                                              : null,
+                                        ),
+                                        child: (avatarUrl == null || avatarUrl.toString().isEmpty)
+                                            ? Icon(Icons.person, size: 48, color: isDark ? Colors.white24 : Colors.grey[400])
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10), // Further reduced spacing
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const SizedBox(height: 10),
+                                        Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              TextSpan(
+                                                text: nameText,
+                                                style: TextStyle(
+                                                  fontSize: nameFontSize, 
+                                                  fontWeight: FontWeight.w900,
+                                                  color: theme.textTheme.bodyLarge?.color,
+                                                  letterSpacing: -0.6,
+                                                ),
+                                              ),
+                                              const TextSpan(text: " "),
+                                              WidgetSpan(
+                                                alignment: PlaceholderAlignment.middle,
+                                                child: PremiumUtils.buildBadge(plan),
+                                              ),
+                                            ],
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 8), // Name -> Username
+                                        Text(
+                                          "@${profileData!['username'] ?? 'username'}",
+                                          style: TextStyle(
+                                            fontSize: 15, 
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? Colors.white54 : Colors.black45,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6), // Username -> Joined Date
+                                        Text(
+                                          joinedText,
+                                          style: TextStyle(
+                                            fontSize: 12, 
+                                            fontWeight: FontWeight.w500,
+                                            color: isDark ? Colors.white30 : Colors.black26,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                              Text(
-                                "@${profileData!['username'] ?? 'username'}",
-                                style: TextStyle(fontSize: 15, color: theme.textTheme.bodySmall?.color),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                joinedText,
-                                style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color),
+                              
+                              const SizedBox(height: 14), // Profile Info -> Bio
+                          // Bio with clickable @usernames and links
+                          Linkify(
+                            onOpen: _handleLinkClick,
+                            text: profileData!['bio'] ?? "Ready to HIGH5",
+                            linkifiers: const [
+                              UrlLinkifier(),
+                              EmailLinkifier(),
+                              UserLinkifier(),
+                            ],
+                            style: TextStyle(
+                              fontSize: 14.5, 
+                              height: 1.45,
+                              fontWeight: FontWeight.w500,
+                              color: theme.textTheme.bodyMedium?.color,
+                            ),
+                            linkStyle: const TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+
+                          const SizedBox(height: 18), // Bio -> Chip
+                              // Today's Questions Highlight Chip
+                              if (isMe)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1B5E20).withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFF1B5E20).withOpacity(0.12)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFF2E7D32)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        (plan == 'blue' || plan == 'gold') 
+                                          ? "Today's questions: Unlimited" 
+                                          : "Questions: $_remainingQuestions left",
+                                        style: const TextStyle(
+                                          fontSize: 12.5, 
+                                          fontWeight: FontWeight.w800, 
+                                          color: Color(0xFF2E7D32),
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                              const SizedBox(height: 16),
+                              if (!isMe)
+                                PrimaryButton(
+                                  text: "ASK ME A QUESTION",
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => AskAnyUserScreen(userId: widget.userId)),
+                                    ).then((_) => _loadData());
+                                  },
+                                ),
+                              if (isMe && plan == 'free')
+                                PrimaryButton(
+                                  text: "GO PREMIUM",
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const PremiumScreen()),
+                                    ).then((_) => _loadData());
+                                  },
+                                ),
+
+                              const SizedBox(height: 20), // Chip -> Stats
+                              // Premium Stats Section
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Colors.white.withOpacity(0.02) : Colors.grey.withOpacity(0.035),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(color: theme.dividerColor.withOpacity(0.05)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: _buildStat("Likes", _likesCount.toString())),
+                                    Container(width: 1, height: 24, color: theme.dividerColor.withOpacity(0.1)),
+                                    Expanded(child: _buildStat("Answers", _answers.length.toString())),
+                                    Container(width: 1, height: 24, color: theme.dividerColor.withOpacity(0.1)),
+                                    Expanded(child: _buildStat("High5s", _high5Count.toString())),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      profileData!['bio'] ?? "Ready to H I G H 5",
-                      style: TextStyle(fontSize: 14, color: theme.textTheme.bodyMedium?.color),
-                    ),
-                  ),
-                  if (isMe)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20, top: 12),
-                      child: Text(
-                        (plan == 'blue' || plan == 'gold') 
-                          ? "Today's questions: Unlimited" 
-                          : "Today's remaining questions: $_remainingQuestions",
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.primaryColor),
                       ),
-                    ),
-                  const SizedBox(height: 24),
-                  if (!isMe)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: PrimaryButton(
-                        text: "ASK ME A QUESTION",
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => AskAnyUserScreen(
-                                userId: widget.userId,
+                      
+                      const SizedBox(height: 28), // Stats -> My Answers
+
+                      // Answers Section Title
+                      Padding(
+                        padding: const EdgeInsets.only(left: 20, bottom: 12),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.auto_awesome_motion_rounded, size: 18, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Text(
+                              "MY ANSWERS", 
+                              style: TextStyle(
+                                fontSize: 12, 
+                                fontWeight: FontWeight.w900, 
+                                letterSpacing: 1.5,
+                                color: isDark ? Colors.white38 : Colors.black38,
                               ),
                             ),
-                          ).then((_) => _loadData());
-                        },
+                          ],
+                        ),
                       ),
-                    ),
-                  if (isMe && plan == 'free')
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: PrimaryButton(
-                        text: "GO PREMIUM",
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const PremiumScreen()),
-                          ).then((_) => _loadData());
-                        },
-                      ),
-                    ),
-                  const SizedBox(height: 24),
-                  Divider(height: 1, color: theme.dividerColor),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(child: _buildStat("Likes", _likesCount.toString())),
-                      Expanded(child: _buildStat("Answers", _answers.length.toString())),
-                      Expanded(child: _buildStat("High5s", _high5Count.toString())),
+
+                      if (_loadingAnswers)
+                        const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+                      else if (_answers.isEmpty)
+                        Center(child: Padding(padding: const EdgeInsets.only(top: 40.0), child: Text("No answers yet.", style: TextStyle(color: theme.textTheme.bodySmall?.color))))
+                      else
+                        ListView.builder(
+                          shrinkWrap: true,
+                          padding: EdgeInsets.zero,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _answers.length,
+                          itemBuilder: (context, index) {
+                            return AnswerCard(
+                              key: ValueKey(_answers[index].id),
+                              answer: _answers[index],
+                              onDelete: (id) => _deleteAnswer(id),
+                              onPin: (id, pin) => _togglePin(id, pin),
+                              onLikeChanged: () {
+                                setState(() {
+                                  final current = _answers[index];
+                                  _answers[index] = current.copyWith(
+                                    isLiked: !current.isLiked,
+                                    likeCount: current.isLiked ? current.likeCount - 1 : current.likeCount + 1,
+                                  );
+                                  int total = 0;
+                                  for (var ans in _answers) {
+                                    total += ans.likeCount;
+                                  }
+                                  _likesCount = total;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      const SizedBox(height: 40),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Divider(height: 1, color: theme.dividerColor),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Text("MY ANSWERS", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: theme.textTheme.bodySmall?.color)),
-                        ),
-                        const SizedBox(height: 16),
-                        _loadingAnswers
-                            ? const Center(child: CircularProgressIndicator())
-                            : _answers.isEmpty
-                                ? Center(child: Padding(padding: const EdgeInsets.only(top: 24.0), child: Text("No answers yet.", style: TextStyle(color: theme.textTheme.bodySmall?.color))))
-                                : ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _answers.length,
-                                    itemBuilder: (context, index) {
-                                      return AnswerCard(
-                                        key: ValueKey(_answers[index].id),
-                                        answer: _answers[index],
-                                        onDelete: (id) => _deleteAnswer(id),
-                                        onPin: (id, pin) => _togglePin(id, pin),
-                                        onLikeChanged: () {
-                                          setState(() {
-                                            final current = _answers[index];
-                                            _answers[index] = current.copyWith(
-                                              isLiked: !current.isLiked,
-                                              likeCount: current.isLiked 
-                                                  ? current.likeCount - 1 
-                                                  : current.likeCount + 1,
-                                            );
-                                            
-                                            int total = 0;
-                                            for (var ans in _answers) {
-                                              total += ans.likeCount;
-                                            }
-                                            _likesCount = total;
-                                          });
-                                        },
-                                      );
-                                    },
-                                  ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -846,12 +1004,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildStat(String label, String value) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.textTheme.bodyLarge?.color)),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color)),
+        Text(
+          value, 
+          style: TextStyle(
+            fontSize: 22, 
+            fontWeight: FontWeight.w900, 
+            color: theme.textTheme.bodyLarge?.color,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label.toUpperCase(), 
+          style: TextStyle(
+            fontSize: 10, 
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.5,
+            color: isDark ? Colors.white38 : Colors.black38,
+          ),
+        ),
       ],
     );
+  }
+}
+
+class UserLinkifier extends Linkifier {
+  const UserLinkifier();
+
+  @override
+  List<LinkifyElement> parse(List<LinkifyElement> elements, LinkifyOptions options) {
+    final list = <LinkifyElement>[];
+    final regex = RegExp(r"@[a-zA-Z0-9_]+", multiLine: true);
+
+    for (var element in elements) {
+      if (element is TextElement) {
+        final matches = regex.allMatches(element.text);
+        if (matches.isEmpty) {
+          list.add(element);
+        } else {
+          int lastIndex = 0;
+          for (var match in matches) {
+            if (match.start > lastIndex) {
+              list.add(TextElement(element.text.substring(lastIndex, match.start)));
+            }
+            list.add(LinkableElement(match.group(0)!, match.group(0)!));
+            lastIndex = match.end;
+          }
+          if (lastIndex < element.text.length) {
+            list.add(TextElement(element.text.substring(lastIndex)));
+          }
+        }
+      } else {
+        list.add(element);
+      }
+    }
+    return list;
   }
 }

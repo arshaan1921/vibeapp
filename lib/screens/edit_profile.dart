@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import '../utils/image_utils.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'onboarding/onboarding.dart';
@@ -77,38 +78,161 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    try {
-      if (Platform.isAndroid) {
-        final status = await Permission.photos.request();
-        if (!status.isGranted) {
-          final storageStatus = await Permission.storage.request();
-          if (!storageStatus.isGranted) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Gallery permission denied")),
-              );
-            }
-            return;
-          }
-        }
-      }
+  bool _isPickingImage = false;
 
+  Future<void> _pickImage() async {
+    if (_isPickingImage) return;
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text("Take Photo"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _getImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text("Choose from Gallery"),
+                onTap: () {
+                  Navigator.pop(context);
+                  _getImage(ImageSource.gallery);
+                },
+              ),
+              if (_avatarUrl != null || _selectedImage != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: const Text("Remove Photo", style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _selectedImage = null;
+                      _avatarUrl = null;
+                    });
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _getImage(ImageSource source) async {
+    if (_isPickingImage) return;
+    setState(() => _isPickingImage = true);
+
+    try {
       final picker = ImagePicker();
       final image = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 500,
-        maxHeight: 500,
+        source: source,
         imageQuality: 80,
       );
 
-      if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+      if (image != null && mounted) {
+        // Increased delay to 500ms for better Android activity lifecycle handling
+        await Future.delayed(const Duration(milliseconds: 500));
+        await _cropImage(image.path);
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false);
+    }
+  }
+
+  Future<void> _cropImage(String path) async {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    try {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Profile Picture',
+            toolbarColor: const Color(0xFF0A3321),
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: const Color(0xFFFFD700),
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            hideBottomControls: false,
+            // Removed statusBarColor to let the CustomUCropTheme handle it with fitsSystemWindows
+            backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+            showCropGrid: true,
+          ),
+          IOSUiSettings(
+            title: 'Crop Profile Picture',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+          ),
+        ],
+      );
+
+      if (croppedFile != null && mounted) {
+        final file = File(croppedFile.path);
+        setState(() {
+          _selectedImage = file;
+        });
+        
+        // Ensure the cropper activity is completely closed and cleaned up 
+        // before starting the upload which might trigger more state changes
+        await Future.delayed(const Duration(milliseconds: 200));
+        await _uploadCroppedImage(file);
+      }
+    } catch (e) {
+      debugPrint('Error cropping image: $e');
+    }
+  }
+
+  Future<void> _uploadCroppedImage(File file) async {
+    setState(() => _isUploading = true);
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final fileExtension = file.path.split('.').last;
+      final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+      
+      await Supabase.instance.client.storage.from('avatars').upload(
+            fileName,
+            file,
+            fileOptions: const FileOptions(upsert: true),
+          );
+          
+      final imageUrl = Supabase.instance.client.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+      if (mounted) {
+        setState(() {
+          _avatarUrl = imageUrl;
+          _selectedImage = null; // We use the URL now
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Photo uploaded!")),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Upload failed. Please try again.")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
@@ -135,30 +259,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
-      String? imageUrl = _avatarUrl;
-
-      if (_selectedImage != null) {
-        setState(() => _isUploading = true);
-        final fileExtension = _selectedImage!.path.split('.').last;
-        final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
-        
-        await Supabase.instance.client.storage.from('avatars').upload(
-              fileName,
-              _selectedImage!,
-              fileOptions: const FileOptions(upsert: true),
-            );
-            
-        imageUrl = Supabase.instance.client.storage
-            .from('avatars')
-            .getPublicUrl(fileName);
-        setState(() => _isUploading = false);
-      }
-
       await Supabase.instance.client.from('profiles').update({
         'name': _nameController.text.trim(),
         'username': username,
         'bio': _bioController.text.trim(),
-        'avatar_url': imageUrl,
+        'avatar_url': _avatarUrl,
       }).eq('id', user.id);
 
       if (mounted) {

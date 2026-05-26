@@ -30,6 +30,7 @@ dependencies:
   package_info_plus: ^8.1.0
   new_version_plus: ^0.1.0
   http: ^1.2.1
+  image_cropper: ^8.0.2
 
 dev_dependencies:
   flutter_test:
