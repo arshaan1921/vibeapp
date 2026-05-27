@@ -234,7 +234,7 @@ class _High5TopBarState extends State<High5TopBar> with WidgetsBindingObserver {
                       });
                     }),
                     const SizedBox(width: 36),
-                    badgeIcon(Icons.help_outline, questionsCount, () {
+                    badgeIcon(Icons.question_mark_rounded, questionsCount, () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
