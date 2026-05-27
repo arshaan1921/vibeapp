@@ -7,6 +7,7 @@ class PremiumUtils {
         return 50;
       case 'blue':
       case 'gold':
+      case 'yellow':
         return 999999; // Practically unlimited
       default:
         return 10; // free plan
@@ -20,7 +21,8 @@ class PremiumUtils {
       case 'blue':
         return Colors.blue;
       case 'gold':
-        return const Color(0xFFFFD700); // Gold
+      case 'yellow':
+        return const Color(0xFFFFD700); // Gold / Yellow
       default:
         return null;
     }
@@ -33,7 +35,8 @@ class PremiumUtils {
       case 'blue':
         return Colors.blue;
       case 'gold':
-        return const Color(0xFFFFD700); // Gold
+      case 'yellow':
+        return const Color(0xFFFFD700); // Gold / Yellow
       default:
         return Colors.transparent;
     }
