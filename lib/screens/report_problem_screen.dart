@@ -4,6 +4,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 
+import 'my_tickets_screen.dart';
+
 class ReportProblemScreen extends StatefulWidget {
   final String? reportedUserId;
   const ReportProblemScreen({super.key, this.reportedUserId});
@@ -79,6 +81,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         }
       }
 
+      // 1. Existing Moderation Report Logic (UNTCHED)
       final reportData = {
         'user_id': user.id,
         'message': reportText,
@@ -94,7 +97,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         const telegramUrl = "https://api.telegram.org/bot$botToken/sendMessage";
 
         final typeLabel = widget.reportedUserId != null ? "👤 User Report" : "🚨 Support Report";
-        final message = "$typeLabel\n\n"
+        final telegramMessage = "$typeLabel\n\n"
             "Reporter: $reporterName (@$reporterUsername)\n"
             "Reporter ID: ${user.id}\n"
             "${widget.reportedUserId != null ? "Reported User ID: ${widget.reportedUserId}\n" : ""}"
@@ -105,18 +108,39 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           Uri.parse(telegramUrl),
           body: {
             "chat_id": chatId,
-            "text": message,
+            "text": telegramMessage,
           },
         );
       } catch (e) {
         debugPrint("Telegram notification failed: $e");
       }
 
+      // 2. New Support Ticket Logic (ISOLATED)
+      String? ticketId;
+      if (widget.reportedUserId == null) {
+        try {
+          final ticketRes = await supabase.from('support_tickets').insert({
+            'user_id': user.id,
+            'message': reportText,
+            'screenshot_url': imageUrl,
+          }).select('ticket_id').single();
+          ticketId = ticketRes['ticket_id'];
+        } catch (e) {
+          debugPrint("Failed to create isolated support ticket: $e");
+        }
+      }
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Report submitted successfully")),
-        );
-        Navigator.pop(context);
+        if (widget.reportedUserId != null) {
+          // Standard User/Answer report success
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Report submitted successfully")),
+          );
+          Navigator.pop(context);
+        } else {
+          // General Support problem success - Show Premium Dialog
+          _showTicketSuccessDialog(ticketId ?? "Pending");
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -127,6 +151,60 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _showTicketSuccessDialog(String ticketId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: const Color(0xFF0A3321), // Dark Green
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle_outline_rounded, color: Color(0xFFFFD700), size: 64),
+            const SizedBox(height: 20),
+            const Text(
+              "✅ Ticket Raised Successfully",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Ticket ID: $ticketId\nStatus: Open\n\nOur support team will review your issue.\nYou’ll be notified when there is an update.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD700),
+                  foregroundColor: const Color(0xFF0A3321),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(context); // Close dialog
+                  Navigator.pop(context); // Close report screen
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTicketsScreen()));
+                },
+                child: const Text("VIEW TICKET", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Close report screen
+              },
+              child: const Text("DONE", style: TextStyle(color: Colors.white70)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

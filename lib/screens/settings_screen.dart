@@ -9,6 +9,8 @@ import 'report_problem_screen.dart';
 import 'booster_pack_screen.dart';
 import 'delete_account_screen.dart';
 
+import 'my_tickets_screen.dart';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -102,6 +104,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => const ReportProblemScreen()),
+                            );
+                          }),
+                          const Divider(),
+                          _buildRow(Icons.history_edu_outlined, "My Tickets", () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const MyTicketsScreen()),
                             );
                           }),
                         ],
