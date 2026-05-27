@@ -615,19 +615,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
     final isMe = widget.userId == null || widget.userId == currentUserId;
     final avatarUrl = profileData!['avatar_url'];
     final plan = profileData!['premium_plan'] ?? 'free';
     
     final nameText = profileData!['name'] ?? "No Name";
-    double nameFontSize = 24; // Baseline
-    if (nameText.length > 18) {
-      nameFontSize = 18;
-    } else if (nameText.length > 14) {
-      nameFontSize = 20;
-    } else if (nameText.length > 10) {
-      nameFontSize = 22;
+    double nameFontSize = isLandscape ? 18 : 24; // Baseline adjusted for landscape
+    if (!isLandscape) {
+      if (nameText.length > 18) {
+        nameFontSize = 18;
+      } else if (nameText.length > 14) {
+        nameFontSize = 20;
+      } else if (nameText.length > 10) {
+        nameFontSize = 22;
+      }
+    } else {
+       if (nameText.length > 18) {
+        nameFontSize = 14;
+      } else if (nameText.length > 14) {
+        nameFontSize = 16;
+      }
     }
 
     final joinedDate = profileData?['created_at'];
@@ -746,13 +755,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               // Avatar + Name Section
                               Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center, // Perfectly center text against avatar height
                                 children: [
                                   // Squircle Avatar (Premium Rounded Square)
                                   GestureDetector(
                                       onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
                                     child: Container(
-                                      width: 92, // Reduced from 106 to give more space for text
+                                      width: 92, 
                                       height: 92,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(22),
@@ -784,12 +793,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 10), // Further reduced spacing
+                                  const SizedBox(width: 14), // Balanced spacing
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min, // Wrap content for centering
                                       children: [
-                                        const SizedBox(height: 10),
                                         Text.rich(
                                           TextSpan(
                                             children: [
@@ -812,20 +821,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        const SizedBox(height: 8), // Name -> Username
+                                        const SizedBox(height: 4), // Tighter vertical spacing
                                         Text(
                                           "@${profileData!['username'] ?? 'username'}",
                                           style: TextStyle(
-                                            fontSize: 15, 
+                                            fontSize: isLandscape ? 12 : 14, 
                                             fontWeight: FontWeight.w600,
                                             color: isDark ? Colors.white54 : Colors.black45,
                                           ),
                                         ),
-                                        const SizedBox(height: 6), // Username -> Joined Date
+                                        const SizedBox(height: 2), 
                                         Text(
                                           joinedText,
                                           style: TextStyle(
-                                            fontSize: 12, 
+                                            fontSize: isLandscape ? 10 : 11,
                                             fontWeight: FontWeight.w500,
                                             color: isDark ? Colors.white30 : Colors.black26,
                                           ),
@@ -847,7 +856,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               UserLinkifier(),
                             ],
                             style: TextStyle(
-                              fontSize: 14.5, 
+                              fontSize: isLandscape ? 13 : 14.5, 
                               height: 1.45,
                               fontWeight: FontWeight.w500,
                               color: theme.textTheme.bodyMedium?.color,
@@ -922,11 +931,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    Expanded(child: _buildStat("Likes", _likesCount.toString())),
+                                    Expanded(child: _buildStat("Likes", _likesCount.toString(), isLandscape)),
                                     Container(width: 1, height: 24, color: theme.dividerColor.withOpacity(0.1)),
-                                    Expanded(child: _buildStat("Answers", _answers.length.toString())),
+                                    Expanded(child: _buildStat("Answers", _answers.length.toString(), isLandscape)),
                                     Container(width: 1, height: 24, color: theme.dividerColor.withOpacity(0.1)),
-                                    Expanded(child: _buildStat("High5s", _high5Count.toString())),
+                                    Expanded(child: _buildStat("High5s", _high5Count.toString(), isLandscape)),
                                   ],
                                 ),
                               ),
@@ -1002,7 +1011,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStat(String label, String value) {
+  Widget _buildStat(String label, String value, bool isLandscape) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     return Column(
@@ -1010,7 +1019,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Text(
           value, 
           style: TextStyle(
-            fontSize: 22, 
+            fontSize: isLandscape ? 18 : 22, 
             fontWeight: FontWeight.w900, 
             color: theme.textTheme.bodyLarge?.color,
             letterSpacing: -0.5,
@@ -1020,7 +1029,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Text(
           label.toUpperCase(), 
           style: TextStyle(
-            fontSize: 10, 
+            fontSize: isLandscape ? 9 : 10,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.5,
             color: isDark ? Colors.white38 : Colors.black38,

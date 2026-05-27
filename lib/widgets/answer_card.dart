@@ -541,12 +541,17 @@ class _AnswerCardState extends State<AnswerCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
 
     return Screenshot(
       controller: _screenshotController,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isLandscape ? 32 : 14, // Wider padding in landscape
+          vertical: 8,
+        ),
         color: theme.scaffoldBackgroundColor,
         child: Container(
           decoration: BoxDecoration(
@@ -561,7 +566,7 @@ class _AnswerCardState extends State<AnswerCard> {
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: EdgeInsets.all(isLandscape ? 14.0 : 20.0), // Reduced internal padding in landscape
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -575,7 +580,7 @@ class _AnswerCardState extends State<AnswerCard> {
                         Text(
                           "Pinned Answer",
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: isLandscape ? 10 : 12,
                             fontWeight: FontWeight.bold,
                             color: Colors.blueAccent[700],
                           ),
@@ -591,11 +596,11 @@ class _AnswerCardState extends State<AnswerCard> {
                         padding: const EdgeInsets.all(2),
                         decoration: PremiumUtils.buildProfileRing(widget.answer.premiumPlan),
                         child: CircleAvatar(
-                          radius: 18,
+                          radius: isLandscape ? 14 : 18,
                           backgroundColor: Colors.grey[300],
                           backgroundImage: ImageUtils.getImageProvider(widget.answer.avatarUrl),
                           child: ImageUtils.safeUrl(widget.answer.avatarUrl) == null
-                              ? const Icon(Icons.person, size: 20, color: Colors.white)
+                              ? Icon(Icons.person, size: isLandscape ? 16 : 20, color: Colors.white)
                               : null,
                         ),
                       ),
@@ -612,7 +617,7 @@ class _AnswerCardState extends State<AnswerCard> {
                                 "@${widget.answer.username}",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 15,
+                                  fontSize: isLandscape ? 13 : 15,
                                   color: textTheme.bodyLarge?.color,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -623,7 +628,7 @@ class _AnswerCardState extends State<AnswerCard> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.more_vert),
+                      icon: Icon(Icons.more_vert, size: isLandscape ? 18 : 24),
                       onPressed: () => _showOptionsMenu(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -640,7 +645,7 @@ class _AnswerCardState extends State<AnswerCard> {
                   child: Text(
                     widget.answer.isAnonymous ? "@anonymously asked" : "@${widget.answer.askerUsername ?? 'User'} asked",
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: isLandscape ? 10 : 12,
                       color: textTheme.bodySmall?.color?.withOpacity(0.6) ?? Colors.grey,
                       fontStyle: FontStyle.italic,
                     ),
@@ -652,7 +657,7 @@ class _AnswerCardState extends State<AnswerCard> {
                   text: widget.answer.questionText,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 16,
+                    fontSize: isLandscape ? 14 : 16,
                     color: textTheme.bodyLarge?.color,
                     height: 1.3,
                   ),
@@ -666,7 +671,8 @@ class _AnswerCardState extends State<AnswerCard> {
                     child: Image.network(
                       widget.answer.questionImageUrl!,
                       width: double.infinity,
-                      fit: BoxFit.cover,
+                      height: isLandscape ? 200 : null, // Limit image height in landscape
+                      fit: BoxFit.contain,
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
                         return Container(
@@ -695,7 +701,7 @@ class _AnswerCardState extends State<AnswerCard> {
                   onOpen: _onOpen,
                   text: widget.answer.text,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: isLandscape ? 13 : 15,
                     color: textTheme.bodyMedium?.color,
                     height: 1.4,
                   ),
@@ -712,7 +718,7 @@ class _AnswerCardState extends State<AnswerCard> {
                     child: Text(
                       _showReplies ? "Hide replies" : "View replies ($_replyCount)",
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: isLandscape ? 11 : 13,
                         fontWeight: FontWeight.bold,
                         color: theme.primaryColor,
                       ),
@@ -740,10 +746,10 @@ class _AnswerCardState extends State<AnswerCard> {
                                 GestureDetector(
                                   onTap: () => _navigateToProfile(profile?['id']),
                                   child: CircleAvatar(
-                                    radius: 14,
+                                    radius: isLandscape ? 12 : 14,
                                     backgroundColor: Colors.grey[200],
                                     backgroundImage: (profile?['avatar_url'] != null && profile?['avatar_url'] != '') ? NetworkImage(profile['avatar_url']) : null,
-                                    child: (profile?['avatar_url'] == null || profile?['avatar_url'] == '') ? const Icon(Icons.person, size: 14) : null,
+                                    child: (profile?['avatar_url'] == null || profile?['avatar_url'] == '') ? Icon(Icons.person, size: isLandscape ? 12 : 14) : null,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -757,13 +763,13 @@ class _AnswerCardState extends State<AnswerCard> {
                                             onTap: () => _navigateToProfile(profile?['id']),
                                             child: Text(
                                               "@${profile?['username'] ?? 'User'}",
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: isLandscape ? 11 : 13),
                                             ),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
                                             _formatTimeAgo(reply['created_at']),
-                                            style: const TextStyle(color: Colors.grey, fontSize: 10),
+                                            style: TextStyle(color: Colors.grey, fontSize: isLandscape ? 9 : 10),
                                           ),
                                           const Spacer(),
                                           if (isMyReply)
@@ -772,9 +778,9 @@ class _AnswerCardState extends State<AnswerCard> {
                                                 if (val == 'delete') _deleteReply(reply['id'].toString());
                                               },
                                               padding: EdgeInsets.zero,
-                                              icon: const Icon(Icons.more_horiz, size: 16, color: Colors.grey),
+                                              icon: Icon(Icons.more_horiz, size: isLandscape ? 14 : 16, color: Colors.grey),
                                               itemBuilder: (context) => [
-                                                const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red, fontSize: 13))),
+                                                PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red, fontSize: isLandscape ? 11 : 13))),
                                               ],
                                             ),
                                         ],
@@ -783,7 +789,7 @@ class _AnswerCardState extends State<AnswerCard> {
                                       Linkify(
                                         onOpen: _onOpen,
                                         text: reply['reply'] ?? "",
-                                        style: const TextStyle(fontSize: 13),
+                                        style: TextStyle(fontSize: isLandscape ? 11 : 13),
                                         linkStyle: const TextStyle(color: Colors.blue),
                                       ),
                                     ],
@@ -809,13 +815,13 @@ class _AnswerCardState extends State<AnswerCard> {
                           Icon(
                             _isLiked ? Icons.favorite : Icons.favorite_border,
                             color: _isLiked ? Colors.red : theme.iconTheme.color,
-                            size: 22,
+                            size: isLandscape ? 18 : 22,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             "$_likeCount",
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: isLandscape ? 12 : 14,
                               color: textTheme.bodyMedium?.color,
                               fontWeight: FontWeight.w600,
                             ),
@@ -828,12 +834,12 @@ class _AnswerCardState extends State<AnswerCard> {
                       onTap: _showReplySheet,
                       child: Row(
                         children: [
-                          Icon(Icons.chat_bubble_outline, size: 21, color: theme.iconTheme.color),
+                          Icon(Icons.chat_bubble_outline, size: isLandscape ? 17 : 21, color: theme.iconTheme.color),
                           const SizedBox(width: 8),
                           Text(
                             "$_replyCount",
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: isLandscape ? 12 : 14,
                               color: textTheme.bodyMedium?.color,
                               fontWeight: FontWeight.w600,
                             ),
@@ -846,7 +852,7 @@ class _AnswerCardState extends State<AnswerCard> {
                       DateFormat('MMM d').format(widget.answer.createdAt.toLocal()),
                       style: TextStyle(
                         color: textTheme.bodySmall?.color,
-                        fontSize: 11,
+                        fontSize: isLandscape ? 9 : 11,
                       ),
                     ),
                   ],
