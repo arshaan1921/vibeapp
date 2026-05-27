@@ -82,13 +82,14 @@ void main() async {
     }
   });
 
-  // ✅ Modern System UI Overlay Style for Android 15
+  // ✅ Modern System UI Style for Android 15 + Dark Green Theme
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark, // Adjust based on background
+      statusBarIconBrightness: Brightness.light, // White icons for dark green background
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarContrastEnforced: false,
     ),
   );
 
