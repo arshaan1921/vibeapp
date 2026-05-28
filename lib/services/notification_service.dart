@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../main.dart';
 import '../screens/profile.dart';
+import '../screens/my_tickets_screen.dart';
 import 'update_service.dart';
 
 class NotificationService {
@@ -103,7 +104,8 @@ class NotificationService {
     FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
         debugPrint("🚀 App opened from terminated state: ${message.data}");
-        Future.delayed(const Duration(milliseconds: 1000), () {
+        // Wait slightly longer than splash screen (3000ms) to ensure navigation persists
+        Future.delayed(const Duration(milliseconds: 3500), () {
           _handleNavigation(message.data);
         });
       }
@@ -150,7 +152,13 @@ class NotificationService {
     final type = data['type'];
     debugPrint("➡️ Navigating for type: $type");
 
-    if (type == 'question') {
+    if (type == 'support_ticket') {
+      debugPrint("🎫 Support ticket notification tapped");
+      debugPrint("➡️ Opening MyTicketsScreen");
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
+      );
+    } else if (type == 'question') {
       tabIndexNotifier.value = 1;
     } else if (type == 'like') {
       tabIndexNotifier.value = 0;
