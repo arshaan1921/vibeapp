@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'answer_view_screen.dart';
 import 'profile.dart';
 import '../services/block_service.dart';
+import '../main.dart';
 
 class LikesActivityScreen extends StatefulWidget {
   const LikesActivityScreen({super.key});
@@ -12,7 +13,7 @@ class LikesActivityScreen extends StatefulWidget {
   State<LikesActivityScreen> createState() => _LikesActivityScreenState();
 }
 
-class _LikesActivityScreenState extends State<LikesActivityScreen> {
+class _LikesActivityScreenState extends State<LikesActivityScreen> with RouteAware {
   List<Map<String, dynamic>> _likes = [];
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
@@ -26,10 +27,23 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
   void dispose() {
     _realtimeChannel?.unsubscribe();
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
+    routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint("🔄 Returning to LikesActivityScreen, auto-refreshing...");
+    _fetchLikes();
   }
 
   void _onBlocksChanged() {

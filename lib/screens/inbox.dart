@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/question.dart';
 import '../services/block_service.dart';
+import '../main.dart';
 import 'answer.dart';
 
 class InboxScreen extends StatefulWidget {
@@ -11,9 +12,27 @@ class InboxScreen extends StatefulWidget {
   State<InboxScreen> createState() => _InboxScreenState();
 }
 
-class _InboxScreenState extends State<InboxScreen> {
+class _InboxScreenState extends State<InboxScreen> with RouteAware {
   List<Map<String, dynamic>> _questions = [];
   bool _isLoading = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint("🔄 Returning to InboxScreen, auto-refreshing...");
+    _fetchInbox();
+  }
 
   @override
   void initState() {

@@ -6,6 +6,7 @@ import 'profile.dart';
 import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
 import '../services/like_service.dart';
+import '../main.dart';
 
 class AnswerDetailScreen extends StatefulWidget {
   final String answerId;
@@ -16,7 +17,7 @@ class AnswerDetailScreen extends StatefulWidget {
   State<AnswerDetailScreen> createState() => _AnswerDetailScreenState();
 }
 
-class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
+class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware {
   Map<String, dynamic>? _answer;
   List<Map<String, dynamic>> _replies = [];
   bool _isLoading = true;
@@ -25,6 +26,24 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> {
   bool _isLiked = false;
   int _likeCount = 0;
   bool _isProcessingLike = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint("🔄 Returning to AnswerDetailScreen, auto-refreshing...");
+    _fetchAnswerDetail();
+  }
 
   @override
   void initState() {

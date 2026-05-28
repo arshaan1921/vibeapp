@@ -23,6 +23,7 @@ import 'widgets/update_popup.dart';
 import 'services/update_service.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'high5_channel',
@@ -109,6 +110,7 @@ class High5App extends StatelessWidget {
     return MaterialApp(
       title: 'High5',
       navigatorKey: NotificationService.navigatorKey,
+      navigatorObservers: [routeObserver],
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

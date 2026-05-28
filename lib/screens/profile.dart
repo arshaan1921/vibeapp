@@ -25,7 +25,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
   Map<String, dynamic>? profileData;
   bool isLoading = true;
   String? errorMessage;
@@ -46,10 +46,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
   void dispose() {
     _realtimeChannel?.unsubscribe();
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
+    routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint("🔄 Returning to ProfileScreen, auto-refreshing...");
+    _loadData();
   }
 
   void _onBlocksChanged() {

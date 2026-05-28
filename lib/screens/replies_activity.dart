@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'answer_view_screen.dart';
 import 'profile.dart';
 import '../services/block_service.dart';
+import '../main.dart';
 
 class AnswersActivityScreen extends StatefulWidget {
   const AnswersActivityScreen({super.key});
@@ -12,7 +13,7 @@ class AnswersActivityScreen extends StatefulWidget {
   State<AnswersActivityScreen> createState() => _AnswersActivityScreenState();
 }
 
-class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
+class _AnswersActivityScreenState extends State<AnswersActivityScreen> with RouteAware {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
@@ -26,11 +27,24 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
   void dispose() {
     markAnswersAsSeen();
     _realtimeChannel?.unsubscribe();
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
+    routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint("🔄 Returning to AnswersActivityScreen, auto-refreshing...");
+    _fetchNotifications();
   }
 
   void _onBlocksChanged() {

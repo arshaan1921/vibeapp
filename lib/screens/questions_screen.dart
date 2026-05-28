@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'answer.dart';
 import '../models/question.dart';
 import '../services/block_service.dart';
+import '../main.dart';
 
 class QuestionsScreen extends StatefulWidget {
   const QuestionsScreen({super.key});
@@ -11,7 +12,7 @@ class QuestionsScreen extends StatefulWidget {
   State<QuestionsScreen> createState() => _QuestionsScreenState();
 }
 
-class _QuestionsScreenState extends State<QuestionsScreen> {
+class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
   List<Map<String, dynamic>> _questions = [];
   bool _isLoading = true;
 
@@ -23,9 +24,22 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
   void dispose() {
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
+    routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint("🔄 Returning to QuestionsScreen, auto-refreshing...");
+    _loadData();
   }
 
   void _onBlocksChanged() {
