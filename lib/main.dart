@@ -34,14 +34,14 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
 
-/// ✅ Centralized Background Handler
+/// ✅ Correctly placed top-level background handler
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> notificationServiceBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is ready in the background isolate
   await Firebase.initializeApp();
-  // Notification body is handled by the system if it contains a 'notification' payload.
-  // Data-only messages in background should be handled here if needed, 
-  // but we avoid manual show() to prevent duplicates.
   debugPrint("📩 Background message received: ${message.messageId}");
+  // Data-only messages are handled here. If the message contains a notification object,
+  // FCM will display it automatically.
 }
 
 void main() async {
@@ -51,9 +51,10 @@ void main() async {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   await Firebase.initializeApp();
+  debugPrint("🔥 Firebase initialized in main");
 
-  // Background handler registration
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // Background handler registration - MUST be here and MUST be top-level
+  FirebaseMessaging.onBackgroundMessage(notificationServiceBackgroundHandler);
 
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
@@ -65,6 +66,10 @@ void main() async {
     anonKey:
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpdGFtbXJ4enNuZGlzc2VkaXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzE1MzIsImV4cCI6MjA4NzUwNzUzMn0._MqAAWpExMvi0vMHFhegqmx_gDPiJZWtUIbjJKvzfoQ",
   );
+  debugPrint("🟢 Supabase initialized");
+
+  // ✅ Initialize Notifications immediately after Supabase
+  await NotificationService.initialize();
 
   // Initialize In-App Purchases
   IAPService().initialize();

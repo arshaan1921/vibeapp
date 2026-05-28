@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../utils/legal_links.dart';
 import 'auth/welcome.dart';
 import 'edit_profile.dart';
@@ -10,6 +11,7 @@ import 'booster_pack_screen.dart';
 import 'delete_account_screen.dart';
 
 import 'my_tickets_screen.dart';
+import '../services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -112,6 +114,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               context,
                               MaterialPageRoute(builder: (context) => const MyTicketsScreen()),
                             );
+                          }),
+                          const Divider(),
+                          _buildRow(Icons.notification_important_outlined, "Test Push Notification", () async {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Sending test notification...")),
+                            );
+                            await NotificationService.sendTestNotification();
+                          }),
+                          const Divider(),
+                          _buildRow(Icons.key_outlined, "Show FCM Token", () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final token = await FirebaseMessaging.instance.getToken();
+                            if (mounted) {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text("FCM Token"),
+                                  content: SelectableText(token ?? "No Token Found"),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text("Close"),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
                           }),
                         ],
                       ),

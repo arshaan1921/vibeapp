@@ -58,7 +58,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     } else {
       print("➡️ Navigating to MainScaffold");
       RealtimeService().startRealtime();
-      NotificationService.initialize();
       blockService.refreshBlockedList();
       Navigator.pushReplacement(
         context,

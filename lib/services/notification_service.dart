@@ -1,5 +1,5 @@
 import 'dart:convert';
-
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,47 +8,57 @@ import '../main.dart';
 import '../screens/profile.dart';
 import 'update_service.dart';
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint("🔵 Background message: ${message.messageId}");
-}
-
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   static bool _isInitialized = false;
   static String? _lastToken;
+  static String? _cachedToken; // To store token if user is not yet logged in
+  static StreamSubscription<AuthState>? _authSubscription;
 
   static final GlobalKey<NavigatorState> navigatorKey =
-  GlobalKey<NavigatorState>();
+      GlobalKey<NavigatorState>();
 
   // ==============================
   // 🔥 INIT
   // ==============================
   static Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (_isInitialized) {
+      debugPrint("🔔 NotificationService already initialized. Checking token...");
+      await setupToken(); // Ensure we have latest token
+      return;
+    }
+    
     _isInitialized = true;
+    debugPrint("🔔 Initializing NotificationService (First Time)...");
 
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-    FirebaseMessaging.onBackgroundMessage(
-        _firebaseMessagingBackgroundHandler);
+    // 1. Request permissions
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+    debugPrint("🔐 Notification Permission Result: ${settings.authorizationStatus}");
 
-    final settings = await messaging.requestPermission();
-    debugPrint("🔐 Permission: ${settings.authorizationStatus}");
-
-    const androidInit =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
-
+    // 2. Local Notification Setup
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
 
     await _localNotificationsPlugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (details) {
+        debugPrint("👆 Local notification clicked: ${details.payload}");
         if (details.payload != null) {
-          final data = jsonDecode(details.payload!);
-          _handleNavigation(data);
+          try {
+            final data = jsonDecode(details.payload!);
+            _handleNavigation(data);
+          } catch (e) {
+            debugPrint("❌ Error parsing notification payload: $e");
+          }
         }
       },
     );
@@ -56,53 +66,81 @@ class NotificationService {
     const channel = AndroidNotificationChannel(
       'high5_channel',
       'High5 Notifications',
+      description: 'Important notifications for High5',
       importance: Importance.max,
+      playSound: true,
     );
 
     await _localNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
+    // 3. Setup Listeners
+    
+    // Listen for token refresh
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+      debugPrint("🔄 FCM Token refreshed: $token");
+      _cachedToken = token;
+      saveTokenToSupabase(token);
+    });
+
+    // Foreground listener
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint("📩 Foreground message received: ${message.messageId}");
+      final title = message.notification?.title ?? message.data['title'] ?? 'High5';
+      final body = message.notification?.body ?? message.data['body'] ?? '';
+      showNotification(title, body, payload: message.data);
+    });
+
+    // Background click listener
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint("👆 Notification clicked (Background): ${message.data}");
+      _handleNavigation(message.data);
+    });
+
+    // Terminated state click listener
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        debugPrint("🚀 App opened from terminated state: ${message.data}");
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          _handleNavigation(message.data);
+        });
+      }
+    });
+
+    // 4. 🔥 AUTH LISTENER: Critical for saving token after login
+    _authSubscription?.cancel();
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      final user = data.session?.user;
+      
+      debugPrint("🔐 NotificationService: Auth Event - $event");
+
+      if (user != null && 
+          (event == AuthChangeEvent.signedIn || 
+           event == AuthChangeEvent.initialSession || 
+           event == AuthChangeEvent.tokenRefreshed)) {
+        
+        debugPrint("👤 User session active ($event), retrying token save...");
+        if (_cachedToken != null) {
+          saveTokenToSupabase(_cachedToken!);
+        } else {
+          setupToken();
+        }
+      }
+    });
+
+    // 5. Initial token fetch
     await setupToken();
 
-    // ✅ Automatic Topic Subscription
+    // Topic subscription
     FirebaseMessaging.instance.subscribeToTopic('high5_updates').then((_) {
       debugPrint("✅ Subscribed to high5_updates topic");
     }).catchError((e) {
       debugPrint("❌ Topic subscription error: $e");
+      return null;
     });
-
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-      debugPrint("🔄 Token refreshed: $token");
-      saveTokenToSupabase(token);
-    });
-
-    FirebaseMessaging.onMessage.listen((message) {
-      debugPrint("📩 Foreground message: ${message.data}");
-
-      final title =
-          message.notification?.title ?? message.data['title'] ?? 'New Message';
-      final body =
-          message.notification?.body ?? message.data['body'] ?? '';
-
-      showNotification(title, body, payload: message.data);
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      debugPrint("👆 Click (background): ${message.data}");
-      _handleNavigation(message.data);
-    });
-
-    final initialMessage =
-    await FirebaseMessaging.instance.getInitialMessage();
-
-    if (initialMessage != null) {
-      debugPrint("🚀 Opened from terminated: ${initialMessage.data}");
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _handleNavigation(initialMessage.data);
-      });
-    }
   }
 
   // ==============================
@@ -110,87 +148,99 @@ class NotificationService {
   // ==============================
   static void _handleNavigation(Map<String, dynamic> data) {
     final type = data['type'];
-    debugPrint("➡️ Navigate type: $type");
+    debugPrint("➡️ Navigating for type: $type");
 
     if (type == 'question') {
       tabIndexNotifier.value = 1;
-
     } else if (type == 'like') {
       tabIndexNotifier.value = 0;
-
     } else if (type == 'update') {
-      // ✅ Handle Update Notification Click
       UpdateService.openPlayStore();
-
     } else if (type == 'vibe' || type == 'profile_save') {
       final userId = data['user_id'];
-
       if (userId != null) {
         navigatorKey.currentState?.push(
-          MaterialPageRoute(
-            builder: (_) => ProfileScreen(userId: userId),
-          ),
+          MaterialPageRoute(builder: (_) => ProfileScreen(userId: userId)),
         );
       } else {
         tabIndexNotifier.value = 4;
       }
+    } else if (type == 'daily_question') {
+      tabIndexNotifier.value = 1;
+    } else if (type == 'answer' || type == 'answer_reply') {
+      tabIndexNotifier.value = 0;
     }
   }
 
   // ==============================
-  // 🔥 TOKEN
+  // 🔥 TOKEN MANAGEMENT
   // ==============================
   static Future<void> setupToken() async {
     try {
       final token = await FirebaseMessaging.instance.getToken();
-
-      debugPrint("📱 FCM TOKEN: $token");
+      debugPrint("📱 Current FCM TOKEN: $token");
 
       if (token != null) {
+        _cachedToken = token;
         await saveTokenToSupabase(token);
       }
     } catch (e) {
-      debugPrint("❌ Token error: $e");
+      debugPrint("❌ FCM Token retrieval error: $e");
     }
   }
 
   static Future<void> saveTokenToSupabase(String token) async {
-    if (_lastToken == token) return;
-
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
     if (user == null) {
-      debugPrint("❌ No user logged in");
+      debugPrint("⚠️ Cannot save token: No user logged in. Token cached.");
+      _cachedToken = token;
       return;
     }
 
-    debugPrint("💾 Saving token for user: ${user.id}");
+    if (_lastToken == token) {
+      debugPrint("ℹ️ Token already saved for this session. Skipping.");
+      return;
+    }
 
-    await supabase.from('device_tokens').upsert(
-      {
-        'user_id': user.id,
-        'token': token,
-      },
-      onConflict: 'user_id,token',
-    );
-
-    _lastToken = token;
+    try {
+      debugPrint("💾 Saving token to Supabase for user: ${user.id}");
+      
+      await supabase.from('device_tokens').upsert(
+        {
+          'user_id': user.id,
+          'token': token,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        onConflict: 'user_id,token',
+      );
+      
+      debugPrint("✅ Token saved successfully to Supabase");
+      _lastToken = token;
+      _cachedToken = null; // Clear cache after successful save
+    } catch (e) {
+      debugPrint("❌ Error saving token to Supabase: $e");
+    }
   }
 
   // ==============================
-  // 🔥 LOCAL NOTIFICATION
+  // 🔥 DISPLAY NOTIFICATION
   // ==============================
   static Future<void> showNotification(
-      String title,
-      String body, {
-        Map<String, dynamic>? payload,
-      }) async {
+    String title,
+    String body, {
+    Map<String, dynamic>? payload,
+  }) async {
+    debugPrint("🔔 Showing local notification: $title");
+    
     const androidDetails = AndroidNotificationDetails(
       'high5_channel',
       'High5 Notifications',
+      channelDescription: 'Notifications for questions, likes, and social updates',
       importance: Importance.max,
       priority: Priority.high,
+      showWhen: true,
     );
 
     const details = NotificationDetails(android: androidDetails);
@@ -205,7 +255,7 @@ class NotificationService {
   }
 
   // ==============================
-  // 🔥 SEND CORE (FIXED)
+  // 🔥 EDGE FUNCTION INVOCATION
   // ==============================
   static Future<void> sendNotification({
     required String userId,
@@ -216,11 +266,10 @@ class NotificationService {
     final supabase = Supabase.instance.client;
 
     try {
-      debugPrint("🚀 Sending notification...");
-      debugPrint("➡️ user_id: $userId");
+      debugPrint("🚀 Invoking Edge Function for user_id: $userId");
 
       final res = await supabase.functions.invoke(
-        'send-push-notification',
+        'supabase-functions-new-send-push-notification',
         body: {
           'user_id': userId,
           'title': title,
@@ -229,65 +278,30 @@ class NotificationService {
         },
       );
 
-      debugPrint("✅ RESPONSE: ${res.data}");
-
+      debugPrint("✅ Edge Function Result: ${res.data}");
     } catch (e) {
-      debugPrint("🔥 ERROR: $e");
+      debugPrint("🔥 Edge Function Invocation Error: $e");
     }
   }
 
-  // ==============================
-  // 🔥 TYPES
-  // ==============================
-  static Future<void> sendLikeNotification({
-    required String receiverUserId,
-    required String senderUserId,
-    required String answerId,
-  }) async {
+  static Future<void> sendTestNotification() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    
+    debugPrint("🧪 Sending TEST notification to self...");
     await sendNotification(
-      userId: receiverUserId,
-      title: "New Like ❤️",
-      body: "Someone liked your answer",
-      data: {
-        "type": "like",
-        "user_id": senderUserId,
-        "answer_id": answerId,
-      },
-    );
-  }
-
-  static Future<void> sendQuestionNotification({
-    required String receiverUserId,
-    required String senderUserId,
-  }) async {
-    await sendNotification(
-      userId: receiverUserId,
-      title: "New Question ❓",
-      body: "Someone asked you a question",
-      data: {
-        "type": "question",
-        "user_id": senderUserId,
-      },
-    );
-  }
-
-  static Future<void> sendVibeNotification({
-    required String receiverUserId,
-    required String senderUserId,
-  }) async {
-    await sendNotification(
-      userId: receiverUserId,
-      title: "New Vibe 🔥",
-      body: "Someone saved your profile",
-      data: {
-        "type": "vibe",
-        "user_id": senderUserId,
-      },
+      userId: user.id,
+      title: "Test Notification 🚀",
+      body: "If you see this, push notifications are working correctly!",
+      data: {"type": "test"},
     );
   }
 
   static void reset() {
-    _isInitialized = false;
+    debugPrint("🔄 Resetting NotificationService session state");
     _lastToken = null;
+    _cachedToken = null;
+    // We keep _isInitialized = true and keep listeners active
+    // so they can handle the next login event.
   }
 }

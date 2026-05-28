@@ -488,9 +488,11 @@ class _AnswerCardState extends State<AnswerCard> {
           'user_id': widget.answer.userId,
           'source_user': user.id,
           'source_id': widget.answer.id,
-          'type': 'answer',
+          'type': 'answer_reply', // Corrected type
           'seen': false,
         });
+
+        _sendReplyPushNotification(widget.answer.userId, widget.answer.id, user.id);
       }
 
       if (mounted) {
@@ -505,6 +507,39 @@ class _AnswerCardState extends State<AnswerCard> {
       debugPrint("Error sending reply: $e");
     } finally {
       if (mounted) setModalState(() => {});
+    }
+  }
+
+  Future<void> _sendReplyPushNotification(String targetUserId, String answerId, String currentUserId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final session = supabase.auth.currentSession;
+      final accessToken = session?.accessToken;
+      if (accessToken == null) return;
+
+      debugPrint("💬 Reply detected for user: $targetUserId");
+      debugPrint("👤 Answer owner found: $targetUserId");
+
+      final profile = await supabase.from('profiles').select('username').eq('id', currentUserId).single();
+      final username = profile['username'] ?? "Someone";
+
+      debugPrint("🚀 Sending reply notification...");
+      await supabase.functions.invoke(
+        'supabase-functions-new-send-push-notification',
+        body: {
+          "user_id": targetUserId,
+          "title": "New Reply 💬",
+          "body": "@$username replied to your answer",
+          "data": {
+            "type": "answer_reply", 
+            "answer_id": answerId
+          }
+        },
+        headers: {"Authorization": "Bearer $accessToken"},
+      );
+      debugPrint("✅ Reply notification sent");
+    } catch (e) {
+      debugPrint("Push notification failed: $e");
     }
   }
 
