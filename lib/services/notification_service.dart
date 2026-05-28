@@ -6,6 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../main.dart';
 import '../screens/profile.dart';
+import '../screens/inbox.dart';
+import '../screens/questions_screen.dart';
+import '../screens/answer_detail_screen.dart';
 import '../screens/my_tickets_screen.dart';
 import 'update_service.dart';
 
@@ -150,18 +153,49 @@ class NotificationService {
   // ==============================
   static void _handleNavigation(Map<String, dynamic> data) {
     final type = data['type'];
+    final String? answerId = data['answer_id']?.toString();
     debugPrint("➡️ Navigating for type: $type");
 
     if (type == 'support_ticket') {
-      debugPrint("🎫 Support ticket notification tapped");
+      debugPrint("🎫 Support ticket tapped");
       debugPrint("➡️ Opening MyTicketsScreen");
       navigatorKey.currentState?.push(
         MaterialPageRoute(builder: (_) => const MyTicketsScreen()),
       );
     } else if (type == 'question') {
+      debugPrint("📥 Question notification tapped");
+      debugPrint("➡️ Opening Questions tab (Inbox)");
+      navigatorKey.currentState?.popUntil((route) => route.isFirst);
       tabIndexNotifier.value = 1;
+    } else if (type == 'answer') {
+      debugPrint("💬 Answer notification tapped");
+      if (answerId != null) {
+        debugPrint("➡️ Opening AnswerDetailScreen");
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => AnswerDetailScreen(answerId: answerId)),
+        );
+      }
+    } else if (type == 'reply' || type == 'answer_reply') {
+      debugPrint("💬 Reply notification tapped");
+      if (answerId != null) {
+        debugPrint("➡️ Opening AnswerDetailScreen");
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => AnswerDetailScreen(answerId: answerId)),
+        );
+      }
     } else if (type == 'like') {
-      tabIndexNotifier.value = 0;
+      debugPrint("❤️ Like notification tapped");
+      if (answerId != null) {
+        debugPrint("➡️ Opening AnswerDetailScreen");
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => AnswerDetailScreen(answerId: answerId)),
+        );
+      }
+    } else if (type == 'daily_question') {
+      debugPrint("🌙 Daily question tapped");
+      debugPrint("➡️ Opening Questions tab (Inbox)");
+      navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      tabIndexNotifier.value = 1;
     } else if (type == 'update') {
       UpdateService.openPlayStore();
     } else if (type == 'vibe' || type == 'profile_save') {
@@ -173,10 +207,6 @@ class NotificationService {
       } else {
         tabIndexNotifier.value = 4;
       }
-    } else if (type == 'daily_question') {
-      tabIndexNotifier.value = 1;
-    } else if (type == 'answer' || type == 'answer_reply') {
-      tabIndexNotifier.value = 0;
     }
   }
 
