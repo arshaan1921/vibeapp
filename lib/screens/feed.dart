@@ -4,6 +4,7 @@ import '../models/answer.dart';
 import '../widgets/high5_top_bar.dart';
 import '../widgets/answer_card.dart';
 import '../services/block_service.dart';
+import '../main.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -12,10 +13,24 @@ class FeedScreen extends StatefulWidget {
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class _FeedScreenState extends State<FeedScreen> with RouteAware {
   List<AnswerModel> _feedItems = [];
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint('🏠 HomeScreen auto refreshing');
+    if (mounted) {
+      _loadFeedData();
+    }
+  }
 
   static const String _answerSelectQuery = '''
     id,
@@ -43,6 +58,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   void dispose() {
+    routeObserver.unsubscribe(this);
     _realtimeChannel?.unsubscribe();
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
     super.dispose();
