@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/ai_message.dart';
 
 class ChatBubble extends StatelessWidget {
@@ -13,39 +14,54 @@ class ChatBubble extends StatelessWidget {
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-        decoration: BoxDecoration(
-          color: isUser ? theme.primaryColor : theme.cardColor,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isUser ? 16 : 0),
-            bottomRight: Radius.circular(isUser ? 0 : 16),
+      child: GestureDetector(
+        onLongPress: () {
+          Clipboard.setData(ClipboardData(text: message.message));
+          HapticFeedback.mediumImpact();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Text copied'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              duration: const Duration(seconds: 1),
+              width: 150,
+            ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          decoration: BoxDecoration(
+            color: isUser ? theme.primaryColor : theme.cardColor,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(isUser ? 16 : 0),
+              bottomRight: Radius.circular(isUser ? 0 : 16),
+            ),
+            border: isUser ? null : Border.all(color: theme.dividerColor),
           ),
-          border: isUser ? null : Border.all(color: theme.dividerColor),
-        ),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message.message,
-              style: TextStyle(
-                color: isUser ? Colors.white : theme.textTheme.bodyLarge?.color,
-                fontSize: 15,
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message.message,
+                style: TextStyle(
+                  color: isUser ? Colors.white : theme.textTheme.bodyLarge?.color,
+                  fontSize: 15,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _formatTime(message.createdAt),
-              style: TextStyle(
-                color: isUser ? Colors.white70 : Colors.grey,
-                fontSize: 10,
+              const SizedBox(height: 4),
+              Text(
+                _formatTime(message.createdAt),
+                style: TextStyle(
+                  color: isUser ? Colors.white70 : Colors.grey,
+                  fontSize: 10,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
