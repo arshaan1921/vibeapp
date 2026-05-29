@@ -12,6 +12,7 @@ class AiCompanionService {
     required AiCompanion companion,
     required List<AiMemory> memories,
     required String userMessage,
+    List<Map<String, String>> history = const [],
   }) async {
     try {
       final session = _supabase.auth.currentSession;
@@ -36,6 +37,7 @@ class AiCompanionService {
             'memory_key': m.memoryKey,
             'memory_value': m.memoryValue
           }).toList(),
+          'history': history,
         }),
       );
 
@@ -44,10 +46,16 @@ class AiCompanionService {
       }
 
       final data = jsonDecode(response.body);
-      return data['reply'] ?? "Sorry, I couldn't respond right now.";
+      final reply = data['reply'] as String?;
+      
+      if (reply == null || reply.isEmpty) {
+        throw Exception('Empty reply from AI');
+      }
+
+      return reply;
     } catch (e) {
       print('Error calling Gemini Edge Function: $e');
-      return "I'm having a bit of trouble thinking right now. Can you try again? ❤️";
+      return "Sorry 😅 My brain glitched for a second. Can you try again?";
     }
   }
 }

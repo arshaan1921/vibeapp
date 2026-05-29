@@ -103,6 +103,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
         companion: _companion,
         memories: memories,
         userMessage: text,
+        history: _messages.length > 10 
+            ? _messages.sublist(_messages.length - 10).map((m) => {'sender': m.sender, 'message': m.message}).toList()
+            : _messages.map((m) => {'sender': m.sender, 'message': m.message}).toList(),
       );
 
       // Save AI message

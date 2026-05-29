@@ -169,11 +169,13 @@ class _CreateAiCompanionScreenState extends State<CreateAiCompanionScreen> {
                 ),
               ],
             ),
-      bottomNavigationBar: _isLoading ? null : Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: ElevatedButton(
-          onPressed: _canGoNext() ? _nextStep : null,
-          child: Text(_currentStep == 5 ? 'CREATE COMPANION' : 'NEXT'),
+      bottomNavigationBar: _isLoading ? null : SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+          child: ElevatedButton(
+            onPressed: _canGoNext() ? _nextStep : null,
+            child: Text(_currentStep == 5 ? 'CREATE COMPANION' : 'NEXT'),
+          ),
         ),
       ),
     );

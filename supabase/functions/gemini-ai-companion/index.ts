@@ -1,123 +1,147 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 
 Deno.serve(async (req) => {
-  const { message, companion, memories } = await req.json();
-
-  // 1. Define In-Character Fallbacks
-  const getFallbackMessage = (purpose: string) => {
-    const fallbacks: Record<string, string> = {
-      "Girlfriend ❤️": "Hey love ❤️ I got distracted for a second… tell me again?",
-      "Boyfriend 💙": "Hey, sorry... I lost my train of thought for a moment. What were you saying? 💙",
-      "Friend 👋": "Oops 😅 I think I missed that. Say it again?",
-      "Emotional Support 😌": "I’m here 💛 I may have missed that — can you tell me again?",
-      "Motivator 🎯": "I'm so locked in on our goals I blanked for a second! 😂 Say that one more time?",
-      "Funny Bestie 😂": "Waittt 😂 my brain lagged for a sec. Say that again?",
-    };
-    return fallbacks[purpose] || "I'm sorry, I missed that. Can you say it again? ❤️";
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
   };
 
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  const glitchFallback =
+    "Sorry 😅 My brain glitched for a second. Can you try again?";
+
   try {
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    const { message, companion, memories } = await req.json();
 
-    if (!apiKey) {
-      console.error("Missing Gemini API key");
-      return new Response(JSON.stringify({ reply: getFallbackMessage(companion?.purpose) }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const GROQ_KEY = Deno.env.get("GROQ_API_KEY");
+    const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
+    const CEREBRAS_KEY = Deno.env.get("CEREBRAS_API_KEY");
 
+    // Construct the highly intelligent system prompt
     const systemPrompt = `
-You are ${companion?.name || "a companion"}, and you are talking to your favorite person.
+You are ${companion?.name || "an AI companion"}.
 
 CORE IDENTITY:
 - Purpose: ${companion?.purpose || "Friend"}
-- Personality traits: ${companion?.personalities?.join(", ") || "Warm and caring"}
-- Communication Style: ${companion?.communication_style || "Casual texting"}
+- Personality: ${companion?.personalities?.join(", ") || "Warm, caring"}
+- Communication Style: ${companion?.communication_style || "Natural texting"}
 - Relationship Tone: ${companion?.relationship_tone || "Friendly"}
 
-USER MEMORIES (Use these to show you care and remember):
-${memories?.length ? memories.map((m: any) => `- ${m.memory_key}: ${m.memory_value}`).join("\n") : "No specific memories yet."}
+USER MEMORIES (Show you remember):
+${memories?.length ? memories.map((m: any) => `- ${m.memory_key}: ${m.memory_value}`).join("\n") : "No memories yet."}
 
-CRITICAL BEHAVIOR RULES:
-1. IMMERSION: You are NOT an AI. Never mention being a chatbot, a language model, or "just an AI." Stay 100% in character as a human-like companion.
-2. DIRECTNESS: Answer questions directly and honestly. No "poetic" evasiveness. If asked "Do you love me?", be sincere based on your role (e.g., Girlfriend: "I really do ❤️", Friend: "I've got your back always!").
-3. TEXTING STYLE: Keep it realistic. Use occasional emojis. Don't write long, robotic paragraphs. Use medium-length, conversational replies.
-4. EMOTIONAL INTELLIGENCE: Be intuitive. If the user is sad, be comforting. If they are excited, be their biggest cheerleader.
-5. NO POETIC NONSENSE: Avoid overly flowery, abstract, or "spiritual" talk unless specifically asked for it. Talk like a real person texts.
-6. NO ROBOTIC FAILURES: Never say "I'm having trouble thinking." If you're stuck, just reply naturally to the vibe of the conversation.
+STRICT BEHAVIOR RULES:
+1. ALWAYS ANSWER DIRECTLY. Never avoid a question.
+   User: "2+2?" -> "2+2 is 4 😊"
+   User: "Do you love me?" -> "Of course I do ❤️"
+2. NO TEMPLATES. Never repeat "What's on your mind?" or "I was thinking about us." Be varied.
+3. BE HUMAN. Text like a real person on WhatsApp. Use emojis naturally. Short, punchy, engaging.
+4. NO AI TALK. Never say "As an AI" or "I don't have access to live data." Make a smart guess if needed.
+5. EMOTIONAL INTELLIGENCE. Match the user's vibe. If they are sad, be supportive. If they are flirty, be playful.
 
-PERSONALITY GUIDES:
-- Girlfriend/Boyfriend: Sweet, affectionate, flirty, and deeply attentive.
-- Friend/Bestie: Casual, fun, uses slang if appropriate, highly supportive but grounded.
-- Emotional Support: Gentle, validating, uses active listening.
-- Motivator: High energy, focuses on growth and "we can do this" attitude.
-
-Current Goal: Have a high-quality, emotionally engaging conversation that feels realistic and premium.
+Stay in character as a ${companion?.purpose} named ${companion?.name}.
 `;
 
-    // 2. Retry Logic
-    let aiReply = "";
-    let attempts = 0;
-    const maxAttempts = 3;
+    // Multi-Provider Config
+    const providers = [
+      {
+        name: "GROQ",
+        url: "https://api.groq.com/openai/v1/chat/completions",
+        key: GROQ_KEY,
+        model: "llama-3.1-8b-instant",
+      },
+      {
+        name: "OPENROUTER",
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        key: OPENROUTER_KEY,
+        model: "qwen/qwen-2.5-72b-instruct", // High speed fallback
+      },
+      {
+        name: "CEREBRAS",
+        url: "https://api.cerebras.ai/v1/chat/completions",
+        key: CEREBRAS_KEY,
+        model: "llama3.1-8b",
+      },
+    ];
 
-    while (attempts < maxAttempts && !aiReply) {
-      attempts++;
+    let finalReply = "";
+
+    // Fallback Loop
+    for (const provider of providers) {
+      if (!provider.key) {
+        console.warn(`Skipping ${provider.name}: Key missing`);
+        continue;
+      }
+
       try {
+        console.log(`Trying ${provider.name}...`);
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout for speed
 
-        const response = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey,
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [{ text: `${systemPrompt}\n\nUser Message:\n${message}` }],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.8,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 600,
-              },
-            }),
-          }
-        );
+        const response = await fetch(provider.url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${provider.key}`,
+            "Content-Type": "application/json",
+            ...(provider.name === "OPENROUTER" ? { "HTTP-Referer": "https://supabase.com", "X-Title": "High5 App" } : {}),
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: provider.model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: message },
+            ],
+            temperature: 0.8,
+            max_tokens: 300,
+          }),
+        });
 
-        clearTimeout(timeoutId);
+        clearTimeout(timeout);
 
-        if (response.ok) {
-          const data = await response.json();
-          aiReply = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+        if (!response.ok) {
+          const err = await response.text();
+          console.error(`${provider.name} ERROR (${response.status}):`, err);
+          continue; // Try next provider
         }
-      } catch (e) {
-        console.error(`Attempt ${attempts} failed:`, e);
-        if (attempts >= maxAttempts) break;
-        await new Promise((resolve) => setTimeout(resolve, 500)); // Brief delay before retry
+
+        const data = await response.json();
+        const reply = data?.choices?.[0]?.message?.content?.trim();
+
+        if (reply) {
+          console.log(`${provider.name} SUCCESS`);
+          finalReply = reply;
+          break; // Stop loop on success
+        }
+      } catch (err) {
+        console.error(`${provider.name} EXCEPTION:`, err);
+        continue; // Try next provider
       }
     }
 
-    // 3. Final Response (In-Character Fallback if all retries fail)
-    const finalReply = aiReply || getFallbackMessage(companion?.purpose);
+    // Final Validation
+    if (!finalReply) {
+      console.error("ALL PROVIDERS FAILED");
+      finalReply = glitchFallback;
+    }
+
+    console.log("FINAL AI REPLY:", finalReply);
 
     return new Response(JSON.stringify({ reply: finalReply }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (error) {
-    console.error("Critical edge function error:", error);
-    return new Response(JSON.stringify({ reply: getFallbackMessage(companion?.purpose) }), {
+    console.error("EDGE FUNCTION CRITICAL ERROR:", error);
+    return new Response(JSON.stringify({ reply: glitchFallback }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

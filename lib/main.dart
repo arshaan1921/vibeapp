@@ -215,7 +215,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                 ),
                 const BottomNavigationBarItem(
                   icon: Icon(Icons.auto_awesome),
-                  label: "AI Companion",
+                  label: "My AI",
                 ),
                 const BottomNavigationBarItem(
                   icon: Icon(Icons.bookmark),
