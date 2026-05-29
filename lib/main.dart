@@ -13,14 +13,13 @@ import 'screens/profile.dart';
 import 'screens/auth/welcome.dart';
 import 'services/realtime_service.dart';
 import 'services/notification_service.dart';
-import 'features/games/games_screen.dart';
-import 'services/rate_game_service.dart';
 import 'services/block_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/reset_password_page.dart';
 import 'services/iap_service.dart';
 import 'widgets/update_popup.dart';
 import 'services/update_service.dart';
+import 'features/ai_companion/screens/ai_companion_screen.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
@@ -129,7 +128,6 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   DateTime? _lastBackPressed;
-  final _gameService = RateGameService();
 
   @override
   void initState() {
@@ -148,7 +146,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   final List<Widget> _screens = const [
     FeedScreen(),
     QuestionsScreen(),
-    GamesScreen(),
+    AiCompanionScreen(),
     SavedScreen(),
     ProfileScreen(),
   ];
@@ -215,19 +213,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                   icon: Icon(Icons.question_answer_rounded),
                   label: "Questions",
                 ),
-                BottomNavigationBarItem(
-                  icon: StreamBuilder<int>(
-                    stream: _gameService.streamUnseenGamesCount(),
-                    builder: (context, snapshot) {
-                      final count = snapshot.data ?? 0;
-                      return Badge(
-                        isLabelVisible: count > 0,
-                        label: Text(count > 9 ? '9+' : count.toString()),
-                        child: const Icon(Icons.sports_esports_rounded),
-                      );
-                    },
-                  ),
-                  label: "Games",
+                const BottomNavigationBarItem(
+                  icon: Icon(Icons.auto_awesome),
+                  label: "AI Companion",
                 ),
                 const BottomNavigationBarItem(
                   icon: Icon(Icons.bookmark),

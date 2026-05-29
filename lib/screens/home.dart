@@ -3,6 +3,7 @@ import '../models/user.dart';
 import 'ask.dart';
 import 'inbox.dart';
 import 'feed.dart';
+import '../features/ai_companion/screens/ai_companion_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -59,6 +60,16 @@ class HomeScreen extends StatelessWidget {
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const FeedScreen()),
+              ),
+            ),
+            _HomeCard(
+              title: 'AI Companion 👋',
+              subtitle: 'Chat with your AI friend',
+              icon: Icons.auto_awesome,
+              color: Colors.deepPurple,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AiCompanionScreen()),
               ),
             ),
           ],
