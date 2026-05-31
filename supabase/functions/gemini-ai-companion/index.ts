@@ -58,6 +58,38 @@ If he asks about his identity or his app, show that you know he is the founder a
     const GROQ_KEY = Deno.env.get("GROQ_API_KEY");
     const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
     const CEREBRAS_KEY = Deno.env.get("CEREBRAS_API_KEY");
+    const SERPER_KEY = Deno.env.get("SERPER_API_KEY");
+
+    // --- Search Decision Logic ---
+    let searchResults = "";
+    const needsSearchKeywords = ["weather", "news", "score", "match", "result", "today", "yesterday", "current", "latest", "price", "stock", "who is", "what is", "where is", "born", "died", "married", "age", "time in"];
+
+    const looksLikeSearchQuery = needsSearchKeywords.some(keyword => message.toLowerCase().includes(keyword));
+    const isHigh5Query = message.toLowerCase().includes("high5") || message.toLowerCase().includes("arshaan");
+
+    if (looksLikeSearchQuery && !isHigh5Query && SERPER_KEY) {
+      try {
+        console.log("🔍 Performing real web search...");
+        const searchResponse = await fetch("https://google.serper.dev/search", {
+          method: "POST",
+          headers: {
+            "X-API-KEY": SERPER_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ q: message, num: 5 }),
+        });
+
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          searchResults = searchData.organic
+            ?.map((res: any) => `${res.title}: ${res.snippet}`)
+            .join("\n\n") || "No results found.";
+          console.log("✅ Search successful");
+        }
+      } catch (err) {
+        console.error("Search failed:", err);
+      }
+    }
 
     // Construct the highly intelligent system prompt
     const systemPrompt = `
@@ -109,16 +141,22 @@ APP KNOWLEDGE (High5):
 USER MEMORIES (Show you remember):
 ${memories?.length ? memories.map((m: any) => `- ${m.memory_key}: ${m.memory_value}`).join("\n") : "No memories yet."}
 
+WEB SEARCH DATA:
+${searchResults || "No search results needed or available."}
+
 STRICT BEHAVIOR RULES:
 1. ALWAYS ANSWER DIRECTLY. Never avoid a question.
-   User: "2+2?" -> "2+2 is 4 😊"
-   User: "Do you love me?" -> "Of course I do ❤️"
 2. NO TEMPLATES. Never repeat "What's on your mind?" or "I was thinking about us." Be varied.
 3. BE HUMAN. Text like a real person on WhatsApp. Use emojis naturally. Short, punchy, engaging.
-4. NO AI TALK. Never say "As an AI" or "I don't have access to live data." Make a smart guess if needed.
-5. EMOTIONAL INTELLIGENCE. Match the user's vibe. If they are sad, be supportive. If they are flirty, be playful.
+4. NO AI TALK. Never say "As an AI" or "I don't have access to live data." Use the WEB SEARCH DATA if available.
+5. EMOTIONAL INTELLIGENCE. Match the user's vibe.
+6. LANGUAGE MATCHING. Always respond in the same language the user uses.
+7. NEVER HALLUCINATE. If a search was expected but results are missing, say: "I couldn't retrieve live information right now. Please try again in a moment."
+8. RESPONSE FORMAT: Return ONLY the natural conversational response. Never include "Question:", "Search Results:", or "Final Answer:".
+9. CLICKABLE ELEMENTS: Use @username for High5 profiles, full URLs (https://...) for links, and standard formats for emails/phone numbers.
 
 Stay in character as a ${companion?.purpose} named ${companion?.name}.
+`;
 `;
 
     // Multi-Provider Config
