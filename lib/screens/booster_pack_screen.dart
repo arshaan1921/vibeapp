@@ -113,24 +113,25 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
         border: Border.all(
-          color: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
         ),
       ),
       child: InkWell(
         onTap: () => _purchaseBooster(id),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 22.0),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Column(
@@ -140,52 +141,43 @@ class _BoosterPackScreenState extends State<BoosterPackScreen> {
                     Text(
                       defaultTitle,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                         color: theme.textTheme.titleLarge?.color,
-                        letterSpacing: -0.2,
+                        letterSpacing: -0.4,
                       ),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    const Icon(
-                      Icons.auto_awesome,
-                      size: 14,
-                      color: Color(0xFFFFD700),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Available instantly",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white54 : Colors.black45,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      displayPrice,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        color: Color(0xFF2E7D32),
-                        fontWeight: FontWeight.w900,
-                      ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.auto_awesome,
+                          size: 13,
+                          color: Color(0xFFFFD700),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Available instantly",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.bolt_rounded,
-                  color: Colors.orange,
-                  size: 32,
+              Text(
+                displayPrice,
+                style: const TextStyle(
+                  fontSize: 20,
+                  color: Color(0xFF2E7D32),
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
                 ),
               ),
             ],
