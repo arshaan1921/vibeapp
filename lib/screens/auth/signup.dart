@@ -80,6 +80,8 @@ class _SignupScreenState extends State<SignupScreen> {
           'email': email,
           'username': username,
           'name': name,
+          'premium_plan': 'free',
+          'is_premium': false,
         });
       } on PostgrestException catch (pgError) {
         // Log the real database error

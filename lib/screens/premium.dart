@@ -55,7 +55,12 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       plan: 'green',
                       title: "Green Plan",
                       price: "₹100.00 / month",
-                      features: ["50 questions per day", "Green badge", "Green profile ring"],
+                      features: [
+                        "50 questions per day",
+                        "100 AI chats per day ❤️",
+                        "Green badge",
+                        "Green profile ring"
+                      ],
                     ),
                     const SizedBox(height: 16),
                     _buildPlanCard(
@@ -63,7 +68,12 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       plan: 'blue',
                       title: "Blue Plan",
                       price: "₹250.00 / 3 months",
-                      features: ["Unlimited questions", "Blue badge", "Blue profile ring"],
+                      features: [
+                        "Unlimited questions",
+                        "300 AI chats per day ❤️",
+                        "Blue badge",
+                        "Blue profile ring"
+                      ],
                     ),
                     const SizedBox(height: 16),
                     _buildPlanCard(
@@ -71,7 +81,12 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       plan: 'gold',
                       title: "Yellow Plan",
                       price: "₹800.00 / 1 year",
-                      features: ["Unlimited questions", "Yellow badge", "Yellow profile ring"],
+                      features: [
+                        "Unlimited questions",
+                        "1000 AI chats per day ❤️",
+                        "Yellow badge",
+                        "Yellow profile ring"
+                      ],
                       isBestValue: true,
                     ),
                     const SizedBox(height: 100),
@@ -121,16 +136,31 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
-                ...features.map((f) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: Row(
-                        children: [
-                          Icon(Icons.check_circle, size: 18, color: color),
-                          const SizedBox(width: 8),
+                ...features.map((f) {
+                  final isAiFeature = f.contains("AI chats");
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, size: 18, color: color),
+                        const SizedBox(width: 8),
+                        if (isAiFeature)
+                          Expanded(
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(f.replaceAll("❤️", "").trim()),
+                                const SizedBox(width: 4),
+                                Icon(Icons.auto_awesome, size: 16, color: color),
+                              ],
+                            ),
+                          )
+                        else
                           Text(f),
-                        ],
-                      ),
-                    )),
+                      ],
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,

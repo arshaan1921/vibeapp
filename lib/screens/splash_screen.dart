@@ -8,6 +8,8 @@ import '../services/realtime_service.dart';
 import '../services/notification_service.dart';
 import '../services/block_service.dart';
 
+import '../services/safety_service.dart';
+
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -51,12 +53,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       print("➡️ Navigating to WelcomeScreen");
       RealtimeService().stopRealtime();
       NotificationService.reset();
+      safetyService.premiumPlan = null;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const WelcomeScreen()),
       );
     } else {
       print("➡️ Navigating to MainScaffold");
+      
+      // Initialize SafetyService premium plan
+      try {
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select('premium_plan')
+            .eq('id', session.user.id)
+            .maybeSingle();
+        if (profile != null) {
+          safetyService.premiumPlan = profile['premium_plan'];
+        }
+      } catch (e) {
+        debugPrint("Error initializing safetyService: $e");
+      }
+
       RealtimeService().startRealtime();
       blockService.refreshBlockedList();
       Navigator.pushReplacement(

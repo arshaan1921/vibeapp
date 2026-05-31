@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/safety_service.dart';
+
 class IAPService {
   static final IAPService _instance = IAPService._internal();
   factory IAPService() => _instance;
@@ -114,18 +116,33 @@ class IAPService {
         await supabase.from('profiles').update({
           'premium_plan': plan,
           'premium_expires_at': expiresAt.toIso8601String(),
+          'is_premium': plan != 'free',
         }).eq('id', user.id);
+
+        // Sync SafetyService
+        safetyService.premiumPlan = plan;
       } else {
         int questions = 0;
-        if (purchase.productID == booster10) questions = 10;
-        else if (purchase.productID == booster25) questions = 25;
-        else if (purchase.productID == booster100) questions = 100;
+        int aiMessages = 0;
 
-        if (questions > 0) {
+        if (purchase.productID == booster10) {
+          questions = 10;
+          aiMessages = 50;
+        } else if (purchase.productID == booster25) {
+          questions = 25;
+          aiMessages = 150;
+        } else if (purchase.productID == booster100) {
+          questions = 100;
+          aiMessages = 500;
+        }
+
+        if (questions > 0 || aiMessages > 0) {
           await supabase.from('question_boosters').insert({
             'user_id': user.id,
             'questions_added': questions,
             'questions_used': 0,
+            'ai_messages_added': aiMessages,
+            'ai_messages_used': 0,
           });
         }
       }

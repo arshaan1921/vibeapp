@@ -10,14 +10,15 @@ class SafetyService {
   int asksSentToday = 0;
   int anonsSentToday = 0;
 
-  bool isPremium = false;
+  String? premiumPlan;
+  bool get isPremium => premiumPlan != null && premiumPlan != 'free';
 
   final List<String> blockedUsers = [];
   final List<String> bannedUsers = [];
   final Map<String, int> reportCount = {};
   final List<String> shadowBannedUsers = [];
 
-  final List<String> _forbiddenWords = ["hate", "kill", "die", "ugly", "stupid"];
+  final List<String> _forbiddenWords = ["fuck", "sex", "bitch", "bastard"];
 
   bool canAsk({bool anonymous = false}) {
     if (isPremium) return true;

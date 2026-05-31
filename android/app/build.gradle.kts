@@ -18,7 +18,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.v1be.v1be"
-    compileSdk = 36 // Fixes build error: required by plugins
+    compileSdk = 36 // Required by recently updated plugins
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

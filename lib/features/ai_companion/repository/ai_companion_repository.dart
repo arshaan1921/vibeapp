@@ -63,6 +63,33 @@ class AiCompanionRepository {
     return AiCompanion.fromMap(response);
   }
 
+  Future<bool> canSendAiMessage() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return false;
+    
+    // Check daily limit and boosters via RPC
+    final bool canSend = await _supabase.rpc('can_send_ai_message', params: {'uid': userId});
+    return canSend;
+  }
+
+  Future<void> registerAiUsage() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    // We now use an atomic RPC that handles the logic:
+    // 1. If daily limit not reached -> increment ai_messages_today
+    // 2. Else -> consume from oldest valid booster
+    await _supabase.rpc('register_ai_usage_atomic', params: {'uid': userId});
+  }
+
+  Future<int> getRemainingAiMessages() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return 0;
+    
+    final int remaining = await _supabase.rpc('get_remaining_ai_messages', params: {'uid': userId});
+    return remaining;
+  }
+
   Future<List<AiMessage>> getMessages(String companionId) async {
     final response = await _supabase
         .from('ai_messages')

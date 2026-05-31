@@ -5,6 +5,8 @@ import '../repository/ai_companion_repository.dart';
 import '../../../services/ai_companion_service.dart';
 import '../widgets/chat_bubble.dart';
 import 'edit_ai_companion_screen.dart';
+import '../../../screens/booster_pack_screen.dart';
+import '../../../screens/premium.dart';
 
 class AiChatScreen extends StatefulWidget {
   final AiCompanion companion;
@@ -25,6 +27,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   List<AiMessage> _messages = [];
   bool _isLoading = true;
   bool _isTyping = false;
+  int _remainingMessages = 0;
   late AiCompanion _companion;
 
   @override
@@ -32,6 +35,18 @@ class _AiChatScreenState extends State<AiChatScreen> {
     super.initState();
     _companion = widget.companion;
     _loadMessages();
+    _loadRemainingCount();
+  }
+
+  Future<void> _loadRemainingCount() async {
+    try {
+      final count = await _repository.getRemainingAiMessages();
+      if (mounted) {
+        setState(() {
+          _remainingMessages = count;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadMessages() async {
@@ -65,9 +80,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // Check message limit
-    if (!_companion.isPremium && _companion.dailyMessageCount >= _companion.messageLimit) {
-      _showPremiumPopup();
+    // 1. Check message limit (Using new RPC system)
+    final bool canSend = await _repository.canSendAiMessage();
+    if (!canSend) {
+      _showAiLimitReachedDialog();
       return;
     }
 
@@ -107,6 +123,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ? _messages.sublist(_messages.length - 10).map((m) => {'sender': m.sender, 'message': m.message}).toList()
             : _messages.map((m) => {'sender': m.sender, 'message': m.message}).toList(),
       );
+
+      // 2. Register usage ONLY after successful AI reply
+      await _repository.registerAiUsage();
+      _loadRemainingCount();
 
       // Save AI message
       await _repository.saveMessage(
@@ -162,15 +182,36 @@ class _AiChatScreenState extends State<AiChatScreen> {
     // For now, it's a placeholder for the memory system
   }
 
-  void _showPremiumPopup() {
+  void _showAiLimitReachedDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Daily Limit Reached'),
-        content: const Text('You’ve reached your free chats with your AI Companion ❤️'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("You've reached your AI chat limit for today. ❤️"),
+            const SizedBox(height: 16),
+            const Text("Unlock more chats with a booster pack or upgrade your plan!", style: TextStyle(fontSize: 13, color: Colors.grey)),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('MAYBE LATER')),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('UPGRADE')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('MAYBE LATER', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BoosterPackScreen()),
+              );
+            },
+            child: const Text('GET BOOSTERS'),
+          ),
         ],
       ),
     );
@@ -185,9 +226,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
         title: Column(
           children: [
             Text(_companion.name),
-            const Text(
-              'Always here for you ❤️',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            Text(
+              'AI Messages Left: $_remainingMessages',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal, color: Colors.white70),
             ),
           ],
         ),

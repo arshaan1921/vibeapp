@@ -39,10 +39,8 @@ class UpgradeScreen extends StatelessWidget {
             const Spacer(),
             ElevatedButton(
               onPressed: () {
-                safetyService.isPremium = true;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Welcome to Premium!")),
-                );
+                // This is a legacy screen, ideally it should navigate to PremiumScreen or trigger IAP
+                // For now, let's just avoid setting isPremium directly.
                 Navigator.pop(context);
               },
               child: const Text("UPGRADE FOR \$4.99/MO"),

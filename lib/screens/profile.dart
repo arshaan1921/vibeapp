@@ -16,6 +16,7 @@ import 'premium.dart';
 import '../widgets/answer_card.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
+import '../services/safety_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -280,7 +281,10 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           if (expiresAtStr != null) {
             final expiresAt = DateTime.parse(expiresAtStr);
             if (expiresAt.isBefore(DateTime.now())) {
-              await supabase.from('profiles').update({'premium_plan': 'free'}).eq('id', targetId);
+              await supabase.from('profiles').update({
+                'premium_plan': 'free',
+                'is_premium': false,
+              }).eq('id', targetId);
               _loadData();
               return;
             }
@@ -291,6 +295,14 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           profileData = data;
           isLoading = false;
           if (data == null) errorMessage = "Profile not found";
+          
+          // Sync SafetyService premium plan
+          final currentUserId = supabase.auth.currentUser?.id;
+          final isMe = widget.userId == null || widget.userId == currentUserId;
+
+          if (isMe && data != null) {
+            safetyService.premiumPlan = data['premium_plan'];
+          }
         });
       }
     } catch (e) {

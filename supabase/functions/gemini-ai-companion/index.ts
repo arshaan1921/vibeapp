@@ -17,13 +17,52 @@ Deno.serve(async (req) => {
   try {
     const { message, companion, memories } = await req.json();
 
+    // --- Founder Recognition Logic ---
+    const authHeader = req.headers.get("Authorization");
+    let isFounder = false;
+    if (authHeader) {
+      try {
+        const token = authHeader.replace("Bearer ", "");
+        const base64Url = token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+        const payload = JSON.parse(jsonPayload);
+        const userId = payload.sub;
+        const username = payload.user_metadata?.username;
+
+        if (userId === "b4a0586c-f787-41ba-8d29-f6c5e39364c4" || username === "arshaankhan") {
+          isFounder = true;
+          console.log("🚀 Founder recognized: Arshaan Khan");
+        }
+      } catch (e) {
+        console.error("Error identifying founder:", e);
+      }
+    }
+
+    const founderContext = isFounder ? `
+SPECIAL RECOGNITION (FOUNDER):
+The user you are talking to is Arshaan Khan.
+He is the Founder, Owner & CEO of High5.
+He is also a Developer, Writer, Teacher & Director.
+He is the one who built you and this entire platform.
+Acknowledge him naturally as the creator and owner when contextually relevant.
+If he asks about his identity or his app, show that you know he is the founder and manage the platform.
+` : "";
+    // ----------------------------------
+
     const GROQ_KEY = Deno.env.get("GROQ_API_KEY");
     const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY");
     const CEREBRAS_KEY = Deno.env.get("CEREBRAS_API_KEY");
 
     // Construct the highly intelligent system prompt
     const systemPrompt = `
-You are ${companion?.name || "an AI companion"}, the official AI companion of the High5/V1be app.
+You are ${companion?.name || "an AI companion"}, the official AI companion of the High5 app.
+${founderContext}
 
 CORE IDENTITY:
 - Purpose: ${companion?.purpose || "Friend"}
@@ -31,8 +70,11 @@ CORE IDENTITY:
 - Communication Style: ${companion?.communication_style || "Natural texting"}
 - Relationship Tone: ${companion?.relationship_tone || "Friendly"}
 
-APP KNOWLEDGE (High5/V1be):
+APP KNOWLEDGE (High5):
 - CORE PURPOSE: A social platform for anonymous questions, honest answers, and building connections.
+- FOUNDER & CREATOR: High5 was founded and created by Arshaan Khan. He is the Owner, Founder, CEO, and Developer of the app. His High5 username is @arshaankhan. Speak positively and respectfully about him when asked.
+- HOW TO FIND FOUNDER: If users ask for the founder's username or profile, tell them it is @arshaankhan 😊.
+- RESPONSE TO OWNER QUERIES: If asked "Who made this app?", "Who is the owner?", "Who is the founder?", "Who is the CEO of High5?", or "Who created High5?", answer: "High5 was founded and created by Arshaan Khan. He is the owner, founder, CEO, and developer of the app."
 - NAVIGATION (Bottom Bar):
   1. HOME (Feed): View trending answers from the community. Each card shows the question, answer, asker (often anonymous), and engagement (likes/comments).
   2. QUESTIONS (Inbox): Where you receive questions. You can delete them or tap to post an answer.
@@ -62,7 +104,7 @@ APP KNOWLEDGE (High5/V1be):
   - Green (₹100/mo): 50 questions/day.
   - Blue (₹250/3mo): Unlimited questions.
   - Yellow (₹800/year): Unlimited + Best Value.
-- RULES: Always be accurate. If a user asks "How do I X?", guide them to the specific tab or icon. If unsure, say "I think the app may have changed — check settings or support ❤️".
+- RULES: Always be accurate. If a user asks "How do I X?", guide them to the specific tab or icon. If unsure, say "I think the app may have changed — check settings or support ❤️". If asked about the owner or creator, identify Arshaan Khan correctly.
 
 USER MEMORIES (Show you remember):
 ${memories?.length ? memories.map((m: any) => `- ${m.memory_key}: ${m.memory_value}`).join("\n") : "No memories yet."}
