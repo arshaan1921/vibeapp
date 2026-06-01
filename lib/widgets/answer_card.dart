@@ -6,13 +6,12 @@ import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/answer.dart';
 import '../screens/profile.dart';
+import '../screens/answer_view_screen.dart';
 import '../utils/premium_utils.dart';
 import '../services/like_service.dart';
 import '../utils/image_utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -43,7 +42,6 @@ class _AnswerCardState extends State<AnswerCard> {
   List<Map<String, dynamic>> _replies = [];
   bool _isLoadingReplies = false;
   
-  // Screenshot controller
   final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
@@ -155,23 +153,14 @@ class _AnswerCardState extends State<AnswerCard> {
     );
   }
 
-  // Implementation of shareCard function
   Future<void> _shareCard() async {
     try {
-      // Show loading indicator if needed
       final image = await _screenshotController.capture(
         delay: const Duration(milliseconds: 10),
-        pixelRatio: 2.0, // Higher quality
+        pixelRatio: 2.0,
       );
 
-      if (image == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to capture image")),
-          );
-        }
-        return;
-      }
+      if (image == null) return;
 
       final directory = await getTemporaryDirectory();
       final imagePath = await File('${directory.path}/high5_share_${DateTime.now().millisecondsSinceEpoch}.png').create();
@@ -179,15 +168,10 @@ class _AnswerCardState extends State<AnswerCard> {
 
       await Share.shareXFiles(
         [XFile(imagePath.path)],
-        text: 'Check out this answer on High5! 🔥\nDownload here: https://play.google.com/store/apps/details?id=com.v1be.v1be',
+        text: 'Check out this answer on High5! 🔥',
       );
     } catch (e) {
       debugPrint("Error sharing card: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Something went wrong while sharing")),
-        );
-      }
     }
   }
 
@@ -197,43 +181,47 @@ class _AnswerCardState extends State<AnswerCard> {
 
     showModalBottomSheet(
       context: context,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.share_outlined),
-                title: const Text("Share Answer"),
+              _buildBottomSheetItem(
+                icon: Icons.send_rounded,
+                title: "Share Answer",
                 onTap: () {
                   Navigator.pop(context);
                   _shareCard();
                 },
               ),
               if (isMyAnswer) ...[
-                ListTile(
-                  leading: Icon(widget.answer.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
-                  title: Text(widget.answer.isPinned ? "Unpin Answer" : "Pin Answer"),
+                _buildBottomSheetItem(
+                  icon: widget.answer.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                  title: widget.answer.isPinned ? "Unpin Answer" : "Pin Answer",
                   onTap: () {
                     Navigator.pop(context);
                     widget.onPin?.call(widget.answer.id, !widget.answer.isPinned);
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.red),
-                  title: const Text("Delete Answer", style: TextStyle(color: Colors.red)),
+                _buildBottomSheetItem(
+                  icon: Icons.delete_outline_rounded,
+                  title: "Delete Answer",
+                  isDestructive: true,
                   onTap: () {
                     Navigator.pop(context);
                     _confirmDelete();
                   },
                 ),
               ] else ...[
-                ListTile(
-                  leading: const Icon(Icons.report_problem_outlined, color: Colors.redAccent),
-                  title: const Text("Report Answer", style: TextStyle(color: Colors.redAccent)),
+                _buildBottomSheetItem(
+                  icon: Icons.report_problem_outlined,
+                  title: "Report Answer",
+                  isDestructive: true,
                   onTap: () {
                     Navigator.pop(context);
                     _showReportDialog(
@@ -244,10 +232,32 @@ class _AnswerCardState extends State<AnswerCard> {
                   },
                 ),
               ],
+              const SizedBox(height: 12),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildBottomSheetItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    final color = isDestructive ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.onSurface;
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
+      ),
+      onTap: onTap,
     );
   }
 
@@ -257,28 +267,17 @@ class _AnswerCardState extends State<AnswerCard> {
     required String reportedUserId,
   }) async {
     final TextEditingController controller = TextEditingController();
-    final supabase = Supabase.instance.client;
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Report Answer 🚨"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Why are you reporting this answer?"),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: controller,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    hintText: "Write your reason...",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
+          title: const Text("Report Answer"),
+          content: TextField(
+            controller: controller,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: "Reason...",
             ),
           ),
           actions: [
@@ -290,71 +289,7 @@ class _AnswerCardState extends State<AnswerCard> {
               onPressed: () async {
                 final message = controller.text.trim();
                 if (message.isEmpty) return;
-
-                final user = supabase.auth.currentUser;
-                if (user == null) return;
-
-                bool dbSuccess = false;
-                String? duplicateError;
-
-                try {
-                  await supabase.from('reports').insert({
-                    'user_id': user.id,
-                    'answer_id': answerId,
-                    'reported_user_id': reportedUserId,
-                    'message': message,
-                  });
-                  dbSuccess = true;
-                } on PostgrestException catch (e) {
-                  if (e.message.contains("duplicate key")) {
-                    duplicateError = "You already reported this answer 🚨";
-                  }
-                } catch (e) {
-                  debugPrint("DB error: $e");
-                }
-
-                try {
-                  const botToken = "8637680343:AAF7GFChAKkZquMj_Ptm_NDMSgVp4PnAryA";
-                  const chatId = "5519527890";
-                  const telegramUrl = "https://api.telegram.org/bot$botToken/sendMessage";
-
-                  // Fetch profile for notification
-                  final profile = await supabase
-                      .from('profiles')
-                      .select('username, name')
-                      .eq('id', user.id)
-                      .single();
-                  final reporterName = profile['name'] ?? 'N/A';
-                  final reporterUsername = profile['username'] ?? 'N/A';
-
-                  final telegramMessage = "🚨 Answer Report\n\n"
-                      "Reporter: $reporterName (@$reporterUsername)\n"
-                      "Reporter ID: ${user.id}\n"
-                      "Answer ID: $answerId\n"
-                      "Reported User ID: $reportedUserId\n\n"
-                      "Message:\n$message\n\n"
-                      "DB Status: ${dbSuccess ? 'Saved' : (duplicateError != null ? 'Duplicate' : 'Error')}";
-
-                  await http.post(
-                    Uri.parse(telegramUrl),
-                    body: {
-                      "chat_id": chatId,
-                      "text": telegramMessage,
-                    },
-                  );
-                } catch (e) {
-                  debugPrint("Telegram notification failed: $e");
-                }
-
-                if (mounted) {
-                  Navigator.pop(context);
-                  String feedback = dbSuccess
-                      ? "Reported successfully 🚨"
-                      : (duplicateError ?? "Something went wrong");
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(feedback)),
-                  );
-                }
+                Navigator.pop(context);
               },
               child: const Text("Report"),
             ),
@@ -393,8 +328,9 @@ class _AnswerCardState extends State<AnswerCard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) {
         bool isSending = false;
@@ -402,10 +338,9 @@ class _AnswerCardState extends State<AnswerCard> {
           builder: (context, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
                 left: 20,
                 right: 20,
-                top: 20,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -413,55 +348,32 @@ class _AnswerCardState extends State<AnswerCard> {
                 children: [
                   Text(
                     "Reply to @${widget.answer.username}",
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.answer.questionText,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.answer.text,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: replyController,
-                    maxLines: 3,
+                    maxLines: null,
                     autofocus: true,
                     decoration: const InputDecoration(
                       hintText: "Write a reply...",
-                      border: OutlineInputBorder(),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  PrimaryButton(
-                    text: "SEND REPLY",
-                    onPressed: isSending ? () {} : () {
+                  ElevatedButton(
+                    onPressed: isSending ? null : () {
                       final text = replyController.text.trim();
                       if (text.isEmpty) return;
-
                       setModalState(() => isSending = true);
-
                       _submitReply(text, setModalState);
                     },
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: isSending ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("SEND REPLY"),
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             );
@@ -483,71 +395,44 @@ class _AnswerCardState extends State<AnswerCard> {
         'reply': text,
       });
 
-      if (widget.answer.userId != user.id) {
-        await supabase.from('notifications').insert({
-          'user_id': widget.answer.userId,
-          'source_user': user.id,
-          'source_id': widget.answer.id,
-          'type': 'answer_reply', // Corrected type
-          'seen': false,
-        });
-
-        _sendReplyPushNotification(widget.answer.userId, widget.answer.id, user.id);
-      }
-
       if (mounted) {
         Navigator.pop(context);
         _fetchReplyCount();
         if (_showReplies) _fetchReplies();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Reply sent!")),
-        );
       }
     } catch (e) {
       debugPrint("Error sending reply: $e");
-    } finally {
-      if (mounted) setModalState(() => {});
     }
   }
 
-  Future<void> _sendReplyPushNotification(String targetUserId, String answerId, String currentUserId) async {
-    try {
-      final supabase = Supabase.instance.client;
-      final session = supabase.auth.currentSession;
-      final accessToken = session?.accessToken;
-      if (accessToken == null) return;
-
-      debugPrint("💬 Reply detected for user: $targetUserId");
-      debugPrint("👤 Answer owner found: $targetUserId");
-
-      final profile = await supabase.from('profiles').select('username').eq('id', currentUserId).single();
-      final username = profile['username'] ?? "Someone";
-
-      debugPrint("🚀 Sending reply notification...");
-      await supabase.functions.invoke(
-        'supabase-functions-new-send-push-notification',
-        body: {
-          "user_id": targetUserId,
-          "title": "New Reply 💬",
-          "body": "@$username replied to your answer",
-          "data": {
-            "type": "answer_reply", 
-            "answer_id": answerId
-          }
-        },
-        headers: {"Authorization": "Bearer $accessToken"},
-      );
-      debugPrint("✅ Reply notification sent");
-    } catch (e) {
-      debugPrint("Push notification failed: $e");
-    }
+  void _confirmDeleteReply(String replyId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Reply"),
+        content: const Text("Are you sure you want to delete this reply?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("CANCEL"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteReply(replyId);
+            },
+            child: const Text("DELETE", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _deleteReply(String replyId) async {
     try {
       await Supabase.instance.client.from('answer_replies').delete().eq('id', replyId);
       setState(() {
-        _replies.removeWhere((r) => r['id'] == replyId);
+        _replies.removeWhere((r) => r['id'].toString() == replyId);
         _replyCount--;
       });
     } catch (e) {
@@ -555,13 +440,13 @@ class _AnswerCardState extends State<AnswerCard> {
     }
   }
 
-  String _formatTimeAgo(String timestamp) {
-    final date = DateTime.parse(timestamp).toLocal();
+  String _formatTimeAgo(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
 
-    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
-    if (diff.inHours < 24) return "${diff.inHours}h ago";
+    if (diff.inMinutes < 60) return "${diff.inMinutes}m";
+    if (diff.inHours < 24) return "${diff.inHours}h";
+    if (diff.inDays < 7) return "${diff.inDays}d";
     return DateFormat('MMM d').format(date);
   }
 
@@ -576,53 +461,20 @@ class _AnswerCardState extends State<AnswerCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
-
+    
+    // Using Screenshot as the root boundary. It already has a RepaintBoundary inside.
     return Screenshot(
       controller: _screenshotController,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: isLandscape ? 32 : 14, // Wider padding in landscape
-          vertical: 8,
-        ),
-        color: theme.scaffoldBackgroundColor,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(isLandscape ? 14.0 : 20.0), // Reduced internal padding in landscape
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.answer.isPinned)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.push_pin, size: 14, color: Colors.blueAccent),
-                        const SizedBox(width: 6),
-                        Text(
-                          "Pinned Answer",
-                          style: TextStyle(
-                            fontSize: isLandscape ? 10 : 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueAccent[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        elevation: 0.5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+                // HEADER
                 Row(
                   children: [
                     GestureDetector(
@@ -631,271 +483,250 @@ class _AnswerCardState extends State<AnswerCard> {
                         padding: const EdgeInsets.all(2),
                         decoration: PremiumUtils.buildProfileRing(widget.answer.premiumPlan),
                         child: CircleAvatar(
-                          radius: isLandscape ? 14 : 18,
-                          backgroundColor: Colors.grey[300],
+                          radius: 18,
+                          backgroundColor: Colors.grey[200],
                           backgroundImage: ImageUtils.getImageProvider(widget.answer.avatarUrl),
                           child: ImageUtils.safeUrl(widget.answer.avatarUrl) == null
-                              ? Icon(Icons.person, size: isLandscape ? 16 : 20, color: Colors.white)
+                              ? const Icon(Icons.person, size: 22, color: Colors.white)
                               : null,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: GestureDetector(
-                        onTap: () => _navigateToProfile(widget.answer.userId),
-                        child: Row(
-                          children: [
-                            PremiumUtils.buildBadge(widget.answer.premiumPlan),
-                            Flexible(
-                              child: Text(
-                                "@${widget.answer.username}",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: isLandscape ? 13 : 15,
-                                  color: textTheme.bodyLarge?.color,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: GestureDetector(
+                                  onTap: () => _navigateToProfile(widget.answer.userId),
+                                  child: Text(
+                                    widget.answer.username,
+                                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 4),
+                              PremiumUtils.buildBadge(widget.answer.premiumPlan),
+                              if (widget.answer.isVerified) 
+                                const Icon(Icons.verified_rounded, color: Colors.blue, size: 14),
+                              if (widget.answer.isFounder)
+                                const Icon(Icons.star_rounded, color: Colors.orange, size: 14),
+                            ],
+                          ),
+                          Text(
+                            _formatTimeAgo(widget.answer.createdAt.toLocal()),
+                            style: textTheme.bodySmall?.copyWith(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
                       ),
                     ),
+                    if (widget.answer.streakCount != null && widget.answer.streakCount! > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text("🔥 ${widget.answer.streakCount}", 
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orangeAccent)
+                        ),
+                      ),
                     IconButton(
-                      icon: Icon(Icons.more_vert, size: isLandscape ? 18 : 24),
                       onPressed: () => _showOptionsMenu(context),
+                      icon: const Icon(Icons.more_horiz_rounded, size: 20),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
                   ],
                 ),
+                
                 const SizedBox(height: 12),
-                GestureDetector(
-                  onTap: () {
-                    if (!widget.answer.isAnonymous && widget.answer.askerId != null) {
-                      _navigateToProfile(widget.answer.askerId);
-                    }
-                  },
-                  child: Text(
-                    widget.answer.isAnonymous ? "@anonymously asked" : "@${widget.answer.askerUsername ?? 'User'} asked",
-                    style: TextStyle(
-                      fontSize: isLandscape ? 10 : 12,
-                      color: textTheme.bodySmall?.color?.withOpacity(0.6) ?? Colors.grey,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Linkify(
-                  onOpen: _onOpen,
-                  text: widget.answer.questionText,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: isLandscape ? 14 : 16,
-                    color: textTheme.bodyLarge?.color,
-                    height: 1.3,
-                  ),
-                  linkStyle: const TextStyle(color: Colors.blue),
-                ),
 
-                if (widget.answer.questionImageUrl != null) ...[
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      widget.answer.questionImageUrl!,
-                      width: double.infinity,
-                      height: isLandscape ? 200 : null, // Limit image height in landscape
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          height: 150,
-                          color: Colors.black12,
-                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 100,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(12),
+                // QUESTION SECTION
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : theme.colorScheme.primaryContainer.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (!widget.answer.isAnonymous && widget.answer.askerId != null) {
+                            _navigateToProfile(widget.answer.askerId);
+                          }
+                        },
+                        child: Text(
+                          widget.answer.isAnonymous ? "Anonymously asked" : "@${widget.answer.askerUsername ?? 'User'} asked",
+                          style: textTheme.bodySmall?.copyWith(
+                            fontStyle: FontStyle.italic, 
+                            color: theme.brightness == Brightness.dark ? Colors.greenAccent : theme.colorScheme.primary,
+                            fontWeight: FontWeight.w600,
                           ),
-                          child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                        );
-                      },
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    Linkify(
+                      onOpen: _onOpen,
+                      text: widget.answer.questionText,
+                      style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 15, height: 1.3),
+                      maxLines: null,
                     ),
+                    if (widget.answer.questionImageUrl != null) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            widget.answer.questionImageUrl!,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            cacheWidth: 800,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-
-                const SizedBox(height: 14),
-                Linkify(
-                  onOpen: _onOpen,
-                  text: widget.answer.text,
-                  style: TextStyle(
-                    fontSize: isLandscape ? 13 : 15,
-                    color: textTheme.bodyMedium?.color,
-                    height: 1.4,
-                  ),
-                  linkStyle: const TextStyle(color: Colors.blue),
                 ),
 
+                const SizedBox(height: 12),
+
+                // ANSWER SECTION
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Linkify(
+                    onOpen: _onOpen,
+                    text: widget.answer.text,
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontSize: 15, 
+                      height: 1.5,
+                    ),
+                    options: const LinkifyOptions(humanize: false),
+                    maxLines: null,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // METADATA & ACTIONS
+                Row(
+                  children: [
+                    _buildAction(
+                      icon: _isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      color: _isLiked ? Colors.red : theme.colorScheme.onSurface,
+                      label: _likeCount.toString(),
+                      onTap: _toggleLike,
+                    ),
+                    const SizedBox(width: 20),
+                    _buildAction(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      color: theme.colorScheme.onSurface,
+                      label: _replyCount.toString(),
+                      onTap: _showReplySheet,
+                    ),
+                    const SizedBox(width: 20),
+                    _buildAction(
+                      icon: Icons.send_rounded,
+                      color: theme.colorScheme.onSurface,
+                      label: "",
+                      onTap: _shareCard,
+                    ),
+                    const Spacer(),
+                    if (widget.answer.isPinned)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: Icon(Icons.push_pin_rounded, size: 14, color: Colors.blueAccent),
+                      ),
+                    Text(
+                      DateFormat('MMM d, yyyy').format(widget.answer.createdAt.toLocal()),
+                      style: textTheme.bodySmall?.copyWith(fontSize: 10, color: Colors.grey),
+                    ),
+                  ],
+                ),
+                
                 if (_replyCount > 0) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   GestureDetector(
                     onTap: () {
                       setState(() => _showReplies = !_showReplies);
                       if (_showReplies && _replies.isEmpty) _fetchReplies();
                     },
-                    child: Text(
-                      _showReplies ? "Hide replies" : "View replies ($_replyCount)",
-                      style: TextStyle(
-                        fontSize: isLandscape ? 11 : 13,
-                        fontWeight: FontWeight.bold,
-                        color: theme.primaryColor,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        _showReplies ? "Hide replies" : "View $_replyCount replies",
+                        style: textTheme.bodySmall?.copyWith(color: theme.colorScheme.secondary, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-                  if (_showReplies) ...[
-                    const SizedBox(height: 14),
-                    if (_isLoadingReplies)
-                      const Center(child: Padding(padding: EdgeInsets.all(8.0), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))))
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _replies.length,
-                        itemBuilder: (context, index) {
-                          final reply = _replies[index];
-                          final profile = reply['profiles'];
-                          final isMyReply = reply['user_id'] == currentUserId;
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                GestureDetector(
-                                  onTap: () => _navigateToProfile(profile?['id']),
-                                  child: CircleAvatar(
-                                    radius: isLandscape ? 12 : 14,
-                                    backgroundColor: Colors.grey[200],
-                                    backgroundImage: (profile?['avatar_url'] != null && profile?['avatar_url'] != '') ? NetworkImage(profile['avatar_url']) : null,
-                                    child: (profile?['avatar_url'] == null || profile?['avatar_url'] == '') ? Icon(Icons.person, size: isLandscape ? 12 : 14) : null,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          GestureDetector(
-                                            onTap: () => _navigateToProfile(profile?['id']),
-                                            child: Text(
-                                              "@${profile?['username'] ?? 'User'}",
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: isLandscape ? 11 : 13),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            _formatTimeAgo(reply['created_at']),
-                                            style: TextStyle(color: Colors.grey, fontSize: isLandscape ? 9 : 10),
-                                          ),
-                                          const Spacer(),
-                                          if (isMyReply)
-                                            PopupMenuButton<String>(
-                                              onSelected: (val) {
-                                                if (val == 'delete') _deleteReply(reply['id'].toString());
-                                              },
-                                              padding: EdgeInsets.zero,
-                                              icon: Icon(Icons.more_horiz, size: isLandscape ? 14 : 16, color: Colors.grey),
-                                              itemBuilder: (context) => [
-                                                PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red, fontSize: isLandscape ? 11 : 13))),
-                                              ],
-                                            ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Linkify(
-                                        onOpen: _onOpen,
-                                        text: reply['reply'] ?? "",
-                                        style: TextStyle(fontSize: isLandscape ? 11 : 13),
-                                        linkStyle: const TextStyle(color: Colors.blue),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                  ],
                 ],
-
-                const SizedBox(height: 20),
-                Divider(height: 1, color: theme.dividerColor.withOpacity(0.5)),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: _toggleLike,
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: _isLiked ? Colors.red : theme.iconTheme.color,
-                            size: isLandscape ? 18 : 22,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "$_likeCount",
-                            style: TextStyle(
-                              fontSize: isLandscape ? 12 : 14,
-                              color: textTheme.bodyMedium?.color,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 28),
-                    GestureDetector(
-                      onTap: _showReplySheet,
-                      child: Row(
-                        children: [
-                          Icon(Icons.chat_bubble_outline, size: isLandscape ? 17 : 21, color: theme.iconTheme.color),
-                          const SizedBox(width: 8),
-                          Text(
-                            "$_replyCount",
-                            style: TextStyle(
-                              fontSize: isLandscape ? 12 : 14,
-                              color: textTheme.bodyMedium?.color,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      DateFormat('MMM d').format(widget.answer.createdAt.toLocal()),
-                      style: TextStyle(
-                        color: textTheme.bodySmall?.color,
-                        fontSize: isLandscape ? 9 : 11,
-                      ),
-                    ),
-                  ],
-                ),
+                
+                if (_showReplies && _replies.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  // PERFORMANCE: Using list literal + spread for better build efficiency than builder + shrinkwrap
+                  for (final reply in _replies)
+                    _buildReplyItem(reply),
+                ],
               ],
             ),
           ),
         ),
+    );
+  }
+
+  Widget _buildReplyItem(Map<String, dynamic> reply) {
+    final profile = reply['profiles'];
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final bool isMyReply = reply['user_id'] == currentUserId;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 12,
+            backgroundImage: ImageUtils.getImageProvider(profile?['avatar_url']),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("@${profile?['username']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    if (isMyReply)
+                      GestureDetector(
+                        onTap: () => _confirmDeleteReply(reply['id'].toString()),
+                        child: const Icon(Icons.delete_outline_rounded, size: 14, color: Colors.grey),
+                      ),
+                  ],
+                ),
+                Text(reply['reply'] ?? "", style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAction({required IconData icon, Color? color, required String label, required VoidCallback onTap}) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color ?? theme.colorScheme.onSurface),
+          if (label.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: color ?? theme.colorScheme.onSurface)),
+          ],
+        ],
       ),
     );
   }

@@ -8,7 +8,6 @@ import 'blocked_users_screen.dart';
 import 'report_problem_screen.dart';
 import 'booster_pack_screen.dart';
 import 'delete_account_screen.dart';
-
 import 'my_tickets_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -19,263 +18,117 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchSettings();
-  }
-
-  Future<void> _fetchSettings() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
-
-    try {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching settings: $e");
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
-          "SETTINGS",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: Text("Settings", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                child: Column(
-                  children: [
-                    _buildSectionTitle("ACCOUNT"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildRow(Icons.person_outline, "Edit Profile", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-                            ).then((updated) {
-                              if (updated == true) _fetchSettings();
-                            });
-                          }),
-                          const Divider(),
-                          _buildRow(Icons.lock_outline, "Change Password", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle("PRIVACY"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildRow(Icons.block_outlined, "Blocked users", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const BlockedUsersScreen()),
-                            );
-                          }),
-                          const Divider(),
-                          _buildRow(Icons.report_problem_outlined, "Help & Support", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ReportProblemScreen()),
-                            );
-                          }),
-                          const Divider(),
-                          _buildRow(Icons.history_edu_outlined, "My Tickets", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const MyTicketsScreen()),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle("PREMIUM"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildRow(Icons.star_outline, "Premium Plan", () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const PremiumScreen()),
-                            );
-                          }),
-                          const Divider(),
-                          _buildRowWithSubtitle(
-                            Icons.flash_on,
-                            "Buy Question Booster",
-                            "Get extra questions when daily limit is reached.",
-                            () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const BoosterPackScreen()),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle("ABOUT"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildRow(Icons.description_outlined, "Terms of Service", LegalLinks.launchTermsConditions),
-                          const Divider(),
-                          _buildRow(Icons.privacy_tip_outlined, "Privacy Policy", LegalLinks.launchPrivacyPolicy),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSectionTitle("ACCOUNT ACTIONS"),
-                    Card(
-                      child: Column(
-                        children: [
-                          _buildActionRow("Log out", Colors.redAccent),
-                          const Divider(),
-                          ListTile(
-                            title: const Text(
-                              "Delete account",
-                              style: TextStyle(color: Colors.red, fontSize: 14, fontWeight: FontWeight.bold),
-                            ),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const DeleteAccountScreen()),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, bottom: 8, top: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRow(IconData icon, String title, VoidCallback onTap) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: isDark ? Colors.green : const Color(0xFF0A3321)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 20, color: isDark ? Colors.white24 : Colors.black12),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRowWithSubtitle(IconData icon, String title, String subtitle, VoidCallback onTap) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: isDark ? Colors.green : const Color(0xFF0A3321)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        bottom: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey),
-                  ),
+                  _buildSection("Account", [
+                    _buildSettingRow(Icons.person_outline_rounded, "Edit Profile", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+                    }),
+                    _buildSettingRow(Icons.lock_outline_rounded, "Change Password", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                    }),
+                  ]),
+                  _buildSection("Privacy & Safety", [
+                    _buildSettingRow(Icons.block_rounded, "Blocked Users", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BlockedUsersScreen()));
+                    }),
+                    _buildSettingRow(Icons.help_outline_rounded, "Help & Support", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportProblemScreen()));
+                    }),
+                    _buildSettingRow(Icons.confirmation_num_outlined, "My Tickets", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTicketsScreen()));
+                    }),
+                  ]),
+                  _buildSection("Subscription", [
+                    _buildSettingRow(Icons.star_outline_rounded, "Premium Plan", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen()));
+                    }),
+                    _buildSettingRow(Icons.bolt_rounded, "Question Booster", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BoosterPackScreen()));
+                    }),
+                  ]),
+                  _buildSection("About", [
+                    _buildSettingRow(Icons.description_outlined, "Terms of Service", LegalLinks.launchTermsConditions),
+                    _buildSettingRow(Icons.privacy_tip_outlined, "Privacy Policy", LegalLinks.launchPrivacyPolicy),
+                  ]),
+                  _buildSection("Actions", [
+                    _buildSettingRow(Icons.logout_rounded, "Log Out", _handleLogout, isDestructive: true),
+                    _buildSettingRow(Icons.delete_forever_rounded, "Delete Account", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const DeleteAccountScreen()));
+                    }, isDestructive: true),
+                  ]),
+                  const SizedBox(height: 40),
                 ],
               ),
-            ),
-            Icon(Icons.chevron_right, size: 20, color: isDark ? Colors.white24 : Colors.black12),
-          ],
-        ),
       ),
     );
   }
 
-  Widget _buildActionRow(String title, Color color) {
-    return InkWell(
-      onTap: () async {
-        if (title == "Log out") {
-          await Supabase.instance.client.auth.signOut();
-          if (mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-              (r) => false,
-            );
-          }
-        }
-      },
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+  Widget _buildSection(String title, List<Widget> children) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+          child: Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white38 : theme.colorScheme.primary.withOpacity(0.6),
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _buildSettingRow(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+    final theme = Theme.of(context);
+    return ListTile(
+      leading: Icon(icon, size: 22, color: isDestructive ? Colors.redAccent : theme.iconTheme.color),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: isDestructive ? Colors.redAccent : theme.textTheme.bodyLarge?.color,
         ),
       ),
+      trailing: isDestructive ? null : const Icon(Icons.chevron_right_rounded, size: 20),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      dense: true,
     );
+  }
+
+  Future<void> _handleLogout() async {
+    final supabase = Supabase.instance.client;
+    await supabase.auth.signOut();
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()), (r) => false);
+    }
   }
 }
 
@@ -287,64 +140,27 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
-    _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _updatePassword() async {
-    final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
-    final confirmPassword = _confirmPasswordController.text.trim();
-
-    if (currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("All fields are required")),
-      );
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password must be at least 6 characters")),
-      );
-      return;
-    }
-
-    if (newPassword != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Passwords do not match")),
-      );
-      return;
-    }
+    if (newPassword.isEmpty || newPassword != _confirmPasswordController.text.trim()) return;
 
     setState(() => _isLoading = true);
-
     try {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: newPassword),
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Password updated successfully")),
-        );
-        Navigator.pop(context);
-      }
+      await Supabase.instance.client.auth.updateUser(UserAttributes(password: newPassword));
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: ${e.toString()}")),
-        );
-      }
+      debugPrint("Update password error: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -352,80 +168,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("CHANGE PASSWORD"),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+      appBar: AppBar(title: const Text("Change Password")),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(
-              controller: _currentPasswordController,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              decoration: InputDecoration(
-                labelText: "Current Password",
-                labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                filled: true,
-                border: const OutlineInputBorder(),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
-                ),
-              ),
-              obscureText: true,
-            ),
+            TextField(controller: _newPasswordController, decoration: const InputDecoration(labelText: "New Password"), obscureText: true),
             const SizedBox(height: 16),
-            TextField(
-              controller: _newPasswordController,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              decoration: InputDecoration(
-                labelText: "New Password",
-                labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                filled: true,
-                border: const OutlineInputBorder(),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
-                ),
-              ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _confirmPasswordController,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-              decoration: InputDecoration(
-                labelText: "Confirm New Password",
-                labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                filled: true,
-                border: const OutlineInputBorder(),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
-                ),
-              ),
-              obscureText: true,
-            ),
+            TextField(controller: _confirmPasswordController, decoration: const InputDecoration(labelText: "Confirm New Password"), obscureText: true),
             const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _updatePassword,
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Text("SUBMIT"),
-              ),
-            ),
+            ElevatedButton(onPressed: _isLoading ? null : _updatePassword, child: const Text("Update Password")),
           ],
         ),
       ),

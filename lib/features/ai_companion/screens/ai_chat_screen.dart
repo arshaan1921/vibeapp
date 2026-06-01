@@ -41,11 +41,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Future<void> _loadRemainingCount() async {
     try {
       final count = await _repository.getRemainingAiMessages();
-      if (mounted) {
-        setState(() {
-          _remainingMessages = count;
-        });
-      }
+      if (mounted) setState(() => _remainingMessages = count);
     } catch (_) {}
   }
 
@@ -80,7 +76,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    // 1. Check message limit (Using new RPC system)
     final bool canSend = await _repository.canSendAiMessage();
     if (!canSend) {
       _showAiLimitReachedDialog();
@@ -104,17 +99,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _scrollToBottom();
 
     try {
-      // Save user message
-      await _repository.saveMessage(
-        companionId: _companion.id,
-        message: text,
-        sender: 'user',
-      );
-
-      // Get memories for context
+      await _repository.saveMessage(companionId: _companion.id, message: text, sender: 'user');
       final memories = await _repository.getMemories(_companion.id);
 
-      // Get AI response
       final aiReply = await _aiService.getAiResponse(
         companion: _companion,
         memories: memories,
@@ -124,16 +111,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
             : _messages.map((m) => {'sender': m.sender, 'message': m.message}).toList(),
       );
 
-      // 2. Register usage ONLY after successful AI reply
       await _repository.registerAiUsage();
       _loadRemainingCount();
 
-      // Save AI message
-      await _repository.saveMessage(
-        companionId: _companion.id,
-        message: aiReply,
-        sender: 'ai',
-      );
+      await _repository.saveMessage(companionId: _companion.id, message: aiReply, sender: 'ai');
 
       final aiMsg = AiMessage(
         id: '',
@@ -148,67 +129,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
         setState(() {
           _messages.add(aiMsg);
           _isTyping = false;
-          // Optimistically update count
-          _companion = AiCompanion(
-            id: _companion.id,
-            userId: _companion.userId,
-            name: _companion.name,
-            purpose: _companion.purpose,
-            personalities: _companion.personalities,
-            communicationStyle: _companion.communicationStyle,
-            relationshipTone: _companion.relationshipTone,
-            avatarUrl: _companion.avatarUrl,
-            createdAt: _companion.createdAt,
-            dailyMessageCount: _companion.dailyMessageCount + 1,
-            isPremium: _companion.isPremium,
-            messageLimit: _companion.messageLimit,
-            lastResetDate: _companion.lastResetDate,
-          );
         });
         _scrollToBottom();
       }
-
-      // TODO: Background task to extract and save memories from the conversation
-      _extractMemories(text, aiReply);
-
     } catch (e) {
       if (mounted) setState(() => _isTyping = false);
     }
-  }
-
-  void _extractMemories(String userMsg, String aiReply) {
-    // Basic logic to see if user shared something personal
-    // In a real app, you might use AI to extract these
-    // For now, it's a placeholder for the memory system
   }
 
   void _showAiLimitReachedDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Daily Limit Reached'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("You've reached your AI chat limit for today. ❤️"),
-            const SizedBox(height: 16),
-            const Text("Unlock more chats with a booster pack or upgrade your plan!", style: TextStyle(fontSize: 13, color: Colors.grey)),
-          ],
-        ),
+        title: const Text('Limit Reached'),
+        content: const Text("You've reached your AI chat limit for today."),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('MAYBE LATER', style: TextStyle(color: Colors.grey)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('LATER')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const BoosterPackScreen()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const BoosterPackScreen()));
             },
             child: const Text('GET BOOSTERS'),
           ),
@@ -223,98 +163,170 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Column(
+        titleSpacing: 0,
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        centerTitle: false,
+        title: Row(
           children: [
-            Text(_companion.name),
-            Text(
-              'AI Messages Left: $_remainingMessages',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal, color: Colors.white70),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => _openSettings(),
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundImage: _companion.avatarUrl != null ? NetworkImage(_companion.avatarUrl!) : null,
+                    child: _companion.avatarUrl == null ? const Icon(Icons.auto_awesome, size: 20) : null,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: theme.colorScheme.surface, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_companion.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF111111))),
+                  Text(
+                    'Online • $_remainingMessages messages left',
+                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
-          GestureDetector(
-            onTap: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EditAiCompanionScreen(companion: _companion),
+          IconButton(icon: const Icon(Icons.info_outline_rounded, color: Color(0xFF111111)), onPressed: _openSettings),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // Personality Indicators
+            if (_companion.personalities.isNotEmpty)
+              Container(
+                height: 40,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _companion.personalities.length,
+                  itemBuilder: (context, index) {
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _companion.personalities[index],
+                        style: TextStyle(fontSize: 11, color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
+                      ),
+                    );
+                  },
                 ),
-              );
-              
-              if (result == 'deleted' && mounted) {
-                widget.onDeleted?.call();
-              } else if (result is AiCompanion && mounted) {
-                setState(() {
-                  _companion = result;
-                });
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: _companion.avatarUrl != null
-                  ? CircleAvatar(
-                      backgroundImage: NetworkImage(_companion.avatarUrl!),
-                    )
-                  : const CircleAvatar(
-                      child: Icon(Icons.person),
+              ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) => ChatBubble(message: _messages[index]),
                     ),
             ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) => ChatBubble(message: _messages[index]),
-                  ),
-          ),
-          if (_isTyping)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Typing...', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            if (_isTyping)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('${_companion.name} is thinking...', style: theme.textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic)),
+                ),
               ),
-            ),
-          _buildMessageInput(),
-        ],
+            _buildMessageInput(),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _openSettings() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => EditAiCompanionScreen(companion: _companion)),
+    );
+    if (result == 'deleted' && mounted) {
+      widget.onDeleted?.call();
+    } else if (result is AiCompanion && mounted) {
+      setState(() => _companion = result);
+    }
   }
 
   Widget _buildMessageInput() {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: const InputDecoration(
-                hintText: 'Say something...',
-                border: InputBorder.none,
-                fillColor: Colors.transparent,
-              ),
-              onSubmitted: (_) => _sendMessage(),
-            ),
-          ),
-          IconButton(
-            onPressed: _sendMessage,
-            icon: Icon(Icons.send, color: theme.primaryColor),
-          ),
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
         ],
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.brightness == Brightness.light ? Colors.black.withOpacity(0.05) : Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            Expanded(
+              child: TextField(
+                controller: _messageController,
+                decoration: const InputDecoration(
+                  hintText: 'Message...',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  fillColor: Colors.transparent,
+                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                ),
+                maxLines: 4,
+                minLines: 1,
+                onSubmitted: (_) => _sendMessage(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: _sendMessage,
+              icon: Icon(Icons.arrow_upward_rounded, color: theme.colorScheme.primary),
+              style: IconButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
       ),
     );
   }

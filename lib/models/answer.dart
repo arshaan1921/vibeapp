@@ -5,6 +5,9 @@ class AnswerModel {
   final String? avatarUrl;
   final String username;
   final String? premiumPlan;
+  final bool isVerified;
+  final bool isFounder;
+  final int? streakCount;
   final DateTime createdAt;
   final String questionText;
   final String? questionImageUrl;
@@ -22,6 +25,9 @@ class AnswerModel {
     this.avatarUrl,
     required this.username,
     this.premiumPlan,
+    this.isVerified = false,
+    this.isFounder = false,
+    this.streakCount,
     required this.createdAt,
     required this.questionText,
     this.questionImageUrl,
@@ -34,8 +40,21 @@ class AnswerModel {
   });
 
   factory AnswerModel.fromMap(Map<String, dynamic> map, {bool? isLiked, int? likeCount}) {
-    final profile = map['profiles'];
-    final question = map['questions'];
+    var profileData = map['profiles'];
+    Map<String, dynamic>? profile;
+    if (profileData is List && profileData.isNotEmpty) {
+      profile = profileData.first;
+    } else if (profileData is Map<String, dynamic>) {
+      profile = profileData;
+    }
+
+    var questionData = map['questions'];
+    Map<String, dynamic>? question;
+    if (questionData is List && questionData.isNotEmpty) {
+      question = questionData.first;
+    } else if (questionData is Map<String, dynamic>) {
+      question = questionData;
+    }
 
     // Handle nested asker profile
     final askerData = question?['asker'] ?? question?['profiles'];
@@ -53,6 +72,9 @@ class AnswerModel {
       avatarUrl: profile?['avatar_url'],
       username: profile?['username'] ?? 'User',
       premiumPlan: profile?['premium_plan'],
+      isVerified: profile?['is_verified'] ?? false,
+      isFounder: profile?['is_founder'] ?? false,
+      streakCount: profile?['streak_count'],
       createdAt: DateTime.parse(map['created_at']),
       questionText: question?['text'] ?? '',
       questionImageUrl: question?['image_url'],
@@ -65,7 +87,7 @@ class AnswerModel {
     );
   }
 
-  AnswerModel copyWith({bool? isLiked, int? likeCount, bool? isPinned}) {
+  AnswerModel copyWith({bool? isLiked, int? likeCount, bool? isPinned, int? streakCount}) {
     return AnswerModel(
       id: id,
       userId: userId,
@@ -73,6 +95,9 @@ class AnswerModel {
       avatarUrl: avatarUrl,
       username: username,
       premiumPlan: premiumPlan,
+      isVerified: isVerified,
+      isFounder: isFounder,
+      streakCount: streakCount ?? this.streakCount,
       createdAt: createdAt,
       questionText: questionText,
       questionImageUrl: questionImageUrl,

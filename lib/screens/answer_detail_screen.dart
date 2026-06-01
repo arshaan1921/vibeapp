@@ -411,6 +411,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
                           Text(
                             _answer!['answer_text'] ?? "",
                             style: const TextStyle(fontSize: 14, color: Colors.black87),
+                            softWrap: true,
                           ),
                           const SizedBox(height: 16),
                           const Divider(height: 1),

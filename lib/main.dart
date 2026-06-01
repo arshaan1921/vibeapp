@@ -87,13 +87,13 @@ void main() async {
     }
   });
 
-  // ✅ Modern System UI Style for Android 15 + Dark Green Theme
+  // ✅ Modern System UI Style for Android 15 + Modern Theme
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light, // White icons for dark green background
+      statusBarIconBrightness: Brightness.dark, // Default to dark icons for light theme
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarIconBrightness: Brightness.dark,
       systemNavigationBarContrastEnforced: false,
     ),
   );
@@ -185,44 +185,43 @@ class _MainScaffoldState extends State<MainScaffold> {
             SystemNavigator.pop();
           },
           child: Scaffold(
-            // ✅ Use SafeArea to prevent overlap with navigation bar
             body: SafeArea(
-              top: false, // Top bar already handles its own SafeArea
+              top: false,
               child: IndexedStack(
                 index: index,
                 children: _screens,
               ),
             ),
-            bottomNavigationBar: BottomNavigationBar(
-              currentIndex: index,
-              onTap: (i) {
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: index,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+              onDestinationSelected: (i) {
                 tabIndexNotifier.value = i;
               },
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: isDark
-                  ? const Color(0xFF1E1E1E)
-                  : Theme.of(context).primaryColor,
-              selectedItemColor: const Color(0xFFFFD700),
-              unselectedItemColor: Colors.white.withOpacity(0.7),
-              items: [
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.home_rounded),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.home_outlined),
+                  selectedIcon: Icon(Icons.home_rounded),
                   label: "Home",
                 ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.question_answer_rounded),
+                NavigationDestination(
+                  icon: Icon(Icons.mark_chat_unread_outlined),
+                  selectedIcon: Icon(Icons.mark_chat_unread_rounded),
                   label: "Questions",
                 ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.auto_awesome),
-                  label: "My AI",
+                NavigationDestination(
+                  icon: Icon(Icons.auto_awesome_outlined),
+                  selectedIcon: Icon(Icons.auto_awesome_rounded),
+                  label: "AI",
                 ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.bookmark),
+                NavigationDestination(
+                  icon: Icon(Icons.bookmark_outline_rounded),
+                  selectedIcon: Icon(Icons.bookmark_rounded),
                   label: "Saved",
                 ),
-                const BottomNavigationBarItem(
-                  icon: Icon(Icons.person_rounded),
+                NavigationDestination(
+                  icon: Icon(Icons.person_outline_rounded),
+                  selectedIcon: Icon(Icons.person_rounded),
                   label: "Profile",
                 ),
               ],

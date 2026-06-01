@@ -4,6 +4,8 @@ import 'answer.dart';
 import '../models/question.dart';
 import '../services/block_service.dart';
 import '../main.dart';
+import '../utils/premium_utils.dart';
+import '../utils/image_utils.dart';
 
 class QuestionsScreen extends StatefulWidget {
   const QuestionsScreen({super.key});
@@ -38,7 +40,6 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
 
   @override
   void didPopNext() {
-    debugPrint("🔄 Returning to QuestionsScreen, auto-refreshing...");
     _loadData();
   }
 
@@ -65,275 +66,180 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
 
       final response = await supabase
           .from('questions')
-          .select('*, answers(id), profiles:from_user(username)')
+          .select('*, answers(id), profiles:from_user(username, avatar_url, premium_plan)')
           .eq('to_user', userId);
 
-      final filtered = (response as List).where((q) {
-        return q['answers'] == null || (q['answers'] as List).isEmpty;
-      }).toList();
+      final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response as List);
 
       if (mounted) {
         setState(() {
-          // Filter out questions from blocked users
-          _questions = List<Map<String, dynamic>>.from(filtered).where((q) {
+          _questions = rawData.where((q) {
             final fromUserId = q['from_user'];
             return fromUserId == null || !blockService.isBlocked(fromUserId);
           }).toList();
-          
-          // Sort by created_at descending
           _questions.sort((a, b) => (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''));
-          
           _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint("Error fetching questions: $e");
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _deleteQuestion(String id) async {
     try {
       final supabase = Supabase.instance.client;
-      final userId = supabase.auth.currentUser?.id;
-      
-      if (userId == null) return;
-
-      await supabase
-          .from('questions')
-          .delete()
-          .match({
-            'id': id,
-            'to_user': userId,
-          });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Question deleted"),
-            duration: Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint("Error deleting question: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to delete question")),
-        );
-      }
-      _fetchQuestions();
-    }
-  }
-
-  Future<bool> _confirmDeleteDialog() async {
-    return await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text("Delete Question"),
-          content: const Text("Are you sure you want to delete this question? This cannot be undone."),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text("CANCEL", style: TextStyle(color: Colors.grey)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text("DELETE", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+      await supabase.from('questions').delete().match({'id': id, 'to_user': supabase.auth.currentUser!.id});
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("INBOX", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        centerTitle: true,
+        title: Text("Questions", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        elevation: 0,
+        centerTitle: false,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: _questions.isEmpty
-                  ? const _EmptyState(
-                      icon: Icons.help_outline_rounded,
-                      message: "No questions yet.",
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _questions.length,
-                      itemBuilder: (context, index) {
-                        final item = _questions[index];
-                        final id = item['id'].toString();
-                        final isAnonymous = item['is_anonymous'] ?? false;
-                        final fromUser = item['profiles']?['username'] ?? "Unknown";
-                        final senderText = isAnonymous ? "Anonymous" : "From: @$fromUser";
-                        final imageUrl = item['image_url'];
+      body: SafeArea(
+        bottom: false,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                child: _questions.isEmpty
+                    ? const Center(child: Text("No new questions yet."))
+                    : ListView.builder(
+                        itemCount: _questions.length,
+                        itemBuilder: (context, index) {
+                          final item = _questions[index];
+                          final id = item['id'].toString();
+                          final isAnonymous = item['is_anonymous'] ?? false;
+                          
+                          var profileData = item['profiles'];
+                          Map<String, dynamic>? profile;
+                          if (profileData is List && profileData.isNotEmpty) {
+                            profile = profileData.first;
+                          } else if (profileData is Map<String, dynamic>) {
+                            profile = profileData;
+                          }
 
-                        return Dismissible(
-                          key: Key(id),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.redAccent.withOpacity(0.9),
+                          final fromUser = profile?['username'] ?? "Unknown";
+                          final plan = profile?['premium_plan'];
+                          final senderText = isAnonymous ? "Anonymous" : "@$fromUser";
+                          final imageUrl = item['image_url'];
+
+                          return Dismissible(
+                            key: Key(id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              color: Colors.redAccent,
+                              child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
                             ),
-                            child: const Icon(Icons.delete_forever_rounded, color: Colors.white, size: 28),
-                          ),
-                          onDismissed: (direction) {
-                            setState(() {
-                              _questions.removeAt(index);
-                            });
-                            _deleteQuestion(id);
-                          },
-                          confirmDismiss: (direction) => _confirmDeleteDialog(),
-                          child: Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: Colors.grey.withOpacity(0.1)),
-                            ),
+                            onDismissed: (_) {
+                              final qId = id;
+                              setState(() {
+                                _questions.removeAt(index);
+                              });
+                              _deleteQuestion(qId);
+                            },
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
                               onTap: () {
-                                final questionModel = Question(
-                                  id: item['id'],
-                                  text: item['text'] ?? "",
-                                  authorName: senderText,
-                                  authorAvatar: "",
-                                  isAnonymous: isAnonymous,
-                                  createdAt: DateTime.parse(item['created_at']),
-                                  imageUrl: imageUrl,
-                                );
-
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AnswerScreen(
-                                      question: questionModel,
-                                    ),
-                                  ),
-                                ).then((_) => _loadData());
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            item['text'] ?? "",
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                                          ),
-                                          if (imageUrl != null && imageUrl.toString().isNotEmpty) ...[
-                                            const SizedBox(height: 10),
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.circular(12),
-                                              child: Image.network(
-                                                imageUrl,
-                                                width: double.infinity,
-                                                height: 160,
-                                                fit: BoxFit.cover,
-                                                loadingBuilder: (context, child, loadingProgress) {
-                                                  if (loadingProgress == null) return child;
-                                                  return Container(
-                                                    height: 160,
-                                                    color: Colors.black12,
-                                                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                                  );
-                                                },
-                                                errorBuilder: (context, error, stackTrace) {
-                                                  return Container(
-                                                    height: 100,
-                                                    width: double.infinity,
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.grey[200],
-                                                      borderRadius: BorderRadius.circular(12),
-                                                    ),
-                                                    child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                                                  );
-                                                },
-                                              ),
-                                            ),
-                                          ],
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            senderText,
-                                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Column(
+                              final questionModel = Question(
+                                id: item['id'].toString(),
+                                text: item['text'] ?? "",
+                                authorName: senderText,
+                                authorAvatar: profile?['avatar_url'] ?? "",
+                                isAnonymous: isAnonymous,
+                                createdAt: DateTime.parse(item['created_at']),
+                                imageUrl: imageUrl,
+                              );
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => AnswerScreen(question: questionModel))).then((_) => _loadData());
+                            },
+                              child: Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 22),
-                                          onPressed: () async {
-                                            final confirmed = await _confirmDeleteDialog();
-                                            if (confirmed) {
-                                              setState(() {
-                                                _questions.removeAt(index);
-                                              });
-                                              _deleteQuestion(id);
-                                            }
-                                          },
-                                          tooltip: "Delete question",
+                                        if (!isAnonymous && profile != null)
+                                          Container(
+                                            margin: const EdgeInsets.only(right: 12),
+                                            padding: const EdgeInsets.all(1.5),
+                                            decoration: PremiumUtils.buildProfileRing(plan, width: 1.5),
+                                            child: CircleAvatar(
+                                              radius: 18,
+                                              backgroundImage: ImageUtils.getImageProvider(profile['avatar_url']),
+                                            ),
+                                          )
+                                        else
+                                          Container(
+                                            margin: const EdgeInsets.only(right: 12),
+                                            child: const CircleAvatar(
+                                              radius: 18,
+                                              child: Icon(Icons.person, size: 20),
+                                            ),
+                                          ),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Flexible(
+                                                    child: Text(
+                                                      senderText,
+                                                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  if (!isAnonymous) ...[
+                                                    const SizedBox(width: 4),
+                                                    PremiumUtils.buildBadge(plan),
+                                                    if (profile?['is_verified'] == true) 
+                                                      const Icon(Icons.verified_rounded, color: Colors.blue, size: 12),
+                                                    if (profile?['is_founder'] == true)
+                                                      const Icon(Icons.star_rounded, color: Colors.orange, size: 12),
+                                                  ],
+                                                ],
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                item['text'] ?? "",
+                                                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.3),
+                                              ),
+                                              if (imageUrl != null) ...[
+                                                const SizedBox(height: 10),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.image_rounded, size: 14, color: Colors.grey),
+                                                    const SizedBox(width: 4),
+                                                    Text("Image attached", style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                                                  ],
+                                                ),
+                                              ],
+                                            ],
+                                          ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Icon(Icons.chevron_right_rounded, color: Colors.grey[400], size: 20),
+                                        const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
                                       ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const Divider(height: 1, thickness: 0.5, indent: 68),
+                                ],
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final IconData icon;
-  final String message;
-  const _EmptyState({required this.icon, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 80, color: Colors.grey[200]),
-          const SizedBox(height: 20),
-          Text(
-            message,
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+                          );
+                        },
+                      ),
+              ),
       ),
     );
   }

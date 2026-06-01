@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/answer.dart';
-import '../widgets/high5_top_bar.dart';
 import '../widgets/answer_card.dart';
 import '../services/block_service.dart';
 import '../main.dart';
+import '../screens/ask_any_user.dart';
+import '../screens/likes_activity.dart';
+import '../screens/replies_activity.dart';
+import '../screens/questions_screen.dart';
+import '../features/games/games_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -13,10 +18,15 @@ class FeedScreen extends StatefulWidget {
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> with RouteAware {
+class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBindingObserver {
   List<AnswerModel> _feedItems = [];
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
+  
+  int likesCount = 0;
+  int questionsCount = 0;
+  int answersCount = 0;
+  RealtimeChannel? _notificationChannel;
 
   @override
   void didChangeDependencies() {
@@ -26,9 +36,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
 
   @override
   void didPopNext() {
-    debugPrint('🏠 HomeScreen auto refreshing');
     if (mounted) {
       _loadFeedData();
+      fetchNotificationCounts();
     }
   }
 
@@ -51,17 +61,29 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadFeedData();
+    fetchNotificationCounts();
     _subscribeToRealtime();
+    _subscribeToNotifications();
     blockService.blockedIdsNotifier.addListener(_onBlocksChanged);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     routeObserver.unsubscribe(this);
     _realtimeChannel?.unsubscribe();
+    _unsubscribeFromNotifications();
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      fetchNotificationCounts();
+    }
   }
 
   void _onBlocksChanged() {
@@ -75,6 +97,87 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
   Future<void> _loadFeedData() async {
     await blockService.refreshBlockedList();
     await _fetchFeed();
+  }
+
+  void _unsubscribeFromNotifications() {
+    if (_notificationChannel != null) {
+      Supabase.instance.client.removeChannel(_notificationChannel!);
+      _notificationChannel = null;
+    }
+  }
+
+  void _subscribeToNotifications() {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _unsubscribeFromNotifications();
+    _notificationChannel = supabase.channel('public:notifications_feed');
+
+    _notificationChannel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            if (payload.newRecord['type'] == 'answer' && payload.newRecord['source_user'] == user.id) return;
+            fetchNotificationCounts();
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) => fetchNotificationCounts(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'questions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'to_user',
+            value: user.id,
+          ),
+          callback: (payload) => fetchNotificationCounts(),
+        )
+        .subscribe();
+  }
+
+  Future<void> fetchNotificationCounts() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final likesRes = await supabase.from('notifications').select('id').eq('user_id', user.id).eq('type', 'like').eq('seen', false);
+      final answersRes = await supabase.from('notifications').select('id').eq('user_id', user.id).eq('type', 'answer').eq('seen', false).neq('source_user', user.id);
+      final questionsRes = await supabase.from('questions').select('id, answers(id)').eq('to_user', user.id);
+
+      final filteredQuestions = (questionsRes as List).where((q) {
+        return q['answers'] == null || (q['answers'] as List).isEmpty;
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          likesCount = (likesRes as List).length;
+          answersCount = (answersRes as List).length;
+          questionsCount = filteredQuestions.length;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching counts: $e");
+    }
   }
 
   void _subscribeToRealtime() {
@@ -93,7 +196,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
             final data = await supabase.from('answers').select(_answerSelectQuery).eq('id', payload.newRecord['id']).single();
             if (mounted) {
               final newAnswer = AnswerModel.fromMap(data);
-              // Filter out if blocked
               if (blockService.isBlocked(newAnswer.userId)) return;
 
               setState(() {
@@ -107,7 +209,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
             setState(() {
               final index = _feedItems.indexWhere((item) => item.id == payload.newRecord['id'].toString());
               if (index != -1) {
-                // Keep the current isLiked state from the model to avoid overwriting optimistic state
                 _feedItems[index] = _feedItems[index].copyWith(
                   likeCount: payload.newRecord['likes_count'],
                 );
@@ -145,15 +246,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
           }
         },
       );
-
-      _realtimeChannel!.onPostgresChanges(
-        event: PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'blocked_users',
-        callback: (payload) {
-          blockService.refreshBlockedList();
-        },
-      );
     }
 
     _realtimeChannel!.subscribe();
@@ -175,7 +267,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
           .select(_answerSelectQuery)
           .order('created_at', ascending: false);
           
-      List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response);
+      final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response as List);
       
       Set<String> likedIds = {};
       if (user != null) {
@@ -194,49 +286,144 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware {
         });
       }
     } catch (e) {
+      debugPrint("Error fetching feed: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  Widget _buildBadgeIcon(IconData icon, int count, VoidCallback onTap, {Color? color}) {
+    final theme = Theme.of(context);
+    return IconButton(
+      onPressed: onTap,
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Icon(icon, size: 26, color: color ?? theme.colorScheme.onSurface),
+          if (count > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                child: Center(
+                  child: Text(
+                    count > 9 ? '9+' : count.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Scaffold(
-      body: Column(
-        children: [
-          const High5TopBar(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _loadFeedData,
-                    child: _feedItems.isEmpty
-                        ? const Center(child: Text("No answers yet."))
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            itemCount: _feedItems.length,
-                            itemBuilder: (context, index) {
-                              return AnswerCard(
-                                key: ValueKey(_feedItems[index].id),
-                                answer: _feedItems[index],
-                                onLikeChanged: () {
-                                  if (mounted) {
-                                    setState(() {
-                                      final current = _feedItems[index];
-                                      _feedItems[index] = current.copyWith(
-                                        isLiked: !current.isLiked,
-                                        likeCount: current.isLiked 
-                                            ? current.likeCount - 1 
-                                            : current.likeCount + 1,
-                                      );
-                                    });
-                                  }
-                                },
-                              );
-                            },
-                          ),
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: _loadFeedData,
+          displacement: 40,
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                floating: true,
+                snap: true,
+                centerTitle: false,
+                elevation: 0,
+                backgroundColor: theme.scaffoldBackgroundColor,
+                surfaceTintColor: Colors.transparent,
+                title: RichText(
+                  text: TextSpan(
+                    style: theme.appBarTheme.titleTextStyle?.copyWith(
+                      fontSize: 22,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: "High",
+                        style: TextStyle(color: isDark ? Colors.greenAccent : theme.colorScheme.primary),
+                      ),
+                      TextSpan(
+                        text: "5", 
+                        style: TextStyle(color: theme.colorScheme.secondary),
+                      ),
+                    ],
                   ),
+                ),
+                actions: [
+                  _buildBadgeIcon(Icons.favorite_border_rounded, likesCount, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const LikesActivityScreen())).then((_) => fetchNotificationCounts());
+                  }),
+                  _buildBadgeIcon(Icons.help_outline_rounded, questionsCount, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionsScreen())).then((_) => fetchNotificationCounts());
+                  }),
+                  _buildBadgeIcon(Icons.reply_rounded, answersCount, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AnswersActivityScreen())).then((_) => fetchNotificationCounts());
+                  }),
+                  IconButton(
+                    icon: Icon(Icons.sports_esports_rounded, size: 26, color: theme.colorScheme.onSurface),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.add_circle_outline_rounded, size: 26, color: theme.colorScheme.onSurface),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AskAnyUserScreen())),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+              if (_isLoading)
+                const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_feedItems.isEmpty)
+                const SliverFillRemaining(
+                  child: Center(child: Text("No answers yet.")),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 24),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        return AnswerCard(
+                          key: ValueKey(_feedItems[index].id),
+                          answer: _feedItems[index],
+                          onLikeChanged: () {
+                            if (mounted) {
+                              setState(() {
+                                final current = _feedItems[index];
+                                _feedItems[index] = current.copyWith(
+                                  isLiked: !current.isLiked,
+                                  likeCount: current.isLiked 
+                                      ? current.likeCount - 1 
+                                      : current.likeCount + 1,
+                                );
+                              });
+                            }
+                          },
+                        );
+                      },
+                      childCount: _feedItems.length,
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

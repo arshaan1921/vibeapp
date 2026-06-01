@@ -7,6 +7,8 @@ import '../utils/image_utils.dart';
 import '../services/like_service.dart';
 import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'profile.dart';
 
 class AnswerViewScreen extends StatefulWidget {
@@ -294,6 +296,41 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
     );
   }
 
+  void _confirmDeleteReply(String replyId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Reply"),
+        content: const Text("Are you sure you want to delete this reply?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("CANCEL"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteReply(replyId);
+            },
+            child: const Text("DELETE", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteReply(String replyId) async {
+    try {
+      await Supabase.instance.client.from('answer_replies').delete().eq('id', replyId);
+      setState(() {
+        _replies.removeWhere((r) => r['id'].toString() == replyId);
+        _replyCount--;
+      });
+    } catch (e) {
+      debugPrint("Error deleting reply: $e");
+    }
+  }
+
   String _formatTimeAgo(String timestamp) {
     final date = DateTime.parse(timestamp).toLocal();
     final now = DateTime.now();
@@ -441,11 +478,17 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                               ],
 
                               const SizedBox(height: 8),
-                              Text(
-                                _answer!['answer_text'] ?? "",
+                              Linkify(
+                                onOpen: (link) async {
+                                  if (await canLaunchUrl(Uri.parse(link.url))) {
+                                    await launchUrl(Uri.parse(link.url), mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                                text: _answer!['answer_text'] ?? "",
                                 style: TextStyle(
-                                  fontSize: 14, 
+                                  fontSize: 15, 
                                   color: isDark ? Colors.grey[300] : Colors.black87,
+                                  height: 1.4,
                                 ),
                               ),
                               const SizedBox(height: 16),
@@ -538,6 +581,9 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                               itemBuilder: (context, index) {
                                 final reply = _replies[index];
                                 final profile = reply['profiles'];
+                                final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+                                final bool isMyReply = reply['user_id'] == currentUserId;
+
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
                                   child: Row(
@@ -558,23 +604,38 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
-                                                GestureDetector(
-                                                  onTap: () => _navigateToProfile(profile?['id']),
-                                                  child: Text(
-                                                    "@${profile?['username'] ?? 'User'}",
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.bold, 
-                                                      fontSize: 13,
-                                                      color: isDark ? Colors.white : Colors.black,
-                                                    ),
+                                                Expanded(
+                                                  child: Row(
+                                                    children: [
+                                                      Flexible(
+                                                        child: GestureDetector(
+                                                          onTap: () => _navigateToProfile(profile?['id']),
+                                                          child: Text(
+                                                            "@${profile?['username'] ?? 'User'}",
+                                                            style: TextStyle(
+                                                              fontWeight: FontWeight.bold, 
+                                                              fontSize: 13,
+                                                              color: isDark ? Colors.white : Colors.black,
+                                                            ),
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        _formatTimeAgo(reply['created_at']),
+                                                        style: const TextStyle(color: Colors.grey, fontSize: 10),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  _formatTimeAgo(reply['created_at']),
-                                                  style: const TextStyle(color: Colors.grey, fontSize: 10),
-                                                ),
+                                                if (isMyReply)
+                                                  GestureDetector(
+                                                    onTap: () => _confirmDeleteReply(reply['id'].toString()),
+                                                    child: const Icon(Icons.delete_outline_rounded, size: 16, color: Colors.grey),
+                                                  ),
                                               ],
                                             ),
                                             const SizedBox(height: 2),
