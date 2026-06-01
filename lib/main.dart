@@ -192,39 +192,49 @@ class _MainScaffoldState extends State<MainScaffold> {
                 children: _screens,
               ),
             ),
-            bottomNavigationBar: NavigationBar(
-              selectedIndex: index,
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-              onDestinationSelected: (i) {
-                tabIndexNotifier.value = i;
-              },
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home_rounded),
-                  label: "Home",
+            bottomNavigationBar: Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+                    width: 0.5,
+                  ),
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.mark_chat_unread_outlined),
-                  selectedIcon: Icon(Icons.mark_chat_unread_rounded),
-                  label: "Questions",
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.auto_awesome_outlined),
-                  selectedIcon: Icon(Icons.auto_awesome_rounded),
-                  label: "AI",
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.bookmark_outline_rounded),
-                  selectedIcon: Icon(Icons.bookmark_rounded),
-                  label: "Saved",
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_outline_rounded),
-                  selectedIcon: Icon(Icons.person_rounded),
-                  label: "Profile",
-                ),
-              ],
+              ),
+              child: NavigationBar(
+                selectedIndex: index,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+                onDestinationSelected: (i) {
+                  tabIndexNotifier.value = i;
+                },
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.home_outlined),
+                    selectedIcon: Icon(Icons.home_rounded),
+                    label: "Home",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.mark_chat_unread_outlined),
+                    selectedIcon: Icon(Icons.mark_chat_unread_rounded),
+                    label: "Questions",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.auto_awesome_outlined),
+                    selectedIcon: Icon(Icons.auto_awesome_rounded),
+                    label: "AI",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.bookmark_outline_rounded),
+                    selectedIcon: Icon(Icons.bookmark_rounded),
+                    label: "Saved",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_outline_rounded),
+                    selectedIcon: Icon(Icons.person_rounded),
+                    label: "Profile",
+                  ),
+                ],
+              ),
             ),
           ),
         );

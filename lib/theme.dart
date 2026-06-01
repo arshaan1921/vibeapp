@@ -68,10 +68,14 @@ class AppTheme {
     // Navigation Bar (Material 3)
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: surfaceLight,
-      indicatorColor: Colors.black.withOpacity(0.05),
+      indicatorColor: Colors.transparent,
+      height: 60,
       labelTextStyle: MaterialStateProperty.all(const TextStyle(fontSize: 0, height: 0)),
       iconTheme: MaterialStateProperty.resolveWith((states) {
-        return const IconThemeData(color: Colors.black, size: 26);
+        if (states.contains(MaterialState.selected)) {
+          return const IconThemeData(color: primaryColor, size: 26);
+        }
+        return IconThemeData(color: Colors.black.withOpacity(0.7), size: 26);
       }),
     ),
 
@@ -180,10 +184,14 @@ class AppTheme {
 
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: surfaceDark,
-      indicatorColor: Colors.white.withOpacity(0.1),
+      indicatorColor: Colors.transparent,
+      height: 60,
       labelTextStyle: MaterialStateProperty.all(const TextStyle(fontSize: 0, height: 0)),
       iconTheme: MaterialStateProperty.resolveWith((states) {
-        return const IconThemeData(color: Colors.white, size: 26);
+        if (states.contains(MaterialState.selected)) {
+          return const IconThemeData(color: Colors.white, size: 26);
+        }
+        return IconThemeData(color: Colors.white.withOpacity(0.7), size: 26);
       }),
     ),
 

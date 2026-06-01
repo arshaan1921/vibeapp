@@ -141,7 +141,7 @@ class PremiumUtils {
   // PREMIUM BADGE
   // =========================
 
-  static Widget buildBadge(String? plan) {
+  static Widget buildBadge(String? plan, {double size = 16}) {
     final color = getBadgeColor(plan);
 
     if (color == null) {
@@ -149,11 +149,11 @@ class PremiumUtils {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.only(left: 4),
       child: Icon(
-        Icons.star,
+        Icons.verified_rounded,
         color: color,
-        size: 14,
+        size: size,
       ),
     );
   }
