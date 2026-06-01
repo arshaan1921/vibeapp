@@ -36,13 +36,40 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _companion = widget.companion;
     _loadMessages();
     _loadRemainingCount();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshAll();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadRemainingCount();
   }
 
   Future<void> _loadRemainingCount() async {
+    if (!mounted) return;
     try {
+      // Force refresh by bypassing any potential local state
+      // Always fetches latest profile data from Supabase
       final count = await _repository.getRemainingAiMessages();
-      if (mounted) setState(() => _remainingMessages = count);
-    } catch (_) {}
+      debugPrint('AI Remaining Messages (Fetched): $count');
+
+      if (mounted) {
+        setState(() {
+          _remainingMessages = count;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading AI count: $e");
+    }
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _loadMessages(),
+      _loadRemainingCount(),
+    ]);
   }
 
   Future<void> _loadMessages() async {
@@ -112,7 +139,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
       );
 
       await _repository.registerAiUsage();
-      _loadRemainingCount();
+      final freshCount = await _repository.getRemainingAiMessages();
+      debugPrint('AI Remaining Messages (Post-Usage): $freshCount');
+
+      if (mounted) {
+        setState(() {
+          _remainingMessages = freshCount;
+        });
+      }
 
       await _repository.saveMessage(companionId: _companion.id, message: aiReply, sender: 'ai');
 
@@ -248,11 +282,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) => ChatBubble(message: _messages[index]),
+                  : RefreshIndicator(
+                      onRefresh: _refreshAll,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) => ChatBubble(message: _messages[index]),
+                      ),
                     ),
             ),
             if (_isTyping)
@@ -279,6 +317,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
       widget.onDeleted?.call();
     } else if (result is AiCompanion && mounted) {
       setState(() => _companion = result);
+      _loadRemainingCount(); // Refresh count when returning from settings
+    } else if (mounted) {
+      _loadRemainingCount(); // Refresh count anyway in case something changed
     }
   }
 

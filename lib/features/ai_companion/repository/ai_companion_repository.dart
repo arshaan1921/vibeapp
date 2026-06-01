@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ai_companion.dart';
 import '../models/ai_message.dart';
 import '../models/ai_memory.dart';
+import '../../../utils/premium_utils.dart';
 
 class AiCompanionRepository {
   final _supabase = Supabase.instance.client;
@@ -83,11 +85,38 @@ class AiCompanionRepository {
   }
 
   Future<int> getRemainingAiMessages() async {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) return 0;
-    
-    final int remaining = await _supabase.rpc('get_remaining_ai_messages', params: {'uid': userId});
-    return remaining;
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return 0;
+
+      // Always fetch fresh data from Supabase - NO CACHING
+      print('--- AI DB FETCH START ---');
+      final user = _supabase.auth.currentUser;
+      print('User ID: ${user?.id}');
+      print('Email: ${user?.email}');
+
+      final response = await _supabase
+          .from('profiles')
+          .select('premium_plan, ai_messages_today')
+          .eq('id', userId)
+          .single();
+
+      print('RAW RESPONSE: $response');
+
+      final String? premiumPlan = response['premium_plan'] as String?;
+      final int aiMessagesToday = (response['ai_messages_today'] as num?)?.toInt() ?? 0;
+
+      final int limit = PremiumUtils.getAiMessageLimit(premiumPlan);
+      final int remaining = limit - aiMessagesToday;
+
+      print('Plan: $premiumPlan, Limit: $limit, Today: $aiMessagesToday, Remaining: $remaining');
+      print('--- AI DB FETCH END ---');
+
+      return remaining < 0 ? 0 : remaining;
+    } catch (e) {
+      debugPrint('Error calculating remaining messages: $e');
+      return 0;
+    }
   }
 
   Future<List<AiMessage>> getMessages(String companionId) async {
@@ -115,22 +144,6 @@ class AiCompanionRepository {
       'message': message,
       'sender': sender,
     });
-
-    if (sender == 'user') {
-      await _incrementMessageCount(companionId);
-    }
-  }
-
-  Future<void> _incrementMessageCount(String companionId) async {
-    // This is handled via Supabase RPC or just updating the count
-    // Given the prompt, we should increment it and the trigger will handle the reset if date changed
-    final companion = await getCompanion();
-    if (companion != null) {
-      await _supabase
-          .from('ai_companions')
-          .update({'daily_message_count': companion.dailyMessageCount + 1})
-          .eq('id', companionId);
-    }
   }
 
   Future<List<AiMemory>> getMemories(String companionId) async {
