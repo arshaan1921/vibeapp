@@ -162,10 +162,23 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
 
       final likesRes = await supabase.from('notifications').select('id').eq('user_id', user.id).eq('type', 'like').eq('seen', false);
       final answersRes = await supabase.from('notifications').select('id').eq('user_id', user.id).eq('type', 'answer').eq('seen', false).neq('source_user', user.id);
-      final questionsRes = await supabase.from('questions').select('id, answers(id)').eq('to_user', user.id);
+      
+      // Fetch unanswered questions for the badge
+      final questionsRes = await supabase
+          .from('questions')
+          .select('answered, is_answered, from_user, answers!answers_question_id_fkey(id)')
+          .eq('to_user', user.id)
+          .eq('answered', false);
 
-      final filteredQuestions = (questionsRes as List).where((q) {
-        return q['answers'] == null || (q['answers'] as List).isEmpty;
+      final List<dynamic> questionsList = questionsRes as List;
+      
+      final filteredQuestions = questionsList.where((q) {
+        final isAnsweredField = q['answered'] == true || q['is_answered'] == true;
+        final hasAnswers = (q['answers'] is List && (q['answers'] as List).isNotEmpty);
+        final fromUserId = q['from_user'];
+        final isBlocked = fromUserId != null && blockService.isBlocked(fromUserId);
+        
+        return !isAnsweredField && !hasAnswers && !isBlocked;
       }).toList();
 
       if (mounted) {
@@ -175,8 +188,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
           questionsCount = filteredQuestions.length;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching counts: $e");
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
     }
   }
 
@@ -203,7 +217,10 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                 _feedItems.insert(0, newAnswer);
               });
             }
-          } catch (_) {}
+          } catch (e, st) {
+            debugPrint('ERROR: $e');
+            debugPrintStack(stackTrace: st);
+          }
         } else if (payload.eventType == PostgresChangeEvent.update) {
           if (mounted) {
             setState(() {
@@ -258,16 +275,20 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
   }
 
   Future<void> _fetchFeed() async {
+    print('FEED_TRACE: START');
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
+      final currentUserId = user?.id;
       
+      print('FEED_TRACE: Querying Supabase...');
       final response = await supabase
           .from('answers')
           .select(_answerSelectQuery)
           .order('created_at', ascending: false);
           
       final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response as List);
+      print('FEED_TRACE: ROWS = ${rawData.length}');
       
       Set<String> likedIds = {};
       if (user != null) {
@@ -277,17 +298,53 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
 
       if (mounted) {
         setState(() {
-          _feedItems = rawData
-              .map((map) => AnswerModel.fromMap(map, isLiked: likedIds.contains(map['id'].toString())))
-              .where((item) => !blockService.isBlocked(item.userId))
-              .toList();
+          try {
+            int ownCount = 0;
+            _feedItems = rawData.map((map) {
+              final model = AnswerModel.fromMap(map, isLiked: likedIds.contains(map['id'].toString()));
+              if (model.userId == currentUserId) ownCount++;
+              return model;
+            })
+            .where((item) => !blockService.isBlocked(item.userId))
+            .toList();
+            
+            print('FEED ANSWERS = ${_feedItems.length}');
+          } catch (e, st) {
+            print('FEED_TRACE: PARSE ERROR: $e');
+            print(st);
+          }
           _sortFeed();
           _isLoading = false;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching feed: $e");
+    } catch (e, st) {
+      print('FEED_TRACE: GLOBAL ERROR: $e');
+      print(st);
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deleteAnswer(String answerId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      await supabase.from('answers').delete().eq('id', answerId);
+      
+      if (mounted) {
+        setState(() {
+          _feedItems.removeWhere((item) => item.id == answerId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Answer deleted")),
+        );
+      }
+    } catch (e, st) {
+      debugPrint('ERROR deleting answer from feed: $e');
+      debugPrintStack(stackTrace: st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to delete answer")),
+        );
+      }
     }
   }
 
@@ -329,6 +386,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("FEED_BUILD: items=${_feedItems.length}, isLoading=$_isLoading");
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
@@ -399,9 +457,13 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
+                        final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+                        final bool isMe = _feedItems[index].userId == currentUserId;
+                        
                         return AnswerCard(
                           key: ValueKey(_feedItems[index].id),
                           answer: _feedItems[index],
+                          onDelete: isMe ? (id) => _deleteAnswer(id) : null,
                           onLikeChanged: () {
                             if (mounted) {
                               setState(() {

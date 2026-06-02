@@ -99,11 +99,25 @@ class _AnswerScreenState extends State<AnswerScreen> {
         }
       }
 
-      // 3. Mark question as answered
-      await supabase
+      // 3. Mark question as archived/answered
+      print('DEBUG: Marking question ${widget.question.id} as archived (answered=true, is_deleted=true)');
+      
+      final updateResponse = await supabase
           .from('questions')
-          .update({'answered': true})
-          .eq('id', widget.question.id);
+          .update({
+            'answered': true,
+            'is_answered': true,
+            'is_deleted': true, // Archive it so it leaves the Inbox forever
+          })
+          .eq('id', widget.question.id)
+          .select('id, answered, is_deleted');
+
+      print('QUESTION ARCHIVE RESPONSE: $updateResponse');
+      if (updateResponse != null && (updateResponse as List).isNotEmpty) {
+        print('SUCCESS: Question archived in DB');
+      } else {
+        print('CRITICAL FAILURE: Question NOT updated in DB. affected rows = 0.');
+      }
 
       // 4. Send notification & Push
       if (questionSenderId != null && questionSenderId != user.id) {

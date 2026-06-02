@@ -114,8 +114,9 @@ class _SavedScreenState extends State<SavedScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching saved profiles: $e");
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
       if (mounted) setState(() => _isLoading = false);
     }
   }

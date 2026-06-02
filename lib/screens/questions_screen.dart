@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'answer.dart';
 import '../models/question.dart';
 import '../services/block_service.dart';
+import '../services/realtime_service.dart';
 import '../main.dart';
 import '../utils/premium_utils.dart';
 import '../utils/image_utils.dart';
@@ -17,12 +19,20 @@ class QuestionsScreen extends StatefulWidget {
 class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
   List<Map<String, dynamic>> _questions = [];
   bool _isLoading = true;
+  StreamSubscription? _realtimeSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadData();
     blockService.blockedIdsNotifier.addListener(_onBlocksChanged);
+    
+    // Listen for realtime updates to refresh inbox
+    _realtimeSubscription = RealtimeService().events.listen((event) {
+      if (event == 'refresh_inbox') {
+        _fetchQuestions();
+      }
+    });
   }
 
   @override
@@ -33,6 +43,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
 
   @override
   void dispose() {
+    _realtimeSubscription?.cancel();
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
     routeObserver.unsubscribe(this);
     super.dispose();
@@ -55,34 +66,51 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
   }
 
   Future<void> _loadData() async {
+    debugPrint("QUESTIONS: _loadData called");
     await blockService.refreshBlockedList();
     await _fetchQuestions();
   }
 
   Future<void> _fetchQuestions() async {
+    print('QUESTIONS: _fetchQuestions STARTED');
     try {
       final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser!.id;
 
+      // Robust query with NO CACHING logic
       final response = await supabase
           .from('questions')
-          .select('*, answers(id), profiles:from_user(username, avatar_url, premium_plan)')
-          .eq('to_user', userId);
+          .select('*, answers!answers_question_id_fkey(id), profiles:profiles!from_user(username, avatar_url, premium_plan)')
+          .eq('to_user', userId)
+          .eq('answered', false)
+          .eq('is_deleted', false); // Only show non-deleted/non-archived questions
 
       final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response as List);
+      
+      // FALLBACK: Filter locally just in case Supabase filter was bypassed/cached
+      final unansweredQuestions = rawData.where((q) {
+        final isAnsweredField = q['answered'] == true || q['is_answered'] == true;
+        final isDeletedField = q['is_deleted'] == true;
+        final hasAnswers = (q['answers'] is List && (q['answers'] as List).isNotEmpty);
+        
+        final fromUserId = q['from_user'];
+        final isBlocked = fromUserId != null && blockService.isBlocked(fromUserId);
+        
+        return !isAnsweredField && !isDeletedField && !hasAnswers && !isBlocked;
+      }).toList();
+
+      print('INBOX DATA: Received ${rawData.length} rows, Filtered to ${unansweredQuestions.length}');
 
       if (mounted) {
         setState(() {
-          _questions = rawData.where((q) {
-            final fromUserId = q['from_user'];
-            return fromUserId == null || !blockService.isBlocked(fromUserId);
-          }).toList();
+          _questions = unansweredQuestions;
           _questions.sort((a, b) => (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''));
           _isLoading = false;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching questions: $e");
+    } catch (e, st) {
+      print('ERROR: $e');
+      print(st);
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -91,11 +119,15 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
     try {
       final supabase = Supabase.instance.client;
       await supabase.from('questions').delete().match({'id': id, 'to_user': supabase.auth.currentUser!.id});
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("QUESTIONS_BUILD: items=${_questions.length}, loading=$_isLoading");
     final theme = Theme.of(context);
     
     return Scaffold(
@@ -160,7 +192,18 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
                                 createdAt: DateTime.parse(item['created_at']),
                                 imageUrl: imageUrl,
                               );
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => AnswerScreen(question: questionModel))).then((_) => _loadData());
+                              Navigator.push(
+                                context, 
+                                MaterialPageRoute(builder: (_) => AnswerScreen(question: questionModel))
+                              ).then((result) {
+                                if (result == true && mounted) {
+                                  setState(() {
+                                    // Remove the question from the local list immediately
+                                    _questions.removeAt(index);
+                                  });
+                                }
+                                _loadData(); // Re-sync with DB
+                              });
                             },
                               child: Column(
                                 children: [

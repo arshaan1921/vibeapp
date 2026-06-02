@@ -186,8 +186,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           _high5Count = response as int;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching High5s count: $e");
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
     }
   }
 
@@ -203,8 +204,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           _remainingQuestions = response as int;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching remaining questions: $e");
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
     }
   }
 
@@ -222,7 +224,10 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           .maybeSingle();
 
       if (mounted) setState(() => isSaved = res != null);
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('ERROR: $st');
+      debugPrintStack(stackTrace: st);
+    }
   }
 
   Future<void> _toggleSave() async {
@@ -241,8 +246,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       }
       if (mounted) setState(() => isSaved = !isSaved);
       _fetchHigh5sCount();
-    } catch (e) {
-      debugPrint("Toggle save error: $e");
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
     }
   }
 
@@ -265,42 +271,40 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           if (data == null) errorMessage = "Profile not found";
         });
       }
-    } catch (e) {
-      if (mounted) setState(() { isLoading = false; errorMessage = "Error: $e"; });
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
     }
   }
 
   Future<void> _fetchAnswers() async {
+    print('PROFILE_TRACE: START');
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       final targetId = widget.userId ?? user?.id;
-      if (targetId == null) return;
 
+      debugPrint('PROFILE TARGET ID = $targetId');
+      debugPrint('CURRENT USER ID = ${Supabase.instance.client.auth.currentUser?.id}');
+
+      if (targetId == null) {
+        print('PROFILE_TRACE: NO TARGET ID');
+        return;
+      }
+
+      print('PROFILE_TRACE: USER ID = $targetId');
+      print('PROFILE_TRACE: Querying Supabase...');
+      // Reverted to more reliable table-only join syntax
       final response = await supabase
           .from('answers')
-          .select('''
-            id,
-            answer_text,
-            created_at,
-            likes_count,
-            user_id,
-            is_pinned,
-            profiles:profiles!answers_user_id_fkey(id, username, avatar_url, premium_plan),
-            questions:questions!answers_question_id_fkey(
-              text,
-              image_url,
-              is_anonymous,
-              from_user,
-              asker:profiles!from_user(id, username)
-            )
-          ''')
+          .select('*, profiles!user_id(username, avatar_url, premium_plan), questions!question_id(text, image_url, is_anonymous, from_user)')
           .eq('user_id', targetId)
-          .order('is_pinned', ascending: false)
           .order('created_at', ascending: false);
 
+      final responseList = response as List;
+      print('PROFILE_TRACE: ROWS = ${responseList.length}');
       if (mounted) {
-        final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response);
+        final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(responseList);
         
         Set<String> likedIds = {};
         if (user != null) {
@@ -308,22 +312,59 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           likedIds = (likesRes as List).map((l) => l['answer_id'].toString()).toSet();
         }
 
-        final answers = rawData.map((map) => AnswerModel.fromMap(map, isLiked: likedIds.contains(map['id'].toString()))).toList();
+        try {
+          final answers = rawData.map((map) => AnswerModel.fromMap(map, isLiked: likedIds.contains(map['id'].toString()))).toList();
 
-        int totalLikes = 0;
-        for (var a in answers) {
-          totalLikes += a.likeCount;
+          int totalLikes = 0;
+          for (var a in answers) {
+            totalLikes += a.likeCount;
+          }
+
+          setState(() {
+            _answers = answers;
+            _likesCount = totalLikes;
+            _loadingAnswers = false;
+            print('PROFILE ANSWERS = ${answers.length}');
+          });
+        } catch (e, st) {
+          print('PROFILE_TRACE: PARSE ERROR: $e');
+          print(st);
+          setState(() => _loadingAnswers = false);
         }
-
-        setState(() {
-          _answers = answers;
-          _likesCount = totalLikes;
-          _loadingAnswers = false;
-        });
       }
-    } catch (e) {
-      debugPrint("Error fetching answers: $e");
+    } catch (e, st) {
+      print('PROFILE_TRACE: GLOBAL ERROR: $e');
+      print(st);
       if (mounted) setState(() => _loadingAnswers = false);
+    }
+  }
+
+  Future<void> _deleteAnswer(String answerId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      await supabase.from('answers').delete().eq('id', answerId);
+      
+      // Update UI immediately
+      if (mounted) {
+        setState(() {
+          _answers.removeWhere((a) => a.id == answerId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Answer deleted")),
+        );
+      }
+      
+      // Refresh to sync counts and logic
+      _fetchAnswers();
+      _fetchHigh5sCount();
+    } catch (e, st) {
+      debugPrint('ERROR deleting answer: $e');
+      debugPrintStack(stackTrace: st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to delete answer")),
+        );
+      }
     }
   }
 
@@ -407,8 +448,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
             SnackBar(content: Text("User @$username not found")),
           );
         }
-      } catch (e) {
-        debugPrint("Error navigating to user: $e");
+      } catch (e, st) {
+        debugPrint('ERROR: $e');
+        debugPrintStack(stackTrace: st);
       }
     } else {
       final Uri url = Uri.parse(link.url);
@@ -420,6 +462,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("PROFILE_BUILD: answers=${_answers.length}, loading=$_loadingAnswers");
     if (isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (errorMessage != null) return const Scaffold(body: Center(child: Text("Error loading profile")));
 
@@ -642,7 +685,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                     (context, index) => AnswerCard(
                       key: ValueKey(_answers[index].id),
                       answer: _answers[index],
-                      onDelete: isMe ? (id) => _fetchAnswers() : null,
+                      onDelete: isMe ? (id) => _deleteAnswer(id) : null,
                       onPin: isMe ? (id, pin) => _fetchAnswers() : null,
                     ),
                     childCount: _answers.length,

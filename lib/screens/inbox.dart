@@ -50,22 +50,32 @@ class _InboxScreenState extends State<InboxScreen> with RouteAware {
       // Fetch questions where I am the recipient ('to_user') and not answered yet
       final response = await supabase
           .from('questions')
-          .select('*, profiles:from_user(username)')
+          .select('*, answers!answers_question_id_fkey(id), profiles:from_user(username, avatar_url, premium_plan)')
           .eq('to_user', userId)
           .eq('answered', false)
+          .eq('is_deleted', false)
           .order('created_at', ascending: false);
+
+      final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response as List);
+      print('INBOX ROWS = ${rawData.length}');
 
       if (mounted) {
         setState(() {
-          _questions = List<Map<String, dynamic>>.from(response as List).where((q) {
+          _questions = rawData.where((q) {
             final fromUserId = q['from_user'];
-            return fromUserId == null || !blockService.isBlocked(fromUserId);
+            final isAnsweredField = q['answered'] == true || q['is_answered'] == true;
+            final isDeletedField = q['is_deleted'] == true;
+            final hasAnswers = (q['answers'] is List && (q['answers'] as List).isNotEmpty);
+            
+            return (fromUserId == null || !blockService.isBlocked(fromUserId)) && 
+                   !isAnsweredField && !isDeletedField && !hasAnswers;
           }).toList();
           _isLoading = false;
         });
       }
-    } catch (e) {
-      debugPrint("Error fetching inbox: $e");
+    } catch (e, st) {
+      debugPrint('ERROR: $e');
+      debugPrintStack(stackTrace: st);
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -125,7 +135,11 @@ class _InboxScreenState extends State<InboxScreen> with RouteAware {
                               ),
                             );
                             
-                            if (result == true) {
+                            if (result == true && mounted) {
+                              setState(() {
+                                // Remove immediately from UI
+                                _questions.removeAt(index);
+                              });
                               _fetchInbox();
                             }
                           },

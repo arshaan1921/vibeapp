@@ -12,6 +12,7 @@ import '../services/like_service.dart';
 import '../utils/image_utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/block_service.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -287,9 +288,10 @@ class _AnswerCardState extends State<AnswerCard> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final message = controller.text.trim();
-                if (message.isEmpty) return;
+                final reason = controller.text.trim();
+                if (reason.isEmpty) return;
                 Navigator.pop(context);
+                _submitAnswerReport(reason);
               },
               child: const Text("Report"),
             ),
@@ -297,6 +299,67 @@ class _AnswerCardState extends State<AnswerCard> {
         );
       },
     );
+  }
+
+  Future<void> _submitAnswerReport(String reason) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      // 1. Save report to Supabase
+      // Using only columns verified to exist in the 'reports' table
+      await supabase.from('reports').insert({
+        'user_id': user.id,
+        'reported_user_id': widget.answer.userId,
+        'message': "REPORTED ANSWER ID: ${widget.answer.id}\n"
+            "ANSWER TEXT: ${widget.answer.text}\n"
+            "REASON: $reason",
+      });
+
+      // 2. Fetch reporter info for Telegram
+      final profile = await supabase
+          .from('profiles')
+          .select('username, name')
+          .eq('id', user.id)
+          .single();
+
+      final reporterName = profile['name'] ?? 'N/A';
+      final reporterUsername = profile['username'] ?? 'N/A';
+
+      // 3. Send to Telegram
+      const botToken = "8637680343:AAF7GFChAKkZquMj_Ptm_NDMSgVp4PnAryA";
+      const chatId = "5519527890";
+      const telegramUrl = "https://api.telegram.org/bot$botToken/sendMessage";
+
+      final telegramMessage = "🚨 ANSWER REPORT\n\n"
+          "Reporter: $reporterName (@$reporterUsername)\n"
+          "Reported User ID: ${widget.answer.userId}\n"
+          "Answer ID: ${widget.answer.id}\n"
+          "Answer Text: ${widget.answer.text}\n"
+          "\nReason:\n$reason";
+
+      await http.post(
+        Uri.parse(telegramUrl),
+        body: {
+          "chat_id": chatId,
+          "text": telegramMessage,
+        },
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Answer reported successfully")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Reporting error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to submit report. Please try again.")),
+        );
+      }
+    }
   }
 
   void _confirmDelete() {

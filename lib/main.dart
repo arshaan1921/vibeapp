@@ -133,12 +133,17 @@ class _MainScaffoldState extends State<MainScaffold> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 1. Check for Play Store updates (Priority)
-      await UpdateService.checkUpdate(context);
-      
-      // 2. Show rebrand announcement if no store update was shown
-      if (mounted) {
-        await UpdatePopup.showIfNeeded(context);
+      try {
+        // 1. Check for Play Store updates (Priority)
+        await UpdateService.checkUpdate(context);
+        
+        // 2. Show rebrand announcement if no store update was shown
+        if (mounted) {
+          await UpdatePopup.showIfNeeded(context);
+        }
+      } catch (e, st) {
+        debugPrint('ERROR: $e');
+        debugPrintStack(stackTrace: st);
       }
     });
   }

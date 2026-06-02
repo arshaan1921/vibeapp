@@ -71,8 +71,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         if (profile != null) {
           safetyService.premiumPlan = profile['premium_plan'];
         }
-      } catch (e) {
-        debugPrint("Error initializing safetyService: $e");
+      } catch (e, st) {
+        debugPrint('ERROR: $e');
+        debugPrintStack(stackTrace: st);
       }
 
       RealtimeService().startRealtime();
