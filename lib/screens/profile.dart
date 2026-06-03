@@ -559,7 +559,6 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    const SizedBox(width: 6),
                                     PremiumUtils.buildBadge(plan),
                                     if (profileData!['is_verified'] == true) 
                                       const Icon(Icons.verified_rounded, color: Colors.blue, size: 18),

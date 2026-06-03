@@ -247,7 +247,6 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
                                                     ),
                                                   ),
                                                   if (!isAnonymous) ...[
-                                                    const SizedBox(width: 4),
                                                     PremiumUtils.buildBadge(plan),
                                                     if (profile?['is_verified'] == true) 
                                                       const Icon(Icons.verified_rounded, color: Colors.blue, size: 12),

@@ -573,7 +573,6 @@ class _AnswerCardState extends State<AnswerCard> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 4),
                               PremiumUtils.buildBadge(widget.answer.premiumPlan),
                               if (widget.answer.isVerified) 
                                 const Icon(Icons.verified_rounded, color: Colors.blue, size: 14),

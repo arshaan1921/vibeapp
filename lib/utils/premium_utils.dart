@@ -149,7 +149,7 @@ class PremiumUtils {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: const EdgeInsets.only(left: 2),
       child: Icon(
         Icons.verified_rounded,
         color: color,
