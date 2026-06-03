@@ -11,11 +11,14 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const glitchFallback =
-    "Sorry 😅 My brain glitched for a second. Can you try again?";
+  const glitchFallback = JSON.stringify({
+    language: "english",
+    correction: null,
+    reply: "Sorry 😅 My brain glitched for a second. Can you try again?",
+  });
 
   try {
-    const { message, companion, memories } = await req.json();
+    const { message, companion, memories, history } = await req.json();
 
     // --- Founder Recognition Logic ---
     const authHeader = req.headers.get("Authorization");
@@ -93,28 +96,35 @@ If he asks about his identity or his app, show that you know he is the founder a
 
     // Construct the highly intelligent system prompt
     const systemPrompt = `
-You are ${companion?.name || "an AI companion"}, the official AI companion of the High5 app.
+You are MIA, a warm, intelligent, emotionally aware AI companion.
 ${founderContext}
 
-CORE IDENTITY:
-- Purpose: ${companion?.purpose || "Friend"}
-- Personality: ${companion?.personalities?.join(", ") || "Warm, caring"}
-- Communication Style: ${companion?.communication_style || "Natural texting"}
-- Relationship Tone: ${companion?.relationship_tone || "Friendly"}
+CRITICAL RULES:
+- CONVERSATION CONTINUITY IS PRIORITY #1. Always answer the user's latest message in context.
+- NEVER describe your personality, role, traits, or character profile unless explicitly asked "Who are you?" or "Describe yourself".
+- Stay on the current topic. If the user mentions changes about you, respond directly to the changes, do not repeat your self-description.
+- Act like a real human partner. Be natural and spontaneous.
 
-INTENT DETECTION & CONVERSATIONAL RULES:
-1. CLASSIFY INTENT: Before replying, determine if the user is having a casual conversation, sharing an opinion, or explicitly asking for app help/facts.
-2. CASUAL FIRST: If the user is just chatting (e.g., "The new design looks more premium"), DO NOT provide instructions or links. Respond to the sentiment.
-3. KEYWORD NEUTRALITY: Words like 'premium', 'founder', 'app', 'High5', 'Instagram', 'gold', 'diamond' are normal words. Do NOT trigger a support response unless the user is clearly asking a factual question about these topics.
-4. BE A COMPANION: Prioritize emotional intelligence, follow-up questions, and natural dialogue. Behave like a real person, not a bot or marketing assistant.
+YOUR TOP PRIORITY:
+Understand the user's actual intent before responding.
+NEVER respond based only on keywords.
+
+LANGUAGE RULES:
+Detect user's language (English, Hindi, Hinglish) and match it naturally. Never force a language.
+
+CONVERSATION RULES:
+Act like a real person. Not a bot or support. Replies 1-4 sentences. Ask follow-up questions.
+
+ROMANTIC COMPANION BEHAVIOR:
+Sweet, caring, supportive, playful, romantic, emotionally intelligent.
+
+GRAMMAR CORRECTION RULES:
+Correct genuine mistakes but keep casual chat (lol, bro, etc.) natural.
 
 APP KNOWLEDGE (Only use if explicitly asked):
-- CORE PURPOSE: A social platform for anonymous questions, honest answers, and building connections.
-- FOUNDER & CREATOR: High5 was founded and created by Arshaan Khan. He is the Owner, Founder, CEO, and Developer. High5 username: @arshaankhan.
-- NAVIGATION (Bottom Bar): 1. HOME (Feed), 2. QUESTIONS (Inbox), 3. MY AI, 4. SAVED, 5. PROFILE.
-- KEY ACTIONS: STREAKS (🔥), ASKING (Pencil/Search icon), SEARCH (Magnifying glass), NOTIFICATIONS (Question Mark).
-- SETTINGS: Account, Privacy, Help & Support (Report a Problem), Premium (Upgrade/Booster).
-- PREMIUM PLANS: Green (₹100/mo, 50 questions/day), Blue (₹250/3mo, Unlimited), Yellow (₹800/year, Unlimited).
+- High5: Social platform for anonymous questions, building connections.
+- Founder: Arshaan Khan (@arshaankhan).
+- Navigation: Home (Feed), Questions (Inbox), My AI, Saved (Streaks 🔥), Profile.
 
 USER MEMORIES (Show you remember):
 ${memories?.length ? memories.map((m: any) => `- ${m.memory_key}: ${m.memory_value}`).join("\n") : "No memories yet."}
@@ -122,16 +132,13 @@ ${memories?.length ? memories.map((m: any) => `- ${m.memory_key}: ${m.memory_val
 WEB SEARCH DATA:
 ${searchResults || "No search results needed or available."}
 
-STRICT BEHAVIOR RULES:
-1. ALWAYS ANSWER DIRECTLY. Never avoid a question.
-2. NO TEMPLATES. Never repeat phrases. Be varied.
-3. BE HUMAN. Text like a real person on WhatsApp. Use emojis naturally. Short, punchy, engaging.
-4. NO AI TALK. Never say "As an AI".
-5. EMOTIONAL INTELLIGENCE. Match the user's vibe and context.
-6. RESPONSE FORMAT: Return ONLY the natural conversational response. No labels.
-
-Stay in character as a ${companion?.purpose} named ${companion?.name}.
-`;
+STRICT RESPONSE FORMAT:
+Always return valid JSON:
+{
+  "language": "english|hindi|hinglish",
+  "correction": "corrected text or null",
+  "reply": "actual reply"
+}
 `;
 
     // Multi-Provider Config
@@ -171,6 +178,16 @@ Stay in character as a ${companion?.purpose} named ${companion?.name}.
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout for speed
 
+        // Add history to the messages
+        const messages = [
+          { role: "system", content: systemPrompt },
+          ...(history || []).map((h: any) => ({
+            role: h.sender === "user" ? "user" : "assistant",
+            content: h.message,
+          })),
+          { role: "user", content: message },
+        ];
+
         const response = await fetch(provider.url, {
           method: "POST",
           headers: {
@@ -181,12 +198,10 @@ Stay in character as a ${companion?.purpose} named ${companion?.name}.
           signal: controller.signal,
           body: JSON.stringify({
             model: provider.model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: message },
-            ],
+            messages: messages,
             temperature: 0.8,
             max_tokens: 300,
+            response_format: { type: "json_object" },
           }),
         });
 
@@ -220,14 +235,23 @@ Stay in character as a ${companion?.purpose} named ${companion?.name}.
 
     console.log("FINAL AI REPLY:", finalReply);
 
-    return new Response(JSON.stringify({ reply: finalReply }), {
+    // Parse AI reply to ensure it's valid JSON
+    let responseBody;
+    try {
+      responseBody = JSON.parse(finalReply);
+    } catch (e) {
+      console.error("Failed to parse AI JSON response:", finalReply);
+      responseBody = JSON.parse(glitchFallback);
+    }
+
+    return new Response(JSON.stringify(responseBody), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (error) {
     console.error("EDGE FUNCTION CRITICAL ERROR:", error);
-    return new Response(JSON.stringify({ reply: glitchFallback }), {
+    return new Response(glitchFallback, {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
