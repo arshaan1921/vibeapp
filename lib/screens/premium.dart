@@ -58,7 +58,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       features: [
                         "50 questions per day",
                         "100 AI chats per day ❤️",
-                        "Green badge",
+                        "Green verified badge",
                         "Green profile ring"
                       ],
                     ),
@@ -71,7 +71,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       features: [
                         "Unlimited questions",
                         "300 AI chats per day ❤️",
-                        "Blue badge",
+                        "Blue verified badge",
                         "Blue profile ring"
                       ],
                     ),
@@ -84,7 +84,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       features: [
                         "Unlimited questions",
                         "1000 AI chats per day ❤️",
-                        "Yellow badge",
+                        "Yellow verified badge",
                         "Yellow profile ring"
                       ],
                       isBestValue: true,
@@ -127,7 +127,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       title,
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
                     ),
-                    PremiumUtils.buildBadge(plan),
+                    PremiumUtils.buildBadge(plan, size: 22),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -138,11 +138,16 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 const SizedBox(height: 16),
                 ...features.map((f) {
                   final isAiFeature = f.contains("AI chats");
+                  final isBadgeFeature = f.contains("verified badge");
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle, size: 18, color: color),
+                        Icon(
+                          isBadgeFeature ? Icons.verified_rounded : Icons.check_circle, 
+                          size: 18, 
+                          color: color
+                        ),
                         const SizedBox(width: 8),
                         if (isAiFeature)
                           Expanded(
