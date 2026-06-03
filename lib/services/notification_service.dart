@@ -10,6 +10,7 @@ import '../screens/inbox.dart';
 import '../screens/questions_screen.dart';
 import '../screens/answer_detail_screen.dart';
 import '../screens/my_tickets_screen.dart';
+import '../features/games/games_screen.dart';
 import 'update_service.dart';
 
 class NotificationService {
@@ -207,7 +208,25 @@ class NotificationService {
       } else {
         tabIndexNotifier.value = 4;
       }
+    } else if (type == 'game') {
+      debugPrint("🎮 Game notification tapped");
+      debugPrint("➡️ Opening GamesScreen");
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const GamesScreen()),
+      );
     }
+  }
+
+  static Future<void> sendGameNotification({
+    required String targetUserId,
+    required String creatorUsername,
+  }) async {
+    await sendNotification(
+      userId: targetUserId,
+      title: "New Game! 🎮",
+      body: "@$creatorUsername started a new game with you",
+      data: {"type": "game"},
+    );
   }
 
   // ==============================

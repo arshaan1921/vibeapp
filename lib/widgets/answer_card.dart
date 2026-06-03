@@ -541,7 +541,8 @@ class _AnswerCardState extends State<AnswerCard> {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: () => _navigateToProfile(widget.answer.userId),
+                      onTap: () => ImageUtils.showImagePreview(context, widget.answer.avatarUrl),
+                      onLongPress: () => _navigateToProfile(widget.answer.userId),
                       child: Container(
                         padding: const EdgeInsets.all(2),
                         decoration: PremiumUtils.buildProfileRing(widget.answer.premiumPlan),

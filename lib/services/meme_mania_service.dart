@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/meme_mania.dart';
 import '../models/user.dart';
+import 'notification_service.dart';
 
 class MemeManiaService {
   final _supabase = Supabase.instance.client;
@@ -79,6 +80,10 @@ class MemeManiaService {
 
     final memeId = game['id'];
 
+    // Fetch creator username
+    final creatorProfile = await _supabase.from('profiles').select('username').eq('id', userId).single();
+    final creatorUsername = creatorProfile['username'] ?? "Someone";
+
     final allParticipantIds = {userId, ...participantIds};
     
     final participants = allParticipantIds.map((id) => {
@@ -88,6 +93,16 @@ class MemeManiaService {
     }).toList();
 
     await _supabase.from('meme_participants').insert(participants);
+
+    // Send notifications
+    for (final friendId in participantIds) {
+      if (friendId != userId) {
+        NotificationService.sendGameNotification(
+          targetUserId: friendId,
+          creatorUsername: creatorUsername,
+        );
+      }
+    }
   }
 
   Future<void> markAsSeen(String memeId) async {

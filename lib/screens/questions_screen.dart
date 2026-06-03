@@ -213,13 +213,16 @@ class _QuestionsScreenState extends State<QuestionsScreen> with RouteAware {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         if (!isAnonymous && profile != null)
-                                          Container(
-                                            margin: const EdgeInsets.only(right: 12),
-                                            padding: const EdgeInsets.all(1.5),
-                                            decoration: PremiumUtils.buildProfileRing(plan, width: 1.5),
-                                            child: CircleAvatar(
-                                              radius: 18,
-                                              backgroundImage: ImageUtils.getImageProvider(profile['avatar_url']),
+                                          GestureDetector(
+                                            onTap: () => ImageUtils.showImagePreview(context, profile!['avatar_url']),
+                                            child: Container(
+                                              margin: const EdgeInsets.only(right: 12),
+                                              padding: const EdgeInsets.all(1.5),
+                                              decoration: PremiumUtils.buildProfileRing(plan, width: 1.5),
+                                              child: CircleAvatar(
+                                                radius: 18,
+                                                backgroundImage: ImageUtils.getImageProvider(profile['avatar_url']),
+                                              ),
                                             ),
                                           )
                                         else

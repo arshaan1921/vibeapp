@@ -513,24 +513,27 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: PremiumUtils.getRingColor(plan), width: 2.5),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(21.5),
-                              child: Image.network(
-                                profileData!['avatar_url'] ?? '',
-                                width: 78,
-                                height: 78,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
+                          GestureDetector(
+                            onTap: () => ImageUtils.showImagePreview(context, profileData!['avatar_url']),
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(color: PremiumUtils.getRingColor(plan), width: 2.5),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(21.5),
+                                child: Image.network(
+                                  profileData!['avatar_url'] ?? '',
                                   width: 78,
                                   height: 78,
-                                  color: isDarkMode ? Colors.white10 : Colors.grey[200],
-                                  child: Icon(Icons.person, size: 40, color: isDarkMode ? Colors.white38 : Colors.white),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    width: 78,
+                                    height: 78,
+                                    color: isDarkMode ? Colors.white10 : Colors.grey[200],
+                                    child: Icon(Icons.person, size: 40, color: isDarkMode ? Colors.white38 : Colors.white),
+                                  ),
                                 ),
                               ),
                             ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/user.dart';
+import '../../services/notification_service.dart';
 import '../../services/block_service.dart';
 
 // --- MAIN ENTRY (LOBBY) ---
@@ -408,7 +409,11 @@ class _MostLikelySetupState extends State<MostLikelySetup> {
       final game = await supabase.from('most_likely_games').insert({'creator_id': userId}).select().single();
       final gameId = game['id'];
 
-      // 2. Add participants
+      // 2. Fetch creator username
+      final creatorProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
+      final creatorUsername = creatorProfile['username'] ?? "Someone";
+
+      // 3. Add participants
       final participantIds = {...widget.selectedFriends.map((f) => f.id), userId};
       final participants = participantIds.map((id) => {
         'game_id': gameId, 
@@ -417,7 +422,17 @@ class _MostLikelySetupState extends State<MostLikelySetup> {
       }).toList();
       await supabase.from('most_likely_participants').insert(participants);
 
-      // 3. Add the setup action (question + options)
+      // 4. Send notifications
+      for (final friendId in widget.selectedFriends.map((f) => f.id)) {
+        if (friendId != userId) {
+          NotificationService.sendGameNotification(
+            targetUserId: friendId,
+            creatorUsername: creatorUsername,
+          );
+        }
+      }
+
+      // 5. Add the setup action (question + options)
       await supabase.from('most_likely_actions').insert({
         'game_id': gameId,
         'user_id': userId,

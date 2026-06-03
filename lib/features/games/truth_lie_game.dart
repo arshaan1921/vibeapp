@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/user.dart';
+import '../../services/notification_service.dart';
 import '../../services/block_service.dart';
 
 // --- MAIN ENTRY (LOBBY) ---
@@ -400,7 +401,11 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
       }).select().single();
       final gameId = game['id'];
 
-      // 2. Add participants
+      // 2. Fetch creator username
+      final creatorProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
+      final creatorUsername = creatorProfile['username'] ?? "Someone";
+
+      // 3. Add participants
       final participantIds = {...widget.selectedFriends.map((f) => f.id), userId};
       final participants = participantIds.map((id) => {
         'game_id': gameId, 
@@ -409,7 +414,17 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
       }).toList();
       await supabase.from('truth_lie_participants').insert(participants);
 
-      // 3. Add setup action
+      // 4. Send notifications
+      for (final friendId in widget.selectedFriends.map((f) => f.id)) {
+        if (friendId != userId) {
+          NotificationService.sendGameNotification(
+            targetUserId: friendId,
+            creatorUsername: creatorUsername,
+          );
+        }
+      }
+
+      // 5. Add setup action
       await supabase.from('truth_lie_actions').insert({
         'game_id': gameId,
         'user_id': userId,

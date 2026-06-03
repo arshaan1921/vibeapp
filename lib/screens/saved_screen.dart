@@ -151,16 +151,19 @@ class _SavedScreenState extends State<SavedScreen> {
                           return Column(
                             children: [
                               ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(1.5),
-                                  decoration: PremiumUtils.buildProfileRing(plan),
-                                  child: CircleAvatar(
-                                    radius: 26,
-                                    backgroundColor: Colors.grey[200],
-                                    backgroundImage: ImageUtils.getImageProvider(avatarUrl),
-                                    child: ImageUtils.safeUrl(avatarUrl) == null
-                                        ? const Icon(Icons.person, color: Colors.white, size: 28)
-                                        : null,
+                                leading: GestureDetector(
+                                  onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(1.5),
+                                    decoration: PremiumUtils.buildProfileRing(plan),
+                                    child: CircleAvatar(
+                                      radius: 26,
+                                      backgroundColor: Colors.grey[200],
+                                      backgroundImage: ImageUtils.getImageProvider(avatarUrl),
+                                      child: ImageUtils.safeUrl(avatarUrl) == null
+                                          ? const Icon(Icons.person, color: Colors.white, size: 28)
+                                          : null,
+                                    ),
                                   ),
                                 ),
                                 title: Row(

@@ -91,6 +91,106 @@ class RealtimeService {
       },
     );
 
+    // games -> update game badge
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'games',
+      callback: (payload) {
+        _eventController.add('update_game_badge');
+      },
+    );
+
+    // most_likely_participants -> update game badge
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'most_likely_participants',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
+      callback: (payload) {
+        _eventController.add('update_game_badge');
+      },
+    );
+
+    // truth_lie_participants -> update game badge
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'truth_lie_participants',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
+      callback: (payload) {
+        _eventController.add('update_game_badge');
+      },
+    );
+
+    // rate_game_participants -> update game badge
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'rate_game_participants',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
+      callback: (payload) {
+        _eventController.add('update_game_badge');
+      },
+    );
+
+    // meme_participants -> update game badge
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'meme_participants',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
+      callback: (payload) {
+        _eventController.add('update_game_badge');
+      },
+    );
+
+    // game_participants -> update game badge
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'game_participants',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
+      callback: (payload) {
+        _eventController.add('update_game_badge');
+      },
+    );
+
+    // game_actions -> update game badge
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'game_actions',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'user_id',
+        value: user.id,
+      ),
+      callback: (payload) {
+        _eventController.add('update_game_badge');
+      },
+    );
+
     _channel!.subscribe();
   }
 

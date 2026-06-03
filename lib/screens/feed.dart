@@ -1,15 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/answer.dart';
 import '../widgets/answer_card.dart';
 import '../services/block_service.dart';
+import '../services/realtime_service.dart';
 import '../main.dart';
 import '../screens/ask_any_user.dart';
 import '../screens/likes_activity.dart';
 import '../screens/replies_activity.dart';
 import '../screens/questions_screen.dart';
 import '../features/games/games_screen.dart';
+import '../services/game_service.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -26,7 +29,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
   int likesCount = 0;
   int questionsCount = 0;
   int answersCount = 0;
+  int gamesCount = 0;
   RealtimeChannel? _notificationChannel;
+  StreamSubscription? _realtimeSubscription;
 
   @override
   void didChangeDependencies() {
@@ -66,6 +71,14 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
     fetchNotificationCounts();
     _subscribeToRealtime();
     _subscribeToNotifications();
+    
+    // Realtime badge updates
+    _realtimeSubscription = RealtimeService().events.listen((event) {
+      if (event == 'update_game_badge' || event == 'refresh_inbox') {
+        fetchNotificationCounts();
+      }
+    });
+    
     blockService.blockedIdsNotifier.addListener(_onBlocksChanged);
   }
 
@@ -75,6 +88,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
     routeObserver.unsubscribe(this);
     _realtimeChannel?.unsubscribe();
     _unsubscribeFromNotifications();
+    _realtimeSubscription?.cancel();
     blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
     super.dispose();
   }
@@ -181,11 +195,14 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
         return !isAnsweredField && !hasAnswers && !isBlocked;
       }).toList();
 
+      final activeGamesCount = await GameService().getUnvotedGamesCount();
+
       if (mounted) {
         setState(() {
           likesCount = (likesRes as List).length;
           answersCount = (answersRes as List).length;
           questionsCount = filteredQuestions.length;
+          gamesCount = activeGamesCount;
         });
       }
     } catch (e, st) {
@@ -432,10 +449,9 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                   _buildBadgeIcon(Icons.reply_rounded, answersCount, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AnswersActivityScreen())).then((_) => fetchNotificationCounts());
                   }),
-                  IconButton(
-                    icon: Icon(Icons.sports_esports_rounded, size: 26, color: theme.colorScheme.onSurface),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
-                  ),
+                  _buildBadgeIcon(Icons.sports_esports_rounded, gamesCount, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())).then((_) => fetchNotificationCounts());
+                  }),
                   IconButton(
                     icon: Icon(Icons.add_circle_outline_rounded, size: 26, color: theme.colorScheme.onSurface),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AskAnyUserScreen())),

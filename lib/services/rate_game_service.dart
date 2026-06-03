@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:rxdart/rxdart.dart';
 import '../models/rate_game.dart';
 import '../models/user.dart';
+import 'notification_service.dart';
 
 class RateGameService {
   final _supabase = Supabase.instance.client;
@@ -45,6 +46,10 @@ class RateGameService {
 
       final gameId = game['id'];
 
+      // Fetch creator username
+      final creatorProfile = await _supabase.from('profiles').select('username').eq('id', userId).single();
+      final creatorUsername = creatorProfile['username'] ?? "Someone";
+
       // 2. Prepare participants list for bulk insert
       final participants = [
         {
@@ -65,6 +70,16 @@ class RateGameService {
 
       // 3. Bulk insert into rate_game_participants
       await _supabase.from('rate_game_participants').insert(participants);
+
+      // 4. Send notifications
+      for (final friendId in participantIds) {
+        if (friendId != userId) {
+          NotificationService.sendGameNotification(
+            targetUserId: friendId,
+            creatorUsername: creatorUsername,
+          );
+        }
+      }
     } catch (e) {
       // Rethrow to be caught by UI
       rethrow;

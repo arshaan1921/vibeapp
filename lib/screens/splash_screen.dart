@@ -117,13 +117,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
               const SizedBox(height: 10),
               Text(
-                "Ask, Answer, Play",
+                "Ask, Answer, Play\nwith your own AI Companion",
                 style: GoogleFonts.poppins(
                   color: Colors.white.withOpacity(0.8),
-                  fontSize: 18,
+                  fontSize: 14,
                   fontWeight: FontWeight.w300,
-                  letterSpacing: 2,
+                  letterSpacing: 1.2,
                 ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
