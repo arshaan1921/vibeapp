@@ -127,7 +127,7 @@ class _SavedScreenState extends State<SavedScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text("Saved", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        title: Text("Following (${_savedProfiles.length})", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -139,7 +139,7 @@ class _SavedScreenState extends State<SavedScreen> {
             : RefreshIndicator(
                 onRefresh: _loadData,
                 child: _savedProfiles.isEmpty
-                    ? const Center(child: Text("No saved profiles yet."))
+                    ? const Center(child: Text("Not following anyone yet."))
                     : ListView.builder(
                         itemCount: _savedProfiles.length,
                         itemBuilder: (context, index) {

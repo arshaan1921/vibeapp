@@ -51,7 +51,7 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("SAVED PROFILES"),
+        title: const Text("FOLLOWING"),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -64,8 +64,8 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                         SizedBox(
                           height: MediaQuery.of(context).size.height * 0.7,
                           child: const _EmptyState(
-                            icon: Icons.bookmark_border,
-                            message: "No saved profiles yet",
+                            icon: Icons.group_add_outlined,
+                            message: "Not following anyone yet",
                           ),
                         ),
                       ],

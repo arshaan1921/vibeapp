@@ -34,6 +34,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _youtubeController = TextEditingController();
   final _tiktokController = TextEditingController();
   final _snapchatController = TextEditingController();
+  final _whatsappController = TextEditingController();
+  final _telegramController = TextEditingController();
   final _gmailController = TextEditingController();
   bool _showSocialLinks = true;
   bool _showGmail = false;
@@ -57,6 +59,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _youtubeController.text = widget.initialData!['youtube_handle'] ?? '';
       _tiktokController.text = widget.initialData!['tiktok_handle'] ?? '';
       _snapchatController.text = widget.initialData!['snapchat_handle'] ?? '';
+      _whatsappController.text = widget.initialData!['whatsapp_handle'] ?? '';
+      _telegramController.text = widget.initialData!['telegram_handle'] ?? '';
       _gmailController.text = widget.initialData!['gmail_address'] ?? '';
       _showSocialLinks = widget.initialData!['show_social_links'] ?? true;
       _showGmail = widget.initialData!['show_gmail'] ?? false;
@@ -88,6 +92,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _youtubeController.text = data['youtube_handle'] ?? '';
             _tiktokController.text = data['tiktok_handle'] ?? '';
             _snapchatController.text = data['snapchat_handle'] ?? '';
+            _whatsappController.text = data['whatsapp_handle'] ?? '';
+            _telegramController.text = data['telegram_handle'] ?? '';
             _gmailController.text = data['gmail_address'] ?? '';
             _showSocialLinks = data['show_social_links'] ?? true;
             _showGmail = data['show_gmail'] ?? false;
@@ -113,6 +119,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _youtubeController.dispose();
     _tiktokController.dispose();
     _snapchatController.dispose();
+    _whatsappController.dispose();
+    _telegramController.dispose();
     _gmailController.dispose();
     super.dispose();
   }
@@ -335,6 +343,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'youtube_handle': _youtubeController.text.trim(),
         'tiktok_handle': _tiktokController.text.trim(),
         'snapchat_handle': _snapchatController.text.trim(),
+        'whatsapp_handle': _whatsappController.text.trim(),
+        'telegram_handle': _telegramController.text.trim(),
         'gmail_address': gmail,
         'show_social_links': _showSocialLinks,
         'show_gmail': _showGmail,
@@ -444,6 +454,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           icon: FontAwesomeIcons.snapchat,
           isDark: isDark,
           hint: "username or URL",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _whatsappController,
+          label: "WhatsApp",
+          icon: FontAwesomeIcons.whatsapp,
+          isDark: isDark,
+          hint: "phone number or link",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _telegramController,
+          label: "Telegram",
+          icon: FontAwesomeIcons.telegram,
+          isDark: isDark,
+          hint: "username or link",
         ),
         const SizedBox(height: 24),
         SwitchListTile(

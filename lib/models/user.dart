@@ -16,6 +16,8 @@ class AppUser {
   final String? youtubeHandle;
   final String? tiktokHandle;
   final String? snapchatHandle;
+  final String? whatsappHandle;
+  final String? telegramHandle;
   final String? gmailAddress;
   final bool showSocialLinks;
   final bool showGmail;
@@ -36,6 +38,8 @@ class AppUser {
     this.youtubeHandle,
     this.tiktokHandle,
     this.snapchatHandle,
+    this.whatsappHandle,
+    this.telegramHandle,
     this.gmailAddress,
     this.showSocialLinks = true,
     this.showGmail = false,
@@ -58,6 +62,8 @@ class AppUser {
       youtubeHandle: json['youtube_handle'],
       tiktokHandle: json['tiktok_handle'],
       snapchatHandle: json['snapchat_handle'],
+      whatsappHandle: json['whatsapp_handle'],
+      telegramHandle: json['telegram_handle'],
       gmailAddress: json['gmail_address'],
       showSocialLinks: json['show_social_links'] ?? true,
       showGmail: json['show_gmail'] ?? false,
@@ -78,6 +84,8 @@ class AppUser {
       'youtube_handle': youtubeHandle,
       'tiktok_handle': tiktokHandle,
       'snapchat_handle': snapchatHandle,
+      'whatsapp_handle': whatsappHandle,
+      'telegram_handle': telegramHandle,
       'gmail_address': gmailAddress,
       'show_social_links': showSocialLinks,
       'show_gmail': showGmail,

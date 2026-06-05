@@ -493,7 +493,6 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
             IconButton(icon: Icon(Icons.search_rounded, color: theme.colorScheme.onSurface), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchScreen()))),
             IconButton(icon: Icon(Icons.settings_outlined, color: theme.colorScheme.onSurface), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())).then((_) => _loadData())),
           ] else ...[
-            IconButton(icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border_rounded, color: theme.colorScheme.onSurface), onPressed: _toggleSave),
             IconButton(icon: Icon(Icons.more_horiz_rounded, color: theme.colorScheme.onSurface), onPressed: _showEllipsisMenu),
           ],
           const SizedBox(width: 8),
@@ -631,7 +630,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                         ),
                         child: Row(
                           children: [
-                            Expanded(child: _buildStatItem("High5s", _high5Count.toString())),
+                            Expanded(child: _buildStatItem("Followers", _high5Count.toString())),
                             Container(width: 1, height: 30, color: Colors.grey.withOpacity(0.2)),
                             Expanded(child: _buildStatItem("Likes", _likesCount.toString())),
                             Container(width: 1, height: 30, color: Colors.grey.withOpacity(0.2)),
@@ -641,14 +640,41 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       ),
                       const SizedBox(height: 24),
                       if (!isMe)
-                        ElevatedButton(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AskAnyUserScreen(userId: widget.userId))).then((_) => _loadData()),
-                          style: ElevatedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(56),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 0,
-                          ),
-                          child: const Text("ASK A QUESTION", style: TextStyle(letterSpacing: 1, fontWeight: FontWeight.bold)),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AskAnyUserScreen(userId: widget.userId))).then((_) => _loadData()),
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(56),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  elevation: 0,
+                                ),
+                                child: const FittedBox(
+                                  child: Text("ASK QUESTION", style: TextStyle(letterSpacing: 1, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 4,
+                              child: OutlinedButton(
+                                onPressed: _toggleSave,
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(56),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                                ),
+                                child: FittedBox(
+                                  child: Text(
+                                    isSaved ? "FOLLOWING ✓" : "FOLLOW",
+                                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         )
                       else ...[
                         Row(
@@ -758,6 +784,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       {'platform': 'youtube', 'icon': FontAwesomeIcons.youtube, 'handle': profileData!['youtube_handle']},
       {'platform': 'tiktok', 'icon': FontAwesomeIcons.tiktok, 'handle': profileData!['tiktok_handle']},
       {'platform': 'snapchat', 'icon': FontAwesomeIcons.snapchat, 'handle': profileData!['snapchat_handle']},
+      {'platform': 'whatsapp', 'icon': FontAwesomeIcons.whatsapp, 'handle': profileData!['whatsapp_handle']},
+      {'platform': 'telegram', 'icon': FontAwesomeIcons.telegram, 'handle': profileData!['telegram_handle']},
     ];
 
     final activeSocials = socials.where((s) => s['handle'] != null && (s['handle'] as String).isNotEmpty).toList();
@@ -825,6 +853,15 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           } else {
             return; // Successfully launched app
           }
+          break;
+        case 'whatsapp':
+          // Clean phone number (remove +, spaces, dashes)
+          final phone = handle.replaceAll(RegExp(r'[^0-9]'), '');
+          url = Uri.parse('https://wa.me/$phone');
+          break;
+        case 'telegram':
+          final username = handle.replaceFirst('t.me/', '').replaceFirst('@', '');
+          url = Uri.parse('https://t.me/$username');
           break;
         default:
           return;

@@ -85,10 +85,10 @@ class _FriendSelectionScreenState extends State<FriendSelectionScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.bookmark_border, size: 64, color: Colors.grey),
+                  Icon(Icons.group_add_outlined, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
                   Text(
-                    "No saved profiles found",
+                    "No following profiles found",
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),
                 ],

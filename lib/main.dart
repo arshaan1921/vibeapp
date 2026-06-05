@@ -226,9 +226,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                     label: "AI",
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.bookmark_outline_rounded),
-                    selectedIcon: Icon(Icons.bookmark_rounded),
-                    label: "Bookmarks",
+                    icon: Icon(Icons.group_outlined),
+                    selectedIcon: Icon(Icons.group_rounded),
+                    label: "Following",
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.person_outline_rounded),

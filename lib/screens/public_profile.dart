@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../widgets/primary_button.dart';
+import '../widgets/answer_card.dart';
+import '../models/answer.dart';
 import '../utils/image_utils.dart';
 import 'ask_any_user.dart';
 import 'report_problem_screen.dart';
@@ -81,12 +83,85 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           }
         });
       }
+      
+      // Fetch dynamic stats
+      if (data != null) {
+        _fetchStats();
+        _fetchAnswers();
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           errorMessage = "Error: $e";
         });
       }
+    }
+  }
+
+  Future<void> _fetchStats() async {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      // Fetch answers for total likes and count
+      final answersRes = await supabase
+          .from('answers')
+          .select('id, likes_count')
+          .eq('user_id', widget.userId)
+          .eq('is_hidden', false);
+      
+      final answers = answersRes as List;
+      int totalLikes = 0;
+      for (var a in answers) {
+        totalLikes += (a['likes_count'] as int? ?? 0);
+      }
+
+      // Fetch High5s count using confirmed RPC
+      int high5s = 0;
+      try {
+        final h5Response = await supabase.rpc('get_profile_v1bes', params: {'uid': widget.userId});
+        high5s = h5Response as int;
+      } catch (e) {
+        debugPrint("RPC error: $e");
+      }
+
+      if (mounted) {
+        setState(() {
+          profileData = {
+            ...profileData!,
+            'likes_count': totalLikes,
+            'answers_count': answers.length,
+            'high5_count': high5s,
+          };
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching stats: $e");
+    }
+  }
+
+  List<Map<String, dynamic>> _userAnswers = [];
+  bool _isLoadingAnswers = false;
+
+  Future<void> _fetchAnswers() async {
+    setState(() => _isLoadingAnswers = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('answers')
+          .select('*, profiles!user_id(username, avatar_url, premium_plan, youtube_verified), questions!question_id(text, image_url, is_anonymous, from_user)')
+          .eq('user_id', widget.userId)
+          .eq('is_hidden', false)
+          .order('created_at', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _userAnswers = List<Map<String, dynamic>>.from(response);
+          _isLoadingAnswers = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching answers: $e");
+      if (mounted) setState(() => _isLoadingAnswers = false);
     }
   }
 
@@ -235,13 +310,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         actions: [
           if (errorMessage == null) ...[
             IconButton(
-              icon: Icon(
-                isSaved ? Icons.bookmark : Icons.bookmark_border,
-                color: Colors.black,
-              ),
-              onPressed: _toggleSave,
-            ),
-            IconButton(
               icon: const Icon(Icons.more_vert, color: Colors.black),
               onPressed: _showEllipsisMenu,
             ),
@@ -312,12 +380,22 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  "@${profileData!['username'] ?? 'username'}",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "@${profileData!['username'] ?? 'username'}",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    if (profileData!['youtube_verified'] == true || (profileData!['premium_plan'] != null && profileData!['premium_plan'] != 'free'))
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4),
+                        child: Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 Padding(
@@ -347,20 +425,45 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: PrimaryButton(
-              text: "ASK ME A QUESTION",
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AskAnyUserScreen(
-                      userId: widget.userId,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: PrimaryButton(
+                    text: "ASK QUESTION",
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AskAnyUserScreen(
+                            userId: widget.userId,
+                          ),
+                        ),
+                      ).then((_) {
+                        _loadData();
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 4,
+                  child: OutlinedButton(
+                    onPressed: _toggleSave,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(color: Colors.black87, width: 1.5),
+                    ),
+                    child: FittedBox(
+                      child: Text(
+                        isSaved ? "FOLLOWING ✓" : "FOLLOW",
+                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
                     ),
                   ),
-                ).then((_) {
-                  _loadData();
-                });
-              },
+                ),
+              ],
             ),
           ),
 
@@ -369,8 +472,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStat("Likes", "0"),
-              _buildStat("Answers", "0"),
+              _buildStat("Followers", "${profileData!['high5_count'] ?? 0}"),
+              _buildStat("Likes", "${profileData!['likes_count'] ?? 0}"),
+              _buildStat("Answers", "${profileData!['answers_count'] ?? 0}"),
             ],
           ),
 
@@ -380,10 +484,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   "ANSWERS",
                   style: TextStyle(
                     fontSize: 14,
@@ -391,13 +495,31 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     color: Colors.grey,
                   ),
                 ),
-                SizedBox(height: 40),
-                Center(
-                  child: Text(
-                    "No answers yet.",
-                    style: TextStyle(color: Colors.grey),
+                const SizedBox(height: 16),
+                if (_isLoadingAnswers)
+                  const Center(child: CircularProgressIndicator())
+                else if (_userAnswers.isEmpty)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 40),
+                      child: Text(
+                        "No answers yet.",
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _userAnswers.length,
+                    itemBuilder: (context, index) {
+                      final item = _userAnswers[index];
+                      return AnswerCard(
+                        answer: AnswerModel.fromMap(item),
+                      );
+                    },
                   ),
-                ),
               ],
             ),
           ),
@@ -466,6 +588,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       {'platform': 'youtube', 'icon': FontAwesomeIcons.youtube, 'handle': profileData!['youtube_handle']},
       {'platform': 'tiktok', 'icon': FontAwesomeIcons.tiktok, 'handle': profileData!['tiktok_handle']},
       {'platform': 'snapchat', 'icon': FontAwesomeIcons.snapchat, 'handle': profileData!['snapchat_handle']},
+      {'platform': 'whatsapp', 'icon': FontAwesomeIcons.whatsapp, 'handle': profileData!['whatsapp_handle']},
+      {'platform': 'telegram', 'icon': FontAwesomeIcons.telegram, 'handle': profileData!['telegram_handle']},
     ];
 
     final activeSocials = socials.where((s) => s['handle'] != null && (s['handle'] as String).isNotEmpty).toList();
@@ -485,7 +609,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withAlpha(13),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -537,6 +661,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           } else {
             return; // Successfully launched app
           }
+          break;
+        case 'whatsapp':
+          final phone = handle.replaceAll(RegExp(r'[^0-9]'), '');
+          url = Uri.parse('https://wa.me/$phone');
+          break;
+        case 'telegram':
+          final username = handle.replaceFirst('t.me/', '').replaceFirst('@', '');
+          url = Uri.parse('https://t.me/$username');
           break;
         default:
           return;

@@ -293,7 +293,7 @@ class _MostLikelyFriendSelectState extends State<MostLikelyFriendSelect> {
                     children: [
                       Icon(Icons.person_search_rounded, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
                       const SizedBox(height: 16),
-                      Text("No saved profiles found.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
+                      Text("Not following anyone yet.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
                     ],
                   ),
                 )
