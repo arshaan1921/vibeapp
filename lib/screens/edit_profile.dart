@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../utils/image_utils.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'onboarding/onboarding.dart';
@@ -26,6 +27,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
+  final _instagramController = TextEditingController();
+  final _twitterController = TextEditingController();
+  final _facebookController = TextEditingController();
+  final _linkedinController = TextEditingController();
+  final _youtubeController = TextEditingController();
+  final _tiktokController = TextEditingController();
+  final _snapchatController = TextEditingController();
+  final _gmailController = TextEditingController();
+  bool _showSocialLinks = true;
+  bool _showGmail = false;
   String? _avatarUrl;
   File? _selectedImage;
   bool _isLoading = false;
@@ -39,6 +50,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _usernameController.text = widget.initialData!['username'] ?? '';
       _bioController.text = widget.initialData!['bio'] ?? '';
       _avatarUrl = widget.initialData!['avatar_url'];
+      _instagramController.text = widget.initialData!['instagram_handle'] ?? '';
+      _twitterController.text = widget.initialData!['twitter_handle'] ?? '';
+      _facebookController.text = widget.initialData!['facebook_handle'] ?? '';
+      _linkedinController.text = widget.initialData!['linkedin_handle'] ?? '';
+      _youtubeController.text = widget.initialData!['youtube_handle'] ?? '';
+      _tiktokController.text = widget.initialData!['tiktok_handle'] ?? '';
+      _snapchatController.text = widget.initialData!['snapchat_handle'] ?? '';
+      _gmailController.text = widget.initialData!['gmail_address'] ?? '';
+      _showSocialLinks = widget.initialData!['show_social_links'] ?? true;
+      _showGmail = widget.initialData!['show_gmail'] ?? false;
     } else {
       _fetchProfile();
     }
@@ -60,6 +81,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _usernameController.text = data['username'] ?? '';
             _bioController.text = data['bio'] ?? '';
             _avatarUrl = data['avatar_url'];
+            _instagramController.text = data['instagram_handle'] ?? '';
+            _twitterController.text = data['twitter_handle'] ?? '';
+            _facebookController.text = data['facebook_handle'] ?? '';
+            _linkedinController.text = data['linkedin_handle'] ?? '';
+            _youtubeController.text = data['youtube_handle'] ?? '';
+            _tiktokController.text = data['tiktok_handle'] ?? '';
+            _snapchatController.text = data['snapchat_handle'] ?? '';
+            _gmailController.text = data['gmail_address'] ?? '';
+            _showSocialLinks = data['show_social_links'] ?? true;
+            _showGmail = data['show_gmail'] ?? false;
           });
         }
       }
@@ -75,6 +106,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
+    _instagramController.dispose();
+    _twitterController.dispose();
+    _facebookController.dispose();
+    _linkedinController.dispose();
+    _youtubeController.dispose();
+    _tiktokController.dispose();
+    _snapchatController.dispose();
+    _gmailController.dispose();
     super.dispose();
   }
 
@@ -259,11 +298,46 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
 
+      final gmail = _gmailController.text.trim();
+      if (gmail.isNotEmpty) {
+        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+        if (!emailRegex.hasMatch(gmail)) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Please enter a valid email address")),
+          );
+          return;
+        }
+      }
+
+      final youtube = _youtubeController.text.trim();
+      if (youtube.isNotEmpty) {
+        // Validate format: @username or youtube.com/@username or https://www.youtube.com/@username
+        final youtubeRegex = RegExp(r'^(@[a-zA-Z0-9_\-\.]+|(https?:\/\/)?(www\.)?youtube\.com\/@[a-zA-Z0-9_\-\.]+)$');
+        if (!youtubeRegex.hasMatch(youtube)) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Please enter a valid YouTube channel (@handle or URL)")),
+          );
+          return;
+        }
+      }
+
       await Supabase.instance.client.from('profiles').update({
         'name': _nameController.text.trim(),
         'username': username,
         'bio': _bioController.text.trim(),
         'avatar_url': _avatarUrl,
+        'instagram_handle': _instagramController.text.trim(),
+        'twitter_handle': _twitterController.text.trim(),
+        'facebook_handle': _facebookController.text.trim(),
+        'linkedin_handle': _linkedinController.text.trim(),
+        'youtube_handle': _youtubeController.text.trim(),
+        'tiktok_handle': _tiktokController.text.trim(),
+        'snapchat_handle': _snapchatController.text.trim(),
+        'gmail_address': gmail,
+        'show_social_links': _showSocialLinks,
+        'show_gmail': _showGmail,
       }).eq('id', user.id);
 
       if (mounted) {
@@ -295,6 +369,159 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     }
+  }
+
+  Widget _buildSocialLinksSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.link, size: 20),
+            SizedBox(width: 8),
+            Text(
+              "SOCIAL LINKS",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildSocialField(
+          controller: _instagramController,
+          label: "Instagram",
+          icon: FontAwesomeIcons.instagram,
+          isDark: isDark,
+          hint: "username or URL",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _twitterController,
+          label: "X (Twitter)",
+          icon: FontAwesomeIcons.xTwitter,
+          isDark: isDark,
+          hint: "username or URL",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _facebookController,
+          label: "Facebook",
+          icon: FontAwesomeIcons.facebook,
+          isDark: isDark,
+          hint: "username or URL",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _linkedinController,
+          label: "LinkedIn",
+          icon: FontAwesomeIcons.linkedin,
+          isDark: isDark,
+          hint: "username or URL",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _youtubeController,
+          label: "YouTube Channel",
+          icon: FontAwesomeIcons.youtube,
+          isDark: isDark,
+          hint: "@MrBeast or https://youtube.com/@MrBeast",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _tiktokController,
+          label: "TikTok",
+          icon: FontAwesomeIcons.tiktok,
+          isDark: isDark,
+          hint: "username or URL",
+        ),
+        const SizedBox(height: 12),
+        _buildSocialField(
+          controller: _snapchatController,
+          label: "Snapchat",
+          icon: FontAwesomeIcons.snapchat,
+          isDark: isDark,
+          hint: "username or URL",
+        ),
+        const SizedBox(height: 24),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text("Show social links publicly", 
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+          value: _showSocialLinks,
+          onChanged: (val) => setState(() => _showSocialLinks = val),
+          activeColor: Theme.of(context).colorScheme.primary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactInfoSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.contact_mail_outlined, size: 20),
+            SizedBox(width: 8),
+            Text(
+              "CONTACT INFORMATION",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildSocialField(
+          controller: _gmailController,
+          label: "Gmail",
+          icon: FontAwesomeIcons.envelope,
+          isDark: isDark,
+          hint: "example@gmail.com",
+        ),
+        const SizedBox(height: 24),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text("Show contact information publicly", 
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+          value: _showGmail,
+          onChanged: (val) => setState(() => _showGmail = val),
+          activeColor: Theme.of(context).colorScheme.primary,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSocialField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    required bool isDark,
+    required String hint,
+  }) {
+    return TextField(
+      controller: controller,
+      style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 13),
+        prefixIcon: Icon(icon, size: 18, color: isDark ? Colors.white70 : Colors.black54),
+        labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
+        fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        filled: true,
+        isDense: true,
+        border: const OutlineInputBorder(),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.black12),
+        ),
+      ),
+    );
   }
 
   @override
@@ -422,6 +649,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 32),
+                  _buildSocialLinksSection(isDark),
+                  const SizedBox(height: 32),
+                  _buildContactInfoSection(isDark),
                   const SizedBox(height: 32),
                   if (widget.isSignupFlow)
                     SizedBox(

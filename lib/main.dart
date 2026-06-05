@@ -7,13 +7,10 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'theme.dart';
 import 'screens/feed.dart';
-import 'screens/questions_screen.dart';
+import 'screens/trending_screen.dart';
 import 'screens/saved_screen.dart';
 import 'screens/profile.dart';
-import 'screens/auth/welcome.dart';
-import 'services/realtime_service.dart';
 import 'services/notification_service.dart';
-import 'services/block_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/reset_password_page.dart';
 import 'services/iap_service.dart';
@@ -150,7 +147,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   final List<Widget> _screens = const [
     FeedScreen(),
-    QuestionsScreen(),
+    TrendingScreen(),
     AiCompanionScreen(),
     SavedScreen(),
     ProfileScreen(),
@@ -219,9 +216,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                     label: "Home",
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.mark_chat_unread_outlined),
-                    selectedIcon: Icon(Icons.mark_chat_unread_rounded),
-                    label: "Questions",
+                    icon: Icon(Icons.local_fire_department_outlined),
+                    selectedIcon: Icon(Icons.local_fire_department_rounded),
+                    label: "Trending",
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.auto_awesome_outlined),
@@ -231,7 +228,7 @@ class _MainScaffoldState extends State<MainScaffold> {
                   NavigationDestination(
                     icon: Icon(Icons.bookmark_outline_rounded),
                     selectedIcon: Icon(Icons.bookmark_rounded),
-                    label: "Saved",
+                    label: "Bookmarks",
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.person_outline_rounded),

@@ -167,7 +167,7 @@ class NotificationService {
       debugPrint("📥 Question notification tapped");
       debugPrint("➡️ Opening Questions tab (Inbox)");
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
-      tabIndexNotifier.value = 1;
+      navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const QuestionsScreen()));
     } else if (type == 'answer') {
       debugPrint("💬 Answer notification tapped");
       if (answerId != null) {
@@ -196,7 +196,7 @@ class NotificationService {
       debugPrint("🌙 Daily question tapped");
       debugPrint("➡️ Opening Questions tab (Inbox)");
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
-      tabIndexNotifier.value = 1;
+      navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const QuestionsScreen()));
     } else if (type == 'update') {
       UpdateService.openPlayStore();
     } else if (type == 'vibe' || type == 'profile_save') {

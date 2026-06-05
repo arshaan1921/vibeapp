@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../widgets/primary_button.dart';
 import '../utils/image_utils.dart';
 import 'ask_any_user.dart';
@@ -329,6 +331,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                if (profileData!['show_gmail'] == true &&
+                    profileData!['gmail_address'] != null && 
+                    profileData!['gmail_address'].toString().isNotEmpty)
+                  _buildContactEmailRow(),
+                const SizedBox(height: 16),
+                if (profileData!['show_social_links'] != false)
+                  _buildSocialLinksRow(),
               ],
             ),
           ),
@@ -418,5 +428,123 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildContactEmailRow() {
+    final email = profileData!['gmail_address'] as String;
+    return InkWell(
+      onTap: () => launchUrl(Uri.parse('mailto:$email')),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.mail_outline_rounded, size: 16, color: Colors.blueAccent),
+            const SizedBox(width: 8),
+            Text(
+              email,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.blueAccent,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialLinksRow() {
+    final socials = [
+      {'platform': 'instagram', 'icon': FontAwesomeIcons.instagram, 'handle': profileData!['instagram_handle']},
+      {'platform': 'twitter', 'icon': FontAwesomeIcons.xTwitter, 'handle': profileData!['twitter_handle']},
+      {'platform': 'facebook', 'icon': FontAwesomeIcons.facebook, 'handle': profileData!['facebook_handle']},
+      {'platform': 'linkedin', 'icon': FontAwesomeIcons.linkedin, 'handle': profileData!['linkedin_handle']},
+      {'platform': 'youtube', 'icon': FontAwesomeIcons.youtube, 'handle': profileData!['youtube_handle']},
+      {'platform': 'tiktok', 'icon': FontAwesomeIcons.tiktok, 'handle': profileData!['tiktok_handle']},
+      {'platform': 'snapchat', 'icon': FontAwesomeIcons.snapchat, 'handle': profileData!['snapchat_handle']},
+    ];
+
+    final activeSocials = socials.where((s) => s['handle'] != null && (s['handle'] as String).isNotEmpty).toList();
+
+    if (activeSocials.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        alignment: WrapAlignment.center,
+        children: activeSocials.map((s) {
+          return InkWell(
+            onTap: () => _launchSocial(s['platform'] as String, s['handle'] as String),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                s['icon'] as IconData,
+                size: 18,
+                color: Colors.black87,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Future<void> _launchSocial(String platform, String handle) async {
+    if (handle.isEmpty) return;
+    
+    Uri url;
+    if (handle.startsWith('http')) {
+      url = Uri.parse(handle);
+    } else {
+      switch (platform) {
+        case 'instagram':
+          url = Uri.parse('https://instagram.com/$handle');
+          break;
+        case 'twitter':
+          url = Uri.parse('https://x.com/$handle');
+          break;
+        case 'facebook':
+          url = Uri.parse('https://facebook.com/$handle');
+          break;
+        case 'linkedin':
+          url = Uri.parse('https://linkedin.com/in/$handle');
+          break;
+        case 'youtube':
+          url = Uri.parse(handle.startsWith('@') ? 'https://youtube.com/$handle' : 'https://youtube.com/@$handle');
+          break;
+        case 'tiktok':
+          url = Uri.parse(handle.startsWith('@') ? 'https://tiktok.com/$handle' : 'https://tiktok.com/@$handle');
+          break;
+        case 'snapchat':
+          final username = handle.startsWith('http') 
+              ? handle.split('/').last.split('?').first 
+              : handle.replaceFirst('snapchat.com/add/', '').replaceFirst('@', '');
+          url = Uri.parse('snapchat://add/$username');
+          // If app fails, fallback to web URL
+          if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+            url = Uri.parse('https://www.snapchat.com/add/$username');
+          } else {
+            return; // Successfully launched app
+          }
+          break;
+        default:
+          return;
+      }
+    }
+
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch $url');
+    }
   }
 }
