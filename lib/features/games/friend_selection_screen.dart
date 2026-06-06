@@ -88,7 +88,7 @@ class _FriendSelectionScreenState extends State<FriendSelectionScreen> {
                   Icon(Icons.group_add_outlined, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
                   Text(
-                    "No following profiles found",
+                    "No friends found",
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),
                 ],

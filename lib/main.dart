@@ -17,6 +17,7 @@ import 'services/iap_service.dart';
 import 'widgets/update_popup.dart';
 import 'services/update_service.dart';
 import 'features/ai_companion/screens/ai_companion_screen.dart';
+import 'features/snap/screens/snap_chats_screen.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
@@ -149,7 +150,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     FeedScreen(),
     TrendingScreen(),
     AiCompanionScreen(),
-    SavedScreen(),
+    SnapChatsScreen(),
     ProfileScreen(),
   ];
 
@@ -226,9 +227,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                     label: "AI",
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.group_outlined),
-                    selectedIcon: Icon(Icons.group_rounded),
-                    label: "Following",
+                    icon: Icon(Icons.chat_bubble_outline_rounded),
+                    selectedIcon: Icon(Icons.chat_bubble_rounded),
+                    label: "Chats",
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.person_outline_rounded),

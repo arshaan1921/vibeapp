@@ -19,52 +19,52 @@ class GameLobbyScreen extends StatefulWidget {
 class _GameLobbyScreenState extends State<GameLobbyScreen> {
   final _gameService = GameService();
   late Future<List<Game>> _gamesFuture;
-  List<Map<String, dynamic>> _savedProfiles = [];
-  bool _isLoadingSaved = true;
+  List<Map<String, dynamic>> _friends = [];
+  bool _isLoadingFriends = true;
 
   @override
   void initState() {
     super.initState();
     _refreshGames();
-    _fetchSavedProfiles();
+    _fetchFriends();
   }
 
-  Future<void> _fetchSavedProfiles() async {
+  Future<void> _fetchFriends() async {
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      final savedRows = await supabase
-          .from('saved_profiles')
-          .select('saved_user_id')
-          .eq('user_id', user.id);
+      final friendsRes = await supabase
+          .from('friends')
+          .select('user1_id, user2_id')
+          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
 
-      final List<String> savedUserIds = (savedRows as List)
-          .map((item) => item['saved_user_id'] as String)
+      final List<String> friendIds = (friendsRes as List)
+          .map((item) => item['user1_id'] == user.id ? item['user2_id'].toString() : item['user1_id'].toString())
           .toList();
 
-      if (savedUserIds.isEmpty) {
-        if (mounted) setState(() => _isLoadingSaved = false);
+      if (friendIds.isEmpty) {
+        if (mounted) setState(() => _isLoadingFriends = false);
         return;
       }
 
       final profilesResponse = await supabase
           .from('profiles')
           .select('id, username, name, avatar_url')
-          .inFilter('id', savedUserIds);
+          .inFilter('id', friendIds);
 
       if (mounted) {
         setState(() {
-          _savedProfiles = List<Map<String, dynamic>>.from(profilesResponse)
+          _friends = List<Map<String, dynamic>>.from(profilesResponse)
               .where((p) => !blockService.isBlocked(p['id']))
               .toList();
-          _isLoadingSaved = false;
+          _isLoadingFriends = false;
         });
       }
     } catch (e) {
-      debugPrint("Error fetching saved profiles in lobby: $e");
-      if (mounted) setState(() => _isLoadingSaved = false);
+      debugPrint("Error fetching friends in lobby: $e");
+      if (mounted) setState(() => _isLoadingFriends = false);
     }
   }
 
@@ -131,11 +131,11 @@ class _GameLobbyScreenState extends State<GameLobbyScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isLoadingSaved ? null : _startNewGame,
-        label: _isLoadingSaved 
+        onPressed: _isLoadingFriends ? null : _startNewGame,
+        label: _isLoadingFriends 
           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
           : const Text("New Game"),
-        icon: _isLoadingSaved ? null : const Icon(Icons.add),
+        icon: _isLoadingFriends ? null : const Icon(Icons.add),
       ),
     );
   }
@@ -146,13 +146,13 @@ class _GameLobbyScreenState extends State<GameLobbyScreen> {
       MaterialPageRoute(
         builder: (_) => FriendSelectionScreen(
           gameType: widget.gameType,
-          savedUsers: _savedProfiles,
+          savedUsers: _friends,
         ),
       ),
     );
     if (result == true) {
       _refreshGames();
-      _fetchSavedProfiles(); // Refresh saved users too in case of blocks etc
+      _fetchFriends(); // Refresh friends list too
     }
   }
 }

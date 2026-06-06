@@ -10,6 +10,7 @@ import 'ask_any_user.dart';
 import 'report_problem_screen.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
+import '../services/friend_service.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
@@ -23,7 +24,8 @@ class PublicProfileScreen extends StatefulWidget {
 class _PublicProfileScreenState extends State<PublicProfileScreen> {
   Map<String, dynamic>? profileData;
   bool isLoading = true;
-  bool isSaved = false;
+  String? _friendshipStatus;
+  int _mutualFriendsCount = 0;
   String? errorMessage;
 
   @override
@@ -61,7 +63,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     setState(() => isLoading = true);
     await Future.wait([
       _fetchProfile(),
-      _checkIfSaved(),
+      _checkFriendship(),
     ]);
     if (mounted) setState(() => isLoading = false);
   }
@@ -115,13 +117,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         totalLikes += (a['likes_count'] as int? ?? 0);
       }
 
-      // Fetch High5s count using confirmed RPC
-      int high5s = 0;
+      // Fetch friends count
+      int friends = 0;
       try {
-        final h5Response = await supabase.rpc('get_profile_v1bes', params: {'uid': widget.userId});
-        high5s = h5Response as int;
+        debugPrint('FRIEND_AUDIT: Fetching friends count for ${widget.userId}');
+        friends = await friendService.getFriendsCount(widget.userId);
+        debugPrint('FRIEND_AUDIT: Friends count for ${widget.userId} = $friends');
       } catch (e) {
-        debugPrint("RPC error: $e");
+        debugPrint("Error fetching friends count: $e");
       }
 
       if (mounted) {
@@ -130,7 +133,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             ...profileData!,
             'likes_count': totalLikes,
             'answers_count': answers.length,
-            'high5_count': high5s,
+            'friends_count': friends,
           };
         });
       }
@@ -165,52 +168,140 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     }
   }
 
-  Future<void> _checkIfSaved() async {
+  Future<void> _checkFriendship() async {
     try {
-      final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-
-      final response = await supabase
-          .from('saved_profiles')
-          .select()
-          .eq('user_id', user.id)
-          .eq('saved_user_id', widget.userId)
-          .maybeSingle();
+      debugPrint('FRIEND_AUDIT: Checking friendship status for ${widget.userId}');
+      final status = await friendService.getFriendshipStatus(widget.userId);
+      debugPrint('CHECK_FRIENDSHIP_STATUS=$status (type: ${status.runtimeType})');
+      final mutual = await friendService.getMutualFriendsCount(widget.userId);
+      debugPrint('FRIEND_AUDIT: Friend status for ${widget.userId} = $status, mutual = $mutual');
 
       if (mounted) {
         setState(() {
-          isSaved = response != null;
+          _friendshipStatus = status;
+          _mutualFriendsCount = mutual;
         });
       }
     } catch (e) {
-      debugPrint("Error checking saved status: $e");
+      debugPrint("Error checking friendship: $e");
     }
   }
 
-  Future<void> _toggleSave() async {
-    final supabase = Supabase.instance.client;
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
+  Future<void> _handleFriendAction() async {
     try {
-      if (isSaved) {
-        await supabase
-            .from('saved_profiles')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('saved_user_id', widget.userId);
-      } else {
-        await supabase.from('saved_profiles').insert({
-          'user_id': user.id,
-          'saved_user_id': widget.userId,
+      if (_friendshipStatus == 'friends') {
+        _showUnfriendOptions();
+        return;
+      }
+
+      if (_friendshipStatus == 'none' || _friendshipStatus == 'declined') {
+        await friendService.sendFriendRequest(widget.userId);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
+      } else if (_friendshipStatus == 'pending_received') {
+        final res = await Supabase.instance.client
+            .from('friend_requests')
+            .select('id')
+            .eq('sender_id', widget.userId)
+            .eq('receiver_id', Supabase.instance.client.auth.currentUser!.id)
+            .eq('status', 'pending')
+            .maybeSingle();
+        
+        if (res != null) {
+          await friendService.acceptFriendRequest(res['id'], widget.userId);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request accepted!")));
+        }
+      }
+      await _checkFriendship();
+      await _fetchStats();
+    } catch (e) {
+      debugPrint("Error handling friend action: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Action failed: $e")));
+      }
+    }
+  }
+
+  void _showUnfriendOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.person_remove_rounded, color: Colors.redAccent),
+                title: const Text("Remove Friend", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmUnfriend();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.block_rounded),
+                title: const Text("Block User", style: TextStyle(fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmBlock();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.cancel_rounded),
+                title: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                onTap: () => Navigator.pop(context),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmUnfriend() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Remove Friend?"),
+        content: const Text("You will no longer appear in each other's friend lists."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _unfriendUser();
+            },
+            child: const Text("REMOVE FRIEND", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _unfriendUser() async {
+    try {
+      debugPrint('FRIEND_AUDIT: Unfriending user ${widget.userId}');
+      await friendService.unfriend(widget.userId);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend removed")));
+        
+        // Immediate UI update to show button as "ADD FRIEND" while we refresh everything
+        setState(() {
+          _friendshipStatus = 'none';
         });
       }
-      setState(() {
-        isSaved = !isSaved;
-      });
+
+      // Re-fetch everything to sync state
+      await _checkFriendship();
+      debugPrint('AFTER_UNFRIEND_STATUS=$_friendshipStatus');
+      await _fetchStats();
     } catch (e) {
-      debugPrint("Error toggling save: $e");
+      debugPrint('Error unfriending: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to unfriend: $e")));
+      }
     }
   }
 
@@ -397,6 +488,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                       ),
                   ],
                 ),
+                if (_mutualFriendsCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      "$_mutualFriendsCount mutual ${_mutualFriendsCount == 1 ? 'friend' : 'friends'}",
+                      style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -449,7 +548,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 Expanded(
                   flex: 4,
                   child: OutlinedButton(
-                    onPressed: _toggleSave,
+                    onPressed: _handleFriendAction,
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(56),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -457,7 +556,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     ),
                     child: FittedBox(
                       child: Text(
-                        isSaved ? "FOLLOWING ✓" : "FOLLOW",
+                        _friendshipStatus == 'friends' 
+                            ? "FRIENDS ✓" 
+                            : _friendshipStatus == 'pending_sent'
+                                ? "REQUESTED"
+                                : _friendshipStatus == 'pending_received'
+                                    ? "ACCEPT"
+                                    : "ADD FRIEND",
                         style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                     ),
@@ -472,7 +577,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStat("Followers", "${profileData!['high5_count'] ?? 0}"),
+              _buildStat("Friends", "${profileData!['friends_count'] ?? 0}"),
               _buildStat("Likes", "${profileData!['likes_count'] ?? 0}"),
               _buildStat("Answers", "${profileData!['answers_count'] ?? 0}"),
             ],

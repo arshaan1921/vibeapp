@@ -6,15 +6,16 @@ import '../services/block_service.dart';
 import '../utils/image_utils.dart';
 import '../utils/premium_utils.dart';
 
-class SavedScreen extends StatefulWidget {
-  const SavedScreen({super.key});
+class FriendsListScreen extends StatefulWidget {
+  final String? userId;
+  const FriendsListScreen({super.key, this.userId});
 
   @override
-  State<SavedScreen> createState() => _SavedScreenState();
+  State<FriendsListScreen> createState() => _FriendsListScreenState();
 }
 
-class _SavedScreenState extends State<SavedScreen> {
-  List<Map<String, dynamic>> _savedProfiles = [];
+class _FriendsListScreenState extends State<FriendsListScreen> {
+  List<Map<String, dynamic>> _friends = [];
   Map<String, int> _userStreaks = {};
   bool _isLoading = true;
 
@@ -22,59 +23,55 @@ class _SavedScreenState extends State<SavedScreen> {
   void initState() {
     super.initState();
     _loadData();
-    tabIndexNotifier.addListener(_onTabChanged);
     blockService.blockedIdsNotifier.addListener(_onBlocksChanged);
   }
 
   @override
   void dispose() {
-    tabIndexNotifier.removeListener(_onTabChanged);
-    blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
+    blockService.blockedIdsNotifier.addListener(_onBlocksChanged);
     super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (tabIndexNotifier.value == 3) {
-      _fetchSavedProfiles();
-    }
   }
 
   void _onBlocksChanged() {
     if (mounted) {
       setState(() {
-        _savedProfiles = _savedProfiles.where((p) => !blockService.isBlocked(p['id'])).toList();
+        _friends = _friends.where((p) => !blockService.isBlocked(p['id'])).toList();
       });
     }
   }
 
   Future<void> _loadData() async {
     await blockService.refreshBlockedList();
-    await _fetchSavedProfiles();
+    await _fetchFriends();
   }
 
-  Future<void> _fetchSavedProfiles() async {
+  Future<void> _fetchFriends() async {
     try {
       final supabase = Supabase.instance.client;
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
+      final currentUser = supabase.auth.currentUser;
+      final targetId = widget.userId ?? currentUser?.id;
+      
+      if (targetId == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
-      // 1. Fetch saved user IDs first (most reliable)
-      final savedRowsResponse = await supabase
-          .from('saved_profiles')
-          .select('saved_user_id')
-          .eq('user_id', user.id);
+      // 1. Fetch friend IDs
+      final response = await supabase
+          .from('friends')
+          .select('user1_id, user2_id')
+          .or('user1_id.eq.$targetId,user2_id.eq.$targetId');
 
-      final List<Map<String, dynamic>> savedRows = List<Map<String, dynamic>>.from(savedRowsResponse as List);
-      final List<String> savedUserIds = savedRows
-          .map((item) => item['saved_user_id']?.toString())
-          .where((id) => id != null)
+      final List<dynamic> data = response as List<dynamic>;
+      final List<String> userIds = data
+          .map((item) => item['user1_id'] == targetId ? item['user2_id'] : item['user1_id'])
           .cast<String>()
           .toList();
 
-      if (savedUserIds.isEmpty) {
+      if (userIds.isEmpty) {
         if (mounted) {
           setState(() {
-            _savedProfiles = [];
+            _friends = [];
             _userStreaks = {};
             _isLoading = false;
           });
@@ -82,41 +79,45 @@ class _SavedScreenState extends State<SavedScreen> {
         return;
       }
 
-      // 2. Fetch profiles and streaks
-      // Splitting these to avoid Future.wait type issues and using correct method name inFilter
+      // 2. Fetch profiles for these IDs
       final profilesResponse = await supabase
           .from('profiles')
           .select('id, username, name, avatar_url, premium_plan')
-          .inFilter('id', savedUserIds);
-
-      final streaksResponse = await supabase
-          .from('user_streaks')
-          .select('user1_id, user2_id, streak_count')
-          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
+          .inFilter('id', userIds);
 
       final List<Map<String, dynamic>> profiles = List<Map<String, dynamic>>.from(profilesResponse as List);
-      final List<Map<String, dynamic>> streaks = List<Map<String, dynamic>>.from(streaksResponse as List);
 
+      // 3. Fetch streaks for current user
       final Map<String, int> streaksMap = {};
-      for (var row in streaks) {
-        final u1 = row['user1_id'] as String;
-        final u2 = row['user2_id'] as String;
-        streaksMap[(u1 == user.id) ? u2 : u1] = row['streak_count'] as int;
+      if (currentUser != null) {
+        try {
+          final streaksResponse = await supabase
+              .from('user_streaks')
+              .select('user1_id, user2_id, streak_count')
+              .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
+          
+          final List<dynamic> streaksData = streaksResponse as List<dynamic>;
+          for (var row in streaksData) {
+            final u1 = row['user1_id'] as String;
+            final u2 = row['user2_id'] as String;
+            streaksMap[(u1 == currentUser.id) ? u2 : u1] = row['streak_count'] as int;
+          }
+        } catch (e) {
+          debugPrint("Streaks fetch error: $e");
+        }
       }
 
       if (mounted) {
         setState(() {
-          // Maintain order of saved items or just show what's found
-          _savedProfiles = profiles
+          _friends = profiles
               .where((p) => !blockService.isBlocked(p['id']))
               .toList();
           _userStreaks = streaksMap;
           _isLoading = false;
         });
       }
-    } catch (e, st) {
-      debugPrint('ERROR: $e');
-      debugPrintStack(stackTrace: st);
+    } catch (e) {
+      debugPrint('ERROR fetching friends: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -127,7 +128,7 @@ class _SavedScreenState extends State<SavedScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text("Following (${_savedProfiles.length})", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        title: Text("Friends (${_friends.length})", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -138,12 +139,12 @@ class _SavedScreenState extends State<SavedScreen> {
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
                 onRefresh: _loadData,
-                child: _savedProfiles.isEmpty
-                    ? const Center(child: Text("Not following anyone yet."))
+                child: _friends.isEmpty
+                    ? const Center(child: Text("No friends yet."))
                     : ListView.builder(
-                        itemCount: _savedProfiles.length,
+                        itemCount: _friends.length,
                         itemBuilder: (context, index) {
-                          final profile = _savedProfiles[index];
+                          final profile = _friends[index];
                           final avatarUrl = profile['avatar_url'];
                           final streak = _userStreaks[profile['id']] ?? 0;
                           final plan = profile['premium_plan'];

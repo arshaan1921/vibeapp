@@ -150,19 +150,12 @@ class _UpdatePopupState extends State<UpdatePopup> with TickerProviderStateMixin
                                 ),
                               ],
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(60),
-                              child: Image.asset(
-                                'assets/logo.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => Container(
-                                  color: const Color(0xFF0A3321),
-                                  child: const Icon(
-                                    Icons.auto_awesome,
-                                    size: 60,
-                                    color: Color(0xFFFFD700),
-                                  ),
-                                ),
+                            child: Container(
+                              color: const Color(0xFF0A3321),
+                              child: const Icon(
+                                Icons.auto_awesome,
+                                size: 60,
+                                color: Color(0xFFFFD700),
                               ),
                             ),
                           ),

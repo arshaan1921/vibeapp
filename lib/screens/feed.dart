@@ -13,6 +13,7 @@ import '../screens/replies_activity.dart';
 import '../screens/questions_screen.dart';
 import '../features/games/games_screen.dart';
 import '../services/game_service.dart';
+import '../features/snap/screens/camera_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -23,6 +24,7 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBindingObserver {
   List<AnswerModel> _feedItems = [];
+  Set<String> _friendIds = {};
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
   
@@ -287,6 +289,12 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
 
   void _sortFeed() {
     _feedItems.sort((a, b) {
+      final aIsFriend = _friendIds.contains(a.userId);
+      final bIsFriend = _friendIds.contains(b.userId);
+      
+      if (aIsFriend && !bIsFriend) return -1;
+      if (!aIsFriend && bIsFriend) return 1;
+      
       return b.createdAt.compareTo(a.createdAt);
     });
   }
@@ -298,6 +306,18 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
       final user = supabase.auth.currentUser;
       final currentUserId = user?.id;
       
+      // Fetch friends
+      if (currentUserId != null) {
+        final friendsRes = await supabase
+            .from('friends')
+            .select('user1_id, user2_id')
+            .or('user1_id.eq.$currentUserId,user2_id.eq.$currentUserId');
+        
+        _friendIds = (friendsRes as List).map((f) {
+          return f['user1_id'] == currentUserId ? f['user2_id'].toString() : f['user1_id'].toString();
+        }).toSet();
+      }
+
       print('FEED_TRACE: Querying Supabase...');
       final response = await supabase
           .from('answers')

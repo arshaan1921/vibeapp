@@ -578,7 +578,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
           ),
           const SizedBox(height: 4),
           Text(
-            "${person['likes_count'] ?? 0} Follows",
+            "${person['likes_count'] ?? 0} Likes",
             style: TextStyle(
               fontSize: 12,
               color: theme.colorScheme.primary,
@@ -636,7 +636,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("${person['likes_count'] ?? 0} Follows", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text("${person['likes_count'] ?? 0} Likes", style: const TextStyle(fontSize: 12, color: Colors.grey)),
           if (showDate && person['created_at'] != null)
             Text("Joined ${DateTime.parse(person['created_at']).toLocal().toString().split(' ')[0]}", style: const TextStyle(fontSize: 10)),
         ],

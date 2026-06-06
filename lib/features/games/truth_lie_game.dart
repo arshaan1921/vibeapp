@@ -222,16 +222,16 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
         return;
       }
 
-      final savedRows = await supabase
-          .from('saved_profiles')
-          .select('saved_user_id')
-          .eq('user_id', user.id);
+      final friendsRes = await supabase
+          .from('friends')
+          .select('user1_id, user2_id')
+          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
 
-      final List<String> savedUserIds = (savedRows as List)
-          .map((item) => item['saved_user_id'] as String)
+      final List<String> friendIds = (friendsRes as List)
+          .map((item) => item['user1_id'] == user.id ? item['user2_id'].toString() : item['user1_id'].toString())
           .toList();
 
-      if (savedUserIds.isEmpty) {
+      if (friendIds.isEmpty) {
         if (mounted) {
           setState(() {
             _friends = [];
@@ -244,7 +244,7 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
       final profilesResponse = await supabase
           .from('profiles')
           .select('*')
-          .inFilter('id', savedUserIds);
+          .inFilter('id', friendIds);
 
       if (mounted) {
         setState(() {
@@ -287,7 +287,7 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
                     children: [
                       Icon(Icons.person_search_rounded, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
                       const SizedBox(height: 16),
-                      Text("Not following anyone yet.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
+                      Text("No friends found yet.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
                     ],
                   ),
                 )
