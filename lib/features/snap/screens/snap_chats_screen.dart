@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../../main.dart';
 import '../../../utils/image_utils.dart';
 import '../../../screens/profile.dart';
 import 'camera_screen.dart';
@@ -15,24 +16,56 @@ class SnapChatsScreen extends StatefulWidget {
   State<SnapChatsScreen> createState() => _SnapChatsScreenState();
 }
 
-class _SnapChatsScreenState extends State<SnapChatsScreen> {
+class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
   List<Map<String, dynamic>> _chats = [];
   int _pendingRequestsCount = 0;
   RealtimeChannel? _realtimeChannel;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _subscribeToRealtime();
+    tabIndexNotifier.addListener(_onTabChanged);
+    
+    // Auto refresh every 30 seconds as fallback
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted && tabIndexNotifier.value == 3) {
+        _loadData();
+      }
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
+    tabIndexNotifier.removeListener(_onTabChanged);
+    routeObserver.unsubscribe(this);
     _realtimeChannel?.unsubscribe();
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when the top route has been popped off, and this route shows up again.
+    debugPrint('CHAT_SCREEN: Returned to screen, refreshing...');
+    _loadData();
+  }
+
+  void _onTabChanged() {
+    if (tabIndexNotifier.value == 3) {
+      debugPrint('CHAT_SCREEN: Tab selected, refreshing data');
+      _loadData();
+    }
   }
 
   void _subscribeToRealtime() {

@@ -19,8 +19,6 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
   List<Map<String, dynamic>> _quickSend = [];
   Map<String, int> _userStreaks = {};
   final Set<String> _selectedUserIds = {};
-  bool _postToPublicStory = false;
-  bool _postToFriendsStory = false;
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -174,7 +172,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
   }
 
   Future<void> _sendSnap() async {
-    if (_selectedUserIds.isEmpty && !_postToPublicStory && !_postToFriendsStory) return;
+    if (_selectedUserIds.isEmpty) return;
     
     setState(() => _isLoading = true);
 
@@ -202,7 +200,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
             'sender_id': user.id,
             'image_url': imageUrl,
             'caption': '', 
-            'is_story': _postToPublicStory || _postToFriendsStory,
+            'is_story': false,
           })
           .select()
           .single();
@@ -260,7 +258,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final totalSelected = _selectedUserIds.length + (_postToPublicStory ? 1 : 0) + (_postToFriendsStory ? 1 : 0);
+    final totalSelected = _selectedUserIds.length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -305,23 +303,6 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
                     children: [
                       // Horizontal Selected Users row (if any)
                       if (_selectedUserIds.isNotEmpty) _buildSelectedUsersRow(),
-
-                      // POST TO STORY
-                      _buildSectionHeader("POST TO STORY"),
-                      _buildStoryTile(
-                        title: "Public Story", 
-                        subtitle: "Visible to everyone", 
-                        icon: Icons.public_rounded,
-                        isSelected: _postToPublicStory,
-                        onTap: () => setState(() => _postToPublicStory = !_postToPublicStory),
-                      ),
-                      _buildStoryTile(
-                        title: "Friends Story", 
-                        subtitle: "Visible to friends only",
-                        icon: Icons.group_rounded,
-                        isSelected: _postToFriendsStory,
-                        onTap: () => setState(() => _postToFriendsStory = !_postToFriendsStory),
-                      ),
 
                       // QUICK SEND
                       if (_quickSend.isNotEmpty) ...[

@@ -82,6 +82,15 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
     try {
       final XFile file = await _controller!.takePicture();
+      
+      // Automatically turn off flash/torch after capturing
+      if (_flashMode != FlashMode.off) {
+        await _controller!.setFlashMode(FlashMode.off);
+        setState(() {
+          _flashMode = FlashMode.off;
+        });
+      }
+
       if (mounted) {
         Navigator.push(
           context,
