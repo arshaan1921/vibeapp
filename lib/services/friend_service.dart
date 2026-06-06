@@ -161,10 +161,7 @@ class FriendService {
           .select('id')
           .or('user1_id.eq.$userId,user2_id.eq.$userId');
       
-      if (res is List) {
-        return res.length;
-      }
-      return 0;
+      return (res as List).length;
     } catch (e) {
       debugPrint('FRIEND_SERVICE_ERROR: getFriendsCount fail: $e');
       return 0;

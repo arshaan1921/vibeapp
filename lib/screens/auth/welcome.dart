@@ -27,10 +27,18 @@ class WelcomeScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(),
-              Icon(
-                Icons.emoji_people_rounded,
-                size: 140,
-                color: Color(0xFFFFD700),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(32),
+                child: Image.asset(
+                  'assets/app_icon.png',
+                  width: 140,
+                  height: 140,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.emoji_people_rounded,
+                    size: 140,
+                    color: Color(0xFFFFD700),
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
               RichText(

@@ -159,6 +159,15 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           }
         }
       },
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'friends',
+      callback: (payload) {
+        debugPrint('FRIEND_AUDIT: Friends table changed, refreshing count');
+        _fetchFriendsCount();
+        _checkFriendship();
+      },
     ).subscribe();
   }
 
@@ -765,7 +774,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                   ).then((_) => _loadData());
                                 },
                                 borderRadius: BorderRadius.circular(12),
-                                child: _buildStatItem("Friends", _friendsCount.toString()),
+                                child: _buildStatItem(_friendsCount == 1 ? "Friend" : "Friends", _friendsCount.toString()),
                               ),
                             ),
                             Container(width: 1, height: 30, color: Colors.grey.withOpacity(0.2)),
@@ -806,13 +815,18 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                 child: FittedBox(
                                   child: Text(
                                     _friendshipStatus == 'friends' 
-                                        ? "FRIENDS ✓" 
+                                        ? "FRIENDS" 
                                         : _friendshipStatus == 'pending_sent'
                                             ? "REQUESTED"
                                             : _friendshipStatus == 'pending_received'
                                                 ? "ACCEPT"
                                                 : "ADD FRIEND",
-                                    style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: TextStyle(
+                                      color: theme.colorScheme.primary, 
+                                      fontWeight: FontWeight.bold, 
+                                      fontSize: 14,
+                                      letterSpacing: 1,
+                                    ),
                                   ),
                                 ),
                               ),

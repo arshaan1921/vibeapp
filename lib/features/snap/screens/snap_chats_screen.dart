@@ -411,7 +411,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
             MaterialPageRoute(builder: (_) => const CameraScreen()),
           );
         },
-        backgroundColor: const Color(0xFF00E676),
+        backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 4,
         child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 28),
       ),

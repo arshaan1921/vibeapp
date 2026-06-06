@@ -88,8 +88,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       
       // Fetch dynamic stats
       if (data != null) {
-        _fetchStats();
-        _fetchAnswers();
+        await Future.wait([
+          _fetchStats(),
+          _fetchAnswers(),
+        ]);
       }
     } catch (e) {
       if (mounted) {
@@ -557,13 +559,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     child: FittedBox(
                       child: Text(
                         _friendshipStatus == 'friends' 
-                            ? "FRIENDS ✓" 
+                            ? "FRIENDS" 
                             : _friendshipStatus == 'pending_sent'
                                 ? "REQUESTED"
                                 : _friendshipStatus == 'pending_received'
                                     ? "ACCEPT"
                                     : "ADD FRIEND",
-                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.black87, 
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 14,
+                          letterSpacing: 1,
+                        ),
                       ),
                     ),
                   ),
@@ -577,7 +584,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStat("Friends", "${profileData!['friends_count'] ?? 0}"),
+              _buildStat(
+                (profileData!['friends_count'] ?? 0) == 1 ? "Friend" : "Friends", 
+                "${profileData!['friends_count'] ?? 0}"
+              ),
               _buildStat("Likes", "${profileData!['likes_count'] ?? 0}"),
               _buildStat("Answers", "${profileData!['answers_count'] ?? 0}"),
             ],

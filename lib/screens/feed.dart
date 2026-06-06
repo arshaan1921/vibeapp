@@ -24,7 +24,6 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBindingObserver {
   List<AnswerModel> _feedItems = [];
-  Set<String> _friendIds = {};
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
   
@@ -288,15 +287,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
   }
 
   void _sortFeed() {
-    _feedItems.sort((a, b) {
-      final aIsFriend = _friendIds.contains(a.userId);
-      final bIsFriend = _friendIds.contains(b.userId);
-      
-      if (aIsFriend && !bIsFriend) return -1;
-      if (!aIsFriend && bIsFriend) return 1;
-      
-      return b.createdAt.compareTo(a.createdAt);
-    });
+    _feedItems.sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
   Future<void> _fetchFeed() async {
@@ -306,18 +297,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
       final user = supabase.auth.currentUser;
       final currentUserId = user?.id;
       
-      // Fetch friends
-      if (currentUserId != null) {
-        final friendsRes = await supabase
-            .from('friends')
-            .select('user1_id, user2_id')
-            .or('user1_id.eq.$currentUserId,user2_id.eq.$currentUserId');
-        
-        _friendIds = (friendsRes as List).map((f) {
-          return f['user1_id'] == currentUserId ? f['user2_id'].toString() : f['user1_id'].toString();
-        }).toSet();
-      }
-
       print('FEED_TRACE: Querying Supabase...');
       final response = await supabase
           .from('answers')

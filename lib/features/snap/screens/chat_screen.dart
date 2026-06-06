@@ -124,6 +124,11 @@ class _ChatScreenState extends State<ChatScreen> {
       final List<Map<String, dynamic>> sentSnaps = List<Map<String, dynamic>>.from(sentSnapsRes as List);
       final List<Map<String, dynamic>> msgsData = List<Map<String, dynamic>>.from(messagesResponse as List);
 
+      if (msgsData.isNotEmpty) {
+        debugPrint('DEBUG_MSG_KEYS: ${msgsData.first.keys.toList()}');
+        debugPrint('DEBUG_MSG_FULL: ${msgsData.first}');
+      }
+
       debugPrint('CHAT_SCREEN receivedSnaps=${receivedSnaps.length}');
       debugPrint('CHAT_SCREEN sentSnaps=${sentSnaps.length}');
       debugPrint('CHAT_LOAD messages count=${msgsData.length}');
@@ -172,8 +177,31 @@ class _ChatScreenState extends State<ChatScreen> {
           _messages.addAll(allMessages);
         });
       }
+
+      // Mark text messages as read if we have any incoming ones
+      final hasUnreadMessages = msgsData.any((m) => m['receiver_id'] == user.id && m['read_at'] == null);
+      if (hasUnreadMessages) {
+        _markMessagesAsRead();
+      }
     } catch (e) {
       debugPrint("Error loading messages: $e");
+    }
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      await supabase
+          .from('messages')
+          .update({'read_at': DateTime.now().toIso8601String()})
+          .eq('receiver_id', user.id)
+          .eq('sender_id', widget.userId)
+          .isFilter('read_at', null);
+    } catch (e) {
+      debugPrint("Error marking messages as read: $e");
     }
   }
 
@@ -315,6 +343,7 @@ class _ChatScreenState extends State<ChatScreen> {
     debugPrint('SNAP_URL=${message.imageUrl}');
 
     final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
     IconData icon;
     Color color;
     String text;
@@ -323,22 +352,22 @@ class _ChatScreenState extends State<ChatScreen> {
       case SnapStatus.sent:
       case SnapStatus.delivered:
         icon = isMe ? Icons.play_arrow_rounded : Icons.play_arrow_rounded;
-        color = Colors.redAccent;
+        color = primaryColor;
         text = isMe ? "Delivered" : "Received a snap";
         break;
       case SnapStatus.opened:
         icon = Icons.play_arrow_outlined;
-        color = Colors.redAccent;
+        color = primaryColor.withOpacity(0.7);
         text = isMe ? "Opened" : "Opened";
         break;
       case SnapStatus.screenshot:
         icon = Icons.screenshot_rounded;
-        color = Colors.greenAccent;
+        color = theme.colorScheme.secondary;
         text = "Screenshot";
         break;
       default:
         icon = Icons.camera_alt_rounded;
-        color = Colors.redAccent;
+        color = primaryColor;
         text = "Snap";
     }
 
@@ -428,11 +457,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildTextItem(SnapMessage message, bool isMe) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
     return Container(
       constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isMe ? const Color(0xFF00E676) : const Color(0xFFF1F1F1),
+        color: isMe ? primaryColor : const Color(0xFFF1F1F1),
         borderRadius: BorderRadius.circular(20).copyWith(
           bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(20),
           bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(0),
@@ -453,44 +485,102 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputArea() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.colorScheme.primary;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF121212) : Colors.white,
+        border: Border(
+          top: BorderSide(
+            color: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+            width: 0.5,
+          ),
+        ),
       ),
       child: SafeArea(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            IconButton(
-              icon: const Icon(Icons.camera_alt_rounded, color: Colors.grey), 
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraScreen()));
-              }
-            ),
-            Expanded(
+            // Camera Icon
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: 44,
+                width: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F1),
-                  borderRadius: BorderRadius.circular(24),
+                  color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF5F5F5),
+                  shape: BoxShape.circle,
                 ),
-                child: TextField(
-                  controller: _textController,
-                  decoration: const InputDecoration(
-                    hintText: "Send a Chat",
-                    hintStyle: TextStyle(color: Colors.grey, fontSize: 15),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  onSubmitted: (_) => _sendMessage(),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.camera_alt_rounded, 
+                    color: isDark ? Colors.white70 : Colors.grey[600],
+                    size: 22,
+                  ), 
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraScreen()));
+                  }
                 ),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.send_rounded, color: Color(0xFF00E676)),
-              onPressed: _sendMessage,
+            const SizedBox(width: 12),
+            
+            // Text Input Pill
+            Expanded(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: TextField(
+                  controller: _textController,
+                  maxLines: 5,
+                  minLines: 1,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black87,
+                    fontSize: 15,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: "Send a Chat",
+                    hintStyle: TextStyle(
+                      color: isDark ? Colors.white24 : Colors.grey[500], 
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    filled: false,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            
+            // Send Button
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _textController,
+              builder: (context, value, _) {
+                final hasText = value.text.trim().isNotEmpty;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.send_rounded, 
+                      color: primaryColor,
+                      size: 28,
+                    ),
+                    onPressed: hasText ? _sendMessage : null,
+                  ),
+                );
+              },
             ),
           ],
         ),
