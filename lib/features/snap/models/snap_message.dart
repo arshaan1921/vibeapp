@@ -1,7 +1,8 @@
 enum SnapStatus { sent, delivered, opened, screenshot }
 
 class SnapMessage {
-  final String id;
+  final String id; // snap_recipients ID
+  final String? snapId; // snaps ID
   final String senderId;
   final String receiverId;
   final String? text;
@@ -13,6 +14,7 @@ class SnapMessage {
 
   SnapMessage({
     required this.id,
+    this.snapId,
     required this.senderId,
     required this.receiverId,
     this.text,

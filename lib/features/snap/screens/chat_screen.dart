@@ -141,6 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
         
         final msg = SnapMessage(
           id: s['id'],
+          snapId: s['snap_id'],
           senderId: snap['sender_id'],
           receiverId: s['recipient_id'],
           imageUrl: snap['image_url'],
@@ -379,34 +380,50 @@ class _ChatScreenState extends State<ChatScreen> {
     if (user == null || message.imageUrl == null) return;
 
     final bool isMe = message.senderId == user.id;
-    
-    // Only allow opening if it's received and unopened, OR if it's already opened (Snapchat allows re-viewing sometimes, but let's stick to "tap to open new ones")
-    if (!isMe && message.status != SnapStatus.opened) {
-      // 1. Navigate to viewer
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => SnapViewerScreen(imageUrl: message.imageUrl!)),
-      );
 
-      // 2. Mark as opened in DB
+    // If it's already opened, do nothing as per requirement
+    if (message.status == SnapStatus.opened) {
+      debugPrint('SNAP_OPEN: Snap already opened, ignoring tap');
+      return;
+    }
+
+    // 1. Navigate to viewer
+    debugPrint('SNAP_OPEN: Opening snap ${message.snapId}');
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => SnapViewerScreen(imageUrl: message.imageUrl!)),
+    );
+
+    // Only proceed with status update and storage deletion for received snaps
+    if (!isMe) {
       try {
         final supabase = Supabase.instance.client;
+
+        // 2. Extract file path correctly from image_url
+        // URL format: .../public/snaps/USER_ID/FILENAME.jpg
+        final String filePath = message.imageUrl!.split('/public/snaps/').last;
+        debugPrint('SNAP_DELETE: Removing storage file $filePath');
+
+        // 3. Delete from Supabase Storage
+        await supabase.storage.from('snaps').remove([filePath]);
+
+        // 4. Update status in DB (Do not delete rows)
+        debugPrint('SNAP_DELETE: Updating snap_recipients status to opened');
         await supabase
             .from('snap_recipients')
-            .update({'status': 'opened', 'opened_at': DateTime.now().toIso8601String()})
+            .update({
+              'status': 'opened', 
+              'opened_at': DateTime.now().toIso8601String()
+            })
             .eq('id', message.id);
+
+        debugPrint('SNAP_DELETE: Success');
         
-        // Refresh local UI
+        // Refresh local UI to show "Opened" instead of deleting
         _loadMessages();
       } catch (e) {
-        debugPrint("Error marking snap as opened: $e");
+        debugPrint('SNAP_DELETE_ERROR: $e');
       }
-    } else if (message.status == SnapStatus.opened || isMe) {
-      // For opened snaps or my own sent snaps, just show the viewer without updating status
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => SnapViewerScreen(imageUrl: message.imageUrl!)),
-      );
     }
   }
 
