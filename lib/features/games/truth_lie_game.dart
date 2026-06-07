@@ -4,8 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/user.dart';
 import '../../services/notification_service.dart';
 import '../../services/block_service.dart';
+import '../../utils/image_utils.dart';
+import 'friend_selection_screen.dart';
 
-// --- MAIN ENTRY (LOBBY) ---
+// ==================================================
+// 1. TRUTH LIE LOBBY
+// ==================================================
 class TruthLieLobby extends StatefulWidget {
   const TruthLieLobby({super.key});
   @override
@@ -25,11 +29,7 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
 
   Future<void> _fetchGames() async {
     final userId = supabase.auth.currentUser?.id;
-    if (userId == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
+    if (userId == null) return;
     try {
       final response = await supabase
           .from('truth_lie_games')
@@ -38,47 +38,41 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
           .eq('status', 'active')
           .order('created_at', ascending: false);
 
+      final List<Map<String, dynamic>> games = List<Map<String, dynamic>>.from(response);
+
+      for (var game in games) {
+        final creatorId = game['creator_id'];
+        final creator = await supabase
+            .from('profiles')
+            .select()
+            .eq('id', creatorId)
+            .single();
+        game['creator'] = creator;
+      }
+
       if (mounted) {
         setState(() {
-          _activeGames = List<Map<String, dynamic>>.from(response);
+          _activeGames = games;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching games: $e');
+      debugPrint('Error: $e');
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _deleteGame(String gameId) async {
-    try {
-      await supabase.from('truth_lie_games').delete().eq('id', gameId);
-      if (mounted) {
-        setState(() {
-          _activeGames.removeWhere((g) => g['id'] == gameId);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Game deleted")));
-      }
-    } catch (e) {
-      debugPrint("Error deleting game: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete game: $e")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = supabase.auth.currentUser?.id;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
       appBar: AppBar(
-        title: const Text("TWO TRUTHS & ONE LIE", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        centerTitle: true,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
+        centerTitle: true,
+        title: const Text("TRUTH OR LIE", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -89,249 +83,113 @@ class _TruthLieLobbyState extends State<TruthLieLobby> {
           : RefreshIndicator(
               onRefresh: _fetchGames,
               child: _activeGames.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.fact_check_outlined, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
-                          const SizedBox(height: 16),
-                          Text("No active games. Start one with friends!", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
-                        ],
-                      ),
-                    )
+                  ? _buildEmptyState(isDark)
                   : ListView.builder(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
                       itemCount: _activeGames.length,
                       itemBuilder: (context, index) {
                         final game = _activeGames[index];
-                        final isCreator = game['creator_id'] == currentUserId;
-                        final bool isUnseen = game['truth_lie_participants'] != null && 
-                                              (game['truth_lie_participants'] as List).any((p) => p['user_id'] == currentUserId && p['is_seen'] == false);
+                        final creator = game['creator'];
+                        final bool isUnseen = (game['truth_lie_participants'] as List).any((p) => p['user_id'] == supabase.auth.currentUser?.id && p['is_seen'] == false);
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: isUnseen ? 4 : 1,
-                          color: theme.cardColor,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            title: Row(
-                              children: [
-                                if (isUnseen) 
-                                  const Padding(
-                                    padding: EdgeInsets.only(right: 8.0),
-                                    child: CircleAvatar(radius: 4, backgroundColor: Colors.red),
-                                  ),
-                                Expanded(
-                                  child: Text(
-                                    "Game ${index + 1}", 
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.textTheme.titleMedium?.color,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            subtitle: Text(
-                              "Started on ${game['created_at'].toString().split('T')[0]}",
-                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isCreator)
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text("Delete Game?"),
-                                          content: const Text("Are you sure you want to delete this game? This action cannot be undone."),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.pop(context);
-                                                _deleteGame(game['id']);
-                                              },
-                                              child: const Text("DELETE", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                Icon(Icons.chevron_right, color: isDark ? Colors.white24 : Colors.black26),
-                              ],
-                            ),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TruthLiePlay(gameId: game['id']))).then((_) => _fetchGames()),
-                          ),
+                        return _LobbyGameCard(
+                          creator: creator,
+                          isUnseen: isUnseen,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => TruthLiePlay(gameId: game['id'])),
+                          ).then((_) => _fetchGames()),
                         );
                       },
                     ),
             ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20),
           child: ElevatedButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TruthLieFriendSelect())).then((_) => _fetchGames()),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TruthLieWizard())),
             style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 54),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: theme.primaryColor,
+              backgroundColor: const Color(0xFF3B82F6),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 60),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 8,
+              shadowColor: const Color(0xFF3B82F6).withOpacity(0.4),
             ),
-            child: const Text("NEW GAME", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            child: const Text("CREATE NEW GAME", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.psychology_alt_rounded, size: 80, color: isDark ? Colors.white10 : Colors.grey[200]),
+          const SizedBox(height: 24),
+          Text("No Games to Guess", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black)),
+          const SizedBox(height: 8),
+          const Text("Wait for friends to start a game or start one!", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
 }
 
-// --- FRIEND SELECTION ---
-class TruthLieFriendSelect extends StatefulWidget {
-  const TruthLieFriendSelect({super.key});
-  @override
-  State<TruthLieFriendSelect> createState() => _TruthLieFriendSelectState();
-}
+class _LobbyGameCard extends StatelessWidget {
+  final Map<String, dynamic> creator;
+  final bool isUnseen;
+  final VoidCallback onTap;
 
-class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
-  final supabase = Supabase.instance.client;
-  List<AppUser> _friends = [];
-  final Set<String> _selectedIds = {};
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    await blockService.refreshBlockedList();
-    await _fetchFriends();
-  }
-
-  Future<void> _fetchFriends() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
-
-      final friendsRes = await supabase
-          .from('friends')
-          .select('user1_id, user2_id')
-          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
-
-      final List<String> friendIds = (friendsRes as List)
-          .map((item) => item['user1_id'] == user.id ? item['user2_id'].toString() : item['user1_id'].toString())
-          .toList();
-
-      if (friendIds.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _friends = [];
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      final profilesResponse = await supabase
-          .from('profiles')
-          .select('*')
-          .inFilter('id', friendIds);
-
-      if (mounted) {
-        setState(() {
-          _friends = (profilesResponse as List)
-              .map((p) => AppUser.fromJson(p))
-              .where((f) => !blockService.isBlocked(f.id))
-              .toList();
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching friends: $e");
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  const _LobbyGameCard({required this.creator, required this.isUnseen, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text("SELECT FRIENDS", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF16181D) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isUnseen ? const Color(0xFF3B82F6).withOpacity(0.5) : (isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)), width: 2),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _friends.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.person_search_rounded, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text("No friends found yet.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
-                    ],
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _friends.length,
-                  separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
-                  itemBuilder: (context, index) {
-                    final f = _friends[index];
-                    final isSelected = _selectedIds.contains(f.id);
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: (f.avatarUrl != null && f.avatarUrl!.isNotEmpty) ? NetworkImage(f.avatarUrl!) : null,
-                        child: (f.avatarUrl == null || f.avatarUrl!.isEmpty) ? const Icon(Icons.person) : null,
-                      ),
-                      title: Text(
-                        f.username.isNotEmpty ? f.username : (f.name ?? "User"), 
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: theme.textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      trailing: Icon(
-                        isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: isSelected ? theme.primaryColor : (isDark ? Colors.white24 : Colors.grey),
-                      ),
-                      onTap: () => setState(() => isSelected ? _selectedIds.remove(f.id) : _selectedIds.add(f.id)),
-                    );
-                  },
-                ),
-      bottomNavigationBar: SafeArea(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ElevatedButton(
-            onPressed: _selectedIds.isEmpty ? null : () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => TruthLieSetup(selectedFriends: _friends.where((f) => _selectedIds.contains(f.id)).toList())));
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 54),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: theme.primaryColor,
-              disabledBackgroundColor: isDark ? Colors.white10 : Colors.grey[300],
-            ),
-            child: Text("NEW GAME (${_selectedIds.length})", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: ImageUtils.getImageProvider(creator['avatar_url']),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      creator['name'] ?? creator['username'],
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isUnseen ? "Find the lie! 🤥" : "Active Game",
+                      style: TextStyle(color: isUnseen ? const Color(0xFF3B82F6) : Colors.grey, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+            ],
           ),
         ),
       ),
@@ -339,74 +197,47 @@ class _TruthLieFriendSelectState extends State<TruthLieFriendSelect> {
   }
 }
 
-// --- SETUP SCREEN ---
-class TruthLieSetup extends StatefulWidget {
-  final List<AppUser> selectedFriends;
-  const TruthLieSetup({super.key, required this.selectedFriends});
+// ==================================================
+// 2. TRUTH LIE WIZARD (MODERN CARD BUILDER)
+// ==================================================
+class TruthLieWizard extends StatefulWidget {
+  const TruthLieWizard({super.key});
   @override
-  State<TruthLieSetup> createState() => _TruthLieSetupState();
+  State<TruthLieWizard> createState() => _TruthLieWizardState();
 }
 
-class _TruthLieSetupState extends State<TruthLieSetup> {
-  final supabase = Supabase.instance.client;
-  final List<TextEditingController> _optCtrls = [
-    TextEditingController(), // Truth 1
-    TextEditingController(), // Truth 2
-    TextEditingController(), // Lie
-  ];
-  bool _isLoading = false;
-  Map<String, dynamic>? _userProfile;
+class _TruthLieWizardState extends State<TruthLieWizard> {
+  int _currentStep = 0;
+  List<AppUser> _selectedFriends = [];
+  final _truth1Ctrl = TextEditingController();
+  final _truth2Ctrl = TextEditingController();
+  final _lieCtrl = TextEditingController();
+  bool _isLaunching = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadUserProfile();
+  void _nextStep() {
+    setState(() => _currentStep++);
   }
 
-  Future<void> _loadUserProfile() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-    try {
-      final profile = await supabase.from('profiles').select().eq('id', user.id).single();
-      if (mounted) setState(() => _userProfile = profile);
-    } catch (e) {
-      debugPrint("Error loading profile: $e");
+  void _prevStep() {
+    if (_currentStep == 0) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _currentStep--);
     }
-  }
-
-  @override
-  void dispose() {
-    for (var c in _optCtrls) {
-      c.dispose();
-    }
-    super.dispose();
   }
 
   Future<void> _launchGame() async {
-    final truths = [_optCtrls[0].text.trim(), _optCtrls[1].text.trim()];
-    final lie = _optCtrls[2].text.trim();
-    
-    if (truths.any((t) => t.isEmpty) || lie.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
-      return;
-    }
+    if (_truth1Ctrl.text.isEmpty || _truth2Ctrl.text.isEmpty || _lieCtrl.text.isEmpty) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isLaunching = true);
     try {
+      final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser!.id;
       
-      // 1. Create game using 'creator_id'
-      final game = await supabase.from('truth_lie_games').insert({
-        'creator_id': userId,
-      }).select().single();
+      final game = await supabase.from('truth_lie_games').insert({'creator_id': userId}).select().single();
       final gameId = game['id'];
 
-      // 2. Fetch creator username
-      final creatorProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
-      final creatorUsername = creatorProfile['username'] ?? "Someone";
-
-      // 3. Add participants
-      final participantIds = {...widget.selectedFriends.map((f) => f.id), userId};
+      final participantIds = {..._selectedFriends.map((f) => f.id), userId};
       final participants = participantIds.map((id) => {
         'game_id': gameId, 
         'user_id': id,
@@ -414,24 +245,13 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
       }).toList();
       await supabase.from('truth_lie_participants').insert(participants);
 
-      // 4. Send notifications
-      for (final friendId in widget.selectedFriends.map((f) => f.id)) {
-        if (friendId != userId) {
-          NotificationService.sendGameNotification(
-            targetUserId: friendId,
-            creatorUsername: creatorUsername,
-          );
-        }
-      }
-
-      // 5. Add setup action
       await supabase.from('truth_lie_actions').insert({
         'game_id': gameId,
         'user_id': userId,
         'action_type': 'setup',
         'data': {
-          'truths': truths,
-          'lie': lie,
+          'truths': [_truth1Ctrl.text, _truth2Ctrl.text],
+          'lie': _lieCtrl.text,
         }
       });
 
@@ -443,126 +263,177 @@ class _TruthLieSetupState extends State<TruthLieSetup> {
         );
       }
     } catch (e) {
-      debugPrint("Error launching game: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-        setState(() => _isLoading = false);
-      }
+      debugPrint("Error: $e");
+      setState(() => _isLaunching = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
       appBar: AppBar(
-        title: const Text("SETUP GAME", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
         ),
+        title: _buildProgressIndicator(),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+      body: Column(
+        children: [
+          Expanded(
+            child: _buildCurrentStep(),
+          ),
+          _buildBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (index) {
+        final isActive = index <= _currentStep;
+        return Container(
+          width: 40,
+          height: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFF3B82F6) : Colors.grey.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildCurrentStep() {
+    switch (_currentStep) {
+      case 0:
+        return GameFriendSelectionScreen(
+          onContinue: (friends) {
+            setState(() => _selectedFriends = friends);
+            _nextStep();
+          },
+        );
+      case 1:
+        return _buildBuilderStep();
+      case 2:
+        return _buildReviewStep();
+      default:
+        return const SizedBox();
+    }
+  }
+
+  Widget _buildBuilderStep() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Create Your Statements", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          const Text("Write two things that are true and one lie.", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 32),
+          
+          _buildStatementInput(_truth1Ctrl, "Truth #1", Colors.green, isDark),
+          const SizedBox(height: 16),
+          _buildStatementInput(_truth2Ctrl, "Truth #2", Colors.green, isDark),
+          const SizedBox(height: 16),
+          _buildStatementInput(_lieCtrl, "The Lie", Colors.red, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatementInput(TextEditingController ctrl, String label, Color accent, bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF16181D) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accent.withOpacity(0.3), width: 2),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: accent, letterSpacing: 1)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: ctrl,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            decoration: const InputDecoration(
+              hintText: "Write here...",
+              border: InputBorder.none,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewStep() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_userProfile != null) ...[
-              CircleAvatar(
-                radius: 40,
-                backgroundImage: (_userProfile!['avatar_url'] != null && _userProfile!['avatar_url'] != '')
-                    ? NetworkImage(_userProfile!['avatar_url'])
-                    : null,
-                child: (_userProfile!['avatar_url'] == null || _userProfile!['avatar_url'] == '')
-                    ? const Icon(Icons.person, size: 40)
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                "@${_userProfile!['username'] ?? 'User'}", 
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 32),
-            ],
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Add two truths about yourself", 
-                style: TextStyle(
-                  fontSize: 16, 
-                  fontWeight: FontWeight.w500,
-                  color: theme.textTheme.bodyLarge?.color,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildInput(_optCtrls[0], "Truth 1"),
-            const SizedBox(height: 12),
-            _buildInput(_optCtrls[1], "Truth 2"),
+            const Icon(Icons.rocket_launch_rounded, size: 80, color: Color(0xFF3B82F6)),
             const SizedBox(height: 32),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Add one lie", 
-                style: TextStyle(
-                  fontSize: 16, 
-                  fontWeight: FontWeight.w500,
-                  color: theme.textTheme.bodyLarge?.color,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildInput(_optCtrls[2], "The Lie", isLie: true),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _launchGame,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 54),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _isLoading 
-                ? const CircularProgressIndicator(color: Colors.white) 
-                : const Text("LAUNCH GAME", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
+            const Text("Ready to Challenge?", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 24),
+            Text("Playing with ${_selectedFriends.length} friends", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInput(TextEditingController ctrl, String hint, {bool isLie = false}) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isLie ? Colors.redAccent.withOpacity(0.3) : (isDark ? Colors.white12 : Colors.greenAccent.withOpacity(0.3))),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
-      ),
-      child: TextField(
-        controller: ctrl,
-        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  Widget _buildBottomBar() {
+    if (_currentStep == 0) return const SizedBox();
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextButton(
+                onPressed: _prevStep,
+                child: const Text("BACK", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey)),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: _isLaunching ? null : (_currentStep == 2 ? _launchGame : _nextStep),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3B82F6),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 56),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                child: _isLaunching 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(_currentStep == 2 ? "LAUNCH" : "CONTINUE", style: const TextStyle(fontWeight: FontWeight.w900)),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// --- PLAY SCREEN ---
+// ==================================================
+// 3. TRUTH LIE PLAY (GAME SHOW EXPERIENCE)
+// ==================================================
 class TruthLiePlay extends StatefulWidget {
   final String gameId;
   const TruthLiePlay({super.key, required this.gameId});
@@ -573,68 +444,51 @@ class TruthLiePlay extends StatefulWidget {
 class _TruthLiePlayState extends State<TruthLiePlay> {
   final supabase = Supabase.instance.client;
   Map<String, dynamic>? _game;
-  Map<String, dynamic>? _creatorProfile;
-  List<String> _shuffledStatements = [];
-  int? _lieIndexInShuffled; 
+  Map<String, dynamic>? _creator;
+  List<String> _shuffled = [];
+  int? _lieIdx;
   bool _isLoading = true;
-  String? _votedForStatement;
+  String? _voted;
   bool _isExpired = false;
-  Map<int, int> _voteCounts = {0: 0, 1: 0, 2: 0};
+  Map<int, int> _votes = {0: 0, 1: 0, 2: 0};
   int _totalVotes = 0;
-  Timer? _countdownTimer;
-  String _timeRemaining = "";
 
   @override
   void initState() {
     super.initState();
-    _loadGame();
-    _markAsSeen();
+    _loadData();
+    _markSeen();
   }
 
-  @override
-  void dispose() {
-    _countdownTimer?.cancel();
-    super.dispose();
+  Future<void> _markSeen() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await supabase.from('truth_lie_participants').update({'is_seen': true}).match({'game_id': widget.gameId, 'user_id': userId});
   }
 
-  Future<void> _markAsSeen() async {
-    try {
-      final userId = supabase.auth.currentUser?.id;
-      if (userId == null) return;
-      await supabase
-          .from('truth_lie_participants')
-          .update({'is_seen': true})
-          .match({'game_id': widget.gameId, 'user_id': userId});
-    } catch (e) {
-      debugPrint("Error marking as seen: $e");
-    }
-  }
-
-  Future<void> _loadGame() async {
+  Future<void> _loadData() async {
     try {
       final userId = supabase.auth.currentUser!.id;
-      final game = await supabase.from('truth_lie_games').select().eq('id', widget.gameId).single();
+      final gameRes = await supabase.from('truth_lie_games').select().eq('id', widget.gameId).single();
       
-      final createdAt = DateTime.parse(game['created_at']);
-      final now = DateTime.now();
-      final isExpired = now.difference(createdAt).inHours >= 24;
+      final creatorId = gameRes['creator_id'];
+      final creator = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', creatorId)
+          .single();
+      gameRes['creator'] = creator;
 
-      if (!isExpired) {
-        _startCountdown(createdAt);
-      }
+      final setup = await supabase.from('truth_lie_actions').select().eq('game_id', widget.gameId).eq('action_type', 'setup').single();
+      final myVote = await supabase.from('truth_lie_actions').select().eq('game_id', widget.gameId).eq('user_id', userId).eq('action_type', 'vote').maybeSingle();
 
-      final creatorProfile = await supabase.from('profiles').select().eq('id', game['creator_id']).single();
-
-      final setupAction = await supabase.from('truth_lie_actions').select().eq('game_id', widget.gameId).eq('action_type', 'setup').single();
-      
-      final List<String> truths = List<String>.from(setupAction['data']['truths']);
-      final String lie = setupAction['data']['lie'];
-
-      final all = [...truths, lie];
-      final seed = widget.gameId.hashCode;
-      all.sort(); // Stable initial order
+      final truths = List<String>.from(setup['data']['truths']);
+      final lie = setup['data']['lie'];
+      final all = List<String>.from([...truths, lie]);
       
       // Deterministic shuffle
+      final seed = widget.gameId.hashCode;
+      all.sort();
       if (seed % 3 == 0) {
         final t = all[0]; all[0] = all[1]; all[1] = t;
       } else if (seed % 3 == 1) {
@@ -643,233 +497,189 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
         final t = all[0]; all[0] = all[2]; all[2] = t;
       }
       
-      _lieIndexInShuffled = all.indexOf(lie);
-      _shuffledStatements = all;
-      
-      final vote = await supabase.from('truth_lie_actions').select().eq('game_id', widget.gameId).eq('user_id', userId).eq('action_type', 'vote').maybeSingle();
+      _shuffled = all;
+      _lieIdx = all.indexOf(lie);
+
+      final createdAt = DateTime.parse(gameRes['created_at']);
+      final isExpired = DateTime.now().difference(createdAt).inHours >= 24;
 
       if (isExpired) {
-        final votesResponse = await supabase.from('truth_lie_actions').select('data').eq('game_id', widget.gameId).eq('action_type', 'vote');
+        final allVotes = await supabase.from('truth_lie_actions').select('data').eq('game_id', widget.gameId).eq('action_type', 'vote');
         final Map<int, int> counts = {0: 0, 1: 0, 2: 0};
-        for (var v in (votesResponse as List)) {
+        for (var v in (allVotes as List)) {
           final idx = v['data']['index'] as int;
           counts[idx] = (counts[idx] ?? 0) + 1;
         }
-        _voteCounts = counts;
-        _totalVotes = votesResponse.length;
+        _votes = counts;
+        _totalVotes = allVotes.length;
       }
 
       if (mounted) {
         setState(() {
-          _game = game;
+          _game = gameRes;
+          _creator = gameRes['creator'];
+          _voted = myVote?['data']?['statement'];
           _isExpired = isExpired;
-          _creatorProfile = creatorProfile;
-          _votedForStatement = vote?['data']?['statement'];
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint("Error loading game: $e");
+      debugPrint("Error: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _startCountdown(DateTime createdAt) {
-    _countdownTimer?.cancel();
-    final expiryTime = createdAt.add(const Duration(hours: 24));
-    _updateTime(expiryTime);
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateTime(expiryTime);
-    });
-  }
-
-  void _updateTime(DateTime expiryTime) {
-    final now = DateTime.now();
-    final difference = expiryTime.difference(now);
-
-    if (difference.isNegative) {
-      _countdownTimer?.cancel();
-      if (mounted) {
-        setState(() {
-          _isExpired = true;
-          _timeRemaining = "Ended";
-        });
-        _loadGame(); 
-      }
-      return;
-    }
-
-    final hours = difference.inHours;
-    final minutes = difference.inMinutes.remainder(60);
-    final seconds = difference.inSeconds.remainder(60);
-
-    if (mounted) {
-      setState(() {
-        _timeRemaining = "${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
-      });
-    }
-  }
-
   Future<void> _vote(int index, String statement) async {
-    if (_votedForStatement != null || _isExpired) return;
-    final userId = supabase.auth.currentUser!.id;
-    if (userId == _game!['creator_id']) return;
-
+    if (_voted != null || _isExpired) return;
     try {
+      final userId = supabase.auth.currentUser!.id;
       await supabase.from('truth_lie_actions').insert({
         'game_id': widget.gameId,
         'user_id': userId,
         'action_type': 'vote',
         'data': {'index': index, 'statement': statement},
       });
-      setState(() => _votedForStatement = statement);
+      setState(() => _voted = statement);
     } catch (e) {
-      debugPrint("Error voting: $e");
+      debugPrint("Error: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_game == null) return const Scaffold(body: Center(child: Text("Game not found")));
+    if (_isExpired) return _buildResults();
 
-    final currentUserId = supabase.auth.currentUser?.id;
-    final isCreator = _game!['creator_id'] == currentUserId;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF0F2F5),
       appBar: AppBar(
-        title: Text(_isExpired ? "RESULTS" : "GUESS THE LIE"), 
-        backgroundColor: theme.primaryColor, 
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text("FIND THE LIE", style: TextStyle(fontWeight: FontWeight.w900)),
+        leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            CircleAvatar(radius: 40, backgroundImage: ImageUtils.getImageProvider(_creator?['avatar_url'])),
+            const SizedBox(height: 12),
+            Text("@${_creator?['username']}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+            const SizedBox(height: 8),
+            const Text("Claims two are true and one is a lie...", style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 48),
+            ...List.generate(_shuffled.length, (i) {
+              final statement = _shuffled[i];
+              final isVoted = _voted == statement;
+              return GestureDetector(
+                onTap: () => _vote(i, statement),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: isVoted ? const Color(0xFF3B82F6) : (isDark ? const Color(0xFF16181D) : Colors.white),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: isVoted ? Colors.transparent : (isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)), width: 2),
+                    boxShadow: isVoted ? [BoxShadow(color: const Color(0xFF3B82F6).withOpacity(0.4), blurRadius: 15, offset: const Offset(0, 4))] : [],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          statement, 
+                          style: TextStyle(
+                            fontSize: 18, 
+                            fontWeight: FontWeight.w800,
+                            color: isVoted ? Colors.white : (isDark ? Colors.white : Colors.black),
+                          ),
+                        ),
+                      ),
+                      if (isVoted) const Icon(Icons.check_circle_rounded, color: Colors.white),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            if (_voted != null) ...[
+              const SizedBox(height: 32),
+              const Icon(Icons.lock_clock_rounded, color: Colors.grey),
+              const SizedBox(height: 8),
+              const Text("Vote Locked! Results in 24h.", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResults() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text("RESULTS", style: TextStyle(fontWeight: FontWeight.w900)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            if (_creatorProfile != null) ...[
-              CircleAvatar(
-                radius: 35,
-                backgroundImage: (_creatorProfile!['avatar_url'] != null && _creatorProfile!['avatar_url'] != '')
-                    ? NetworkImage(_creatorProfile!['avatar_url'])
-                    : null,
-                child: (_creatorProfile!['avatar_url'] == null || _creatorProfile!['avatar_url'] == '')
-                    ? const Icon(Icons.person, size: 35)
-                    : null,
+            const Text("The lie was...", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3), width: 2),
               ),
-              const SizedBox(height: 8),
-              Text(
-                "@${_creatorProfile!['username'] ?? 'User'}", 
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              child: Text(
+                _shuffled[_lieIdx!],
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFFEF4444)),
               ),
-              const SizedBox(height: 16),
-            ],
-            
-            if (!_isExpired) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.red.withOpacity(0.1) : Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+            ),
+            const SizedBox(height: 48),
+            const Text("VOTING STATS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1, color: Colors.grey)),
+            const SizedBox(height: 24),
+            ...List.generate(_shuffled.length, (i) {
+              final isLie = i == _lieIdx;
+              final count = _votes[i] ?? 0;
+              final pct = _totalVotes > 0 ? count / _totalVotes : 0.0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: Column(
                   children: [
-                    Icon(Icons.timer_outlined, size: 16, color: Colors.red.shade700),
-                    const SizedBox(width: 4),
-                    Text(
-                      "Ends in: $_timeRemaining", 
-                      style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 13),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: Text(_shuffled[i], style: const TextStyle(fontWeight: FontWeight.bold))),
+                        if (isLie) const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 16),
+                        const SizedBox(width: 8),
+                        Text("$count votes", style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF3B82F6))),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: pct,
+                        minHeight: 10,
+                        backgroundColor: isDark ? Colors.white10 : Colors.black.withOpacity(0.1),
+                        color: isLie ? const Color(0xFFEF4444) : const Color(0xFF3B82F6),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            const Text("Which one is the lie? 🤥", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 32),
-
-            ...List.generate(_shuffledStatements.length, (i) {
-              final statement = _shuffledStatements[i];
-              final isLie = i == _lieIndexInShuffled;
-              final isVoted = _votedForStatement == statement;
-              final voteCount = _voteCounts[i] ?? 0;
-              final percentage = _totalVotes > 0 ? (voteCount / _totalVotes) : 0.0;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: InkWell(
-                  onTap: (isCreator || _isExpired || _votedForStatement != null) ? null : () => _vote(i, statement),
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _isExpired 
-                          ? (isLie ? Colors.green : (isVoted ? Colors.red : (isDark ? Colors.white12 : Colors.grey.shade200)))
-                          : (isVoted ? Colors.blue : (isDark ? Colors.white12 : Colors.grey.shade200)),
-                        width: 2,
-                      ),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
-                    ),
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                statement, 
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                              ),
-                            ),
-                            if (_isExpired && isLie) const Icon(Icons.check_circle, color: Colors.green),
-                            if (_isExpired && !isLie && isVoted) const Icon(Icons.cancel, color: Colors.red),
-                            if (!_isExpired && isVoted) const Icon(Icons.check_circle, color: Colors.blue),
-                          ],
-                        ),
-                        if (_isExpired) ...[
-                          const SizedBox(height: 12),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: percentage,
-                              backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
-                              color: isLie ? Colors.green : Colors.blue.withOpacity(0.5),
-                              minHeight: 8,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "$voteCount votes (${(percentage * 100).toInt()}%)", 
-                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.grey.shade600),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
               );
             }),
-            
-            if (isCreator && !_isExpired) 
-              const Padding(
-                padding: EdgeInsets.only(top: 20),
-                child: Text("You created this game. Wait for friends to vote!", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
-              ),
-            
-            if (_votedForStatement != null && !_isExpired)
-              const Padding(
-                padding: EdgeInsets.only(top: 20),
-                child: Text("Vote cast! Results will be visible when the game ends.", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-              ),
           ],
         ),
       ),

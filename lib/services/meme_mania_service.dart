@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/meme_mania.dart';
 import '../models/user.dart';
 import 'notification_service.dart';
+import 'block_service.dart';
 
 class MemeManiaService {
   final _supabase = Supabase.instance.client;
@@ -18,7 +20,6 @@ class MemeManiaService {
           .from('meme_games')
           .select('''
             *,
-            profiles:creator_id (*),
             meme_participants!inner (user_id)
           ''')
           .eq('meme_participants.user_id', userId)
@@ -26,11 +27,17 @@ class MemeManiaService {
           .gt('expires_at', now)
           .order('created_at', ascending: false);
 
-      return (response as List).map((data) {
-        return MemeGame.fromJson(data);
-      }).toList();
+      final List<Map<String, dynamic>> gamesData = List<Map<String, dynamic>>.from(response);
+      
+      for (var game in gamesData) {
+        final creatorId = game['creator_id'];
+        final creator = await _supabase.from('profiles').select().eq('id', creatorId).single();
+        game['profiles'] = creator; // The model expects 'profiles' for creator data
+      }
+
+      return gamesData.map((data) => MemeGame.fromJson(data)).toList();
     } catch (e) {
-      print('Error fetching memes: $e');
+      debugPrint('Error fetching memes: $e');
       rethrow;
     }
   }
@@ -38,9 +45,14 @@ class MemeManiaService {
   Future<MemeGame> getGameDetails(String memeId) async {
     final response = await _supabase
         .from('meme_games')
-        .select('*, profiles:creator_id(*)')
+        .select('*')
         .eq('id', memeId)
         .single();
+    
+    final creatorId = response['creator_id'];
+    final creator = await _supabase.from('profiles').select().eq('id', creatorId).single();
+    response['profiles'] = creator;
+
     return MemeGame.fromJson(response);
   }
 
@@ -124,12 +136,20 @@ class MemeManiaService {
     final userId = currentUserId;
     final response = await _supabase
         .from('meme_comments')
-        .select('*, profiles:user_id(*), comment_votes(user_id)')
+        .select('*, comment_votes(user_id)')
         .eq('meme_id', memeId)
         .order('upvotes', ascending: false)
         .order('created_at', ascending: true);
 
-    return (response as List).map((data) => MemeComment.fromJson(data, currentUserId: userId)).toList();
+    final List<Map<String, dynamic>> commentsData = List<Map<String, dynamic>>.from(response);
+    
+    for (var comment in commentsData) {
+      final commenterId = comment['user_id'];
+      final profile = await _supabase.from('profiles').select().eq('id', commenterId).single();
+      comment['profiles'] = profile;
+    }
+
+    return commentsData.map((data) => MemeComment.fromJson(data, currentUserId: userId)).toList();
   }
 
   Future<void> addComment(String memeId, String commentText) async {
@@ -169,6 +189,54 @@ class MemeManiaService {
 
       await _supabase.rpc('increment_comment_upvotes',
           params: {'row_id': commentId});
+    }
+  }
+
+  Future<List<AppUser>> getFriends() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final userId = user.id;
+      debugPrint('MEME_DEBUG: currentUserId = $userId');
+
+      // 1. Fetch friend IDs (Exact logic from Most Likely To)
+      final friendsRes = await supabase
+          .from('friends')
+          .select('user1_id, user2_id')
+          .or('user1_id.eq.$userId,user2_id.eq.$userId');
+
+      debugPrint('MEME_DEBUG: friendships = $friendsRes');
+
+      final List<String> friendIds = (friendsRes as List)
+          .map((item) => item['user1_id'] == userId 
+              ? item['user2_id'].toString() 
+              : item['user1_id'].toString())
+          .toList();
+
+      debugPrint('MEME_DEBUG: friendIds = $friendIds');
+
+      if (friendIds.isEmpty) return [];
+
+      // 2. Fetch profiles
+      final profilesResponse = await supabase
+          .from('profiles')
+          .select('*')
+          .inFilter('id', friendIds);
+
+      debugPrint('MEME_DEBUG: profiles = $profilesResponse');
+
+      final List<AppUser> friends = (profilesResponse as List)
+          .map((p) => AppUser.fromJson(p))
+          .where((f) => !blockService.isBlocked(f.id))
+          .toList();
+
+      debugPrint('MEME_DEBUG: FINAL friends count = ${friends.length}');
+      return friends;
+    } catch (e) {
+      debugPrint('MEME_DEBUG: Error fetching friends: $e');
+      return [];
     }
   }
 

@@ -4,8 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/user.dart';
 import '../../services/notification_service.dart';
 import '../../services/block_service.dart';
+import '../../utils/image_utils.dart';
+import 'friend_selection_screen.dart';
 
-// --- MAIN ENTRY (LOBBY) ---
+// ==================================================
+// 1. MOST LIKELY LOBBY (REDESIGNED)
+// ==================================================
 class MostLikelyLobby extends StatefulWidget {
   const MostLikelyLobby({super.key});
   @override
@@ -26,10 +30,7 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
   Future<void> _fetchGames() async {
     try {
       final userId = supabase.auth.currentUser?.id;
-      if (userId == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
+      if (userId == null) return;
 
       final response = await supabase
           .from('most_likely_games')
@@ -38,47 +39,42 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
           .eq('status', 'active')
           .order('created_at', ascending: false);
 
+      final List<Map<String, dynamic>> games = List<Map<String, dynamic>>.from(response);
+      
+      for (var game in games) {
+        final creatorId = game['creator_id'];
+        final creator = await supabase
+            .from('profiles')
+            .select()
+            .eq('id', creatorId)
+            .single();
+        game['creator'] = creator;
+      }
+
       if (mounted) {
         setState(() {
-          _activeGames = List<Map<String, dynamic>>.from(response);
+          _activeGames = games;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint("Error fetching most likely games: $e");
+      debugPrint("Error: $e");
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _deleteGame(String gameId) async {
-    try {
-      await supabase.from('most_likely_games').delete().eq('id', gameId);
-      if (mounted) {
-        setState(() {
-          _activeGames.removeWhere((g) => g['id'] == gameId);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Game deleted")));
-      }
-    } catch (e) {
-      debugPrint("Error deleting game: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete game: $e")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = supabase.auth.currentUser?.id;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
       appBar: AppBar(
-        title: const Text("MOST LIKELY TO", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        centerTitle: true,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
+        centerTitle: true,
+        title: const Text("MOST LIKELY TO", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -89,255 +85,115 @@ class _MostLikelyLobbyState extends State<MostLikelyLobby> {
           : RefreshIndicator(
               onRefresh: _fetchGames,
               child: _activeGames.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.videogame_asset_outlined, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
-                          const SizedBox(height: 16),
-                          Text("No active games. Start one with friends!", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
-                        ],
-                      ),
-                    )
+                  ? _buildEmptyState(isDark)
                   : ListView.builder(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
                       itemCount: _activeGames.length,
                       itemBuilder: (context, index) {
                         final game = _activeGames[index];
-                        final createdAt = DateTime.parse(game['created_at']);
-                        final isExpired = DateTime.now().difference(createdAt).inHours >= 24;
-                        final isCreator = game['creator_id'] == currentUserId;
-                        
-                        final bool isUnseen = game['most_likely_participants'] != null && 
-                                              (game['most_likely_participants'] as List).any((p) => p['user_id'] == currentUserId && p['is_seen'] == false);
+                        final creator = game['creator'];
+                        final bool isUnseen = (game['most_likely_participants'] as List).any((p) => p['user_id'] == supabase.auth.currentUser?.id && p['is_seen'] == false);
 
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: isUnseen ? 4 : 1,
-                          color: theme.cardColor,
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                            title: Row(
-                              children: [
-                                if (isUnseen) 
-                                  const Padding(
-                                    padding: EdgeInsets.only(right: 8.0),
-                                    child: CircleAvatar(radius: 4, backgroundColor: Colors.red),
-                                  ),
-                                Expanded(
-                                  child: Text(
-                                    "Game ${index + 1}", 
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.textTheme.titleMedium?.color,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            subtitle: Text(
-                              isExpired ? "Game ended - See results" : "Started on ${game['created_at'].toString().split('T')[0]}",
-                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isCreator)
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          title: const Text("Delete Game?"),
-                                          content: const Text("Are you sure you want to delete this game? This action cannot be undone."),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.pop(context);
-                                                _deleteGame(game['id']);
-                                              },
-                                              child: const Text("DELETE", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                Icon(isExpired ? Icons.bar_chart : Icons.chevron_right, color: isDark ? Colors.white24 : Colors.black26),
-                              ],
-                            ),
-                            onTap: () => Navigator.push(
-                              context, 
-                              MaterialPageRoute(builder: (_) => MostLikelyPlay(gameId: game['id']))
-                            ).then((_) => _fetchGames()),
-                          ),
+                        return _LobbyGameCard(
+                          game: game,
+                          creator: creator,
+                          isUnseen: isUnseen,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => MostLikelyPlay(gameId: game['id'])),
+                          ).then((_) => _fetchGames()),
                         );
                       },
                     ),
             ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20),
           child: ElevatedButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MostLikelyFriendSelect())).then((_) => _fetchGames()),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MostLikelyWizard())),
             style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 54),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: theme.primaryColor,
+              backgroundColor: const Color(0xFFEC4899),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 60),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 8,
+              shadowColor: const Color(0xFFEC4899).withOpacity(0.4),
             ),
-            child: const Text("NEW GAME", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            child: const Text("CREATE NEW GAME", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1)),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.auto_awesome_motion_rounded, size: 80, color: isDark ? Colors.white10 : Colors.grey[200]),
+          const SizedBox(height: 24),
+          Text("No Active Games", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black)),
+          const SizedBox(height: 8),
+          const Text("Start a game and see what friends think!", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
 }
 
-// --- FRIEND SELECTION ---
-class MostLikelyFriendSelect extends StatefulWidget {
-  const MostLikelyFriendSelect({super.key});
-  @override
-  State<MostLikelyFriendSelect> createState() => _MostLikelyFriendSelectState();
-}
+class _LobbyGameCard extends StatelessWidget {
+  final Map<String, dynamic> game;
+  final Map<String, dynamic> creator;
+  final bool isUnseen;
+  final VoidCallback onTap;
 
-class _MostLikelyFriendSelectState extends State<MostLikelyFriendSelect> {
-  final supabase = Supabase.instance.client;
-  List<AppUser> _friends = [];
-  final Set<String> _selectedIds = {};
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    await blockService.refreshBlockedList();
-    await _fetchFriends();
-  }
-
-  Future<void> _fetchFriends() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
-
-      final friendsRes = await supabase
-          .from('friends')
-          .select('user1_id, user2_id')
-          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
-
-      final List<String> friendIds = (friendsRes as List)
-          .map((item) => item['user1_id'] == user.id ? item['user2_id'].toString() : item['user1_id'].toString())
-          .toList();
-
-      if (friendIds.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _friends = [];
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      final profilesResponse = await supabase
-          .from('profiles')
-          .select('*')
-          .inFilter('id', friendIds);
-
-      if (mounted) {
-        setState(() {
-          _friends = (profilesResponse as List)
-              .map((p) => AppUser.fromJson(p))
-              .where((f) => !blockService.isBlocked(f.id))
-              .toList();
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Error fetching friends: $e");
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  const _LobbyGameCard({required this.game, required this.creator, required this.isUnseen, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text("SELECT FRIENDS", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF16181D) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: isUnseen ? const Color(0xFFEC4899).withOpacity(0.5) : (isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)), width: 2),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _friends.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.person_search_rounded, size: 64, color: isDark ? Colors.white24 : Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text("No friends found yet.", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey)),
-                    ],
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _friends.length,
-                  separatorBuilder: (context, index) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
-                  itemBuilder: (context, index) {
-                    final f = _friends[index];
-                    final isSelected = _selectedIds.contains(f.id);
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: (f.avatarUrl != null && f.avatarUrl!.isNotEmpty) ? NetworkImage(f.avatarUrl!) : null,
-                        child: (f.avatarUrl == null || f.avatarUrl!.isEmpty) ? const Icon(Icons.person) : null,
-                      ),
-                      title: Text(
-                        f.username.isNotEmpty ? f.username : (f.name ?? "User"), 
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: theme.textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      trailing: Icon(
-                        isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: isSelected ? theme.primaryColor : (isDark ? Colors.white24 : Colors.grey),
-                      ),
-                      onTap: () => setState(() => isSelected ? _selectedIds.remove(f.id) : _selectedIds.add(f.id)),
-                    );
-                  },
-                ),
-      bottomNavigationBar: SafeArea(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ElevatedButton(
-            onPressed: _selectedIds.isEmpty ? null : () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => MostLikelySetup(selectedFriends: _friends.where((f) => _selectedIds.contains(f.id)).toList())));
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 54),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              backgroundColor: theme.primaryColor,
-              disabledBackgroundColor: isDark ? Colors.white10 : Colors.grey[300],
-            ),
-            child: Text("CONTINUE (${_selectedIds.length})", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundImage: ImageUtils.getImageProvider(creator['avatar_url']),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      creator['name'] ?? creator['username'],
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isUnseen ? "Waiting for your vote! 🔥" : "Active Game",
+                      style: TextStyle(color: isUnseen ? const Color(0xFFEC4899) : Colors.grey, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+            ],
           ),
         ),
       ),
@@ -345,101 +201,72 @@ class _MostLikelyFriendSelectState extends State<MostLikelyFriendSelect> {
   }
 }
 
-// --- SETUP SCREEN ---
-class MostLikelySetup extends StatefulWidget {
-  final List<AppUser> selectedFriends;
-  const MostLikelySetup({super.key, required this.selectedFriends});
+// ==================================================
+// 2. MOST LIKELY WIZARD (STEP-BASED SETUP)
+// ==================================================
+class MostLikelyWizard extends StatefulWidget {
+  const MostLikelyWizard({super.key});
   @override
-  State<MostLikelySetup> createState() => _MostLikelySetupState();
+  State<MostLikelyWizard> createState() => _MostLikelyWizardState();
 }
 
-class _MostLikelySetupState extends State<MostLikelySetup> {
-  final _questionCtrl = TextEditingController();
-  final List<TextEditingController> _optionCtrls = [
-    TextEditingController(),
-    TextEditingController(),
+class _MostLikelyWizardState extends State<MostLikelyWizard> {
+  int _currentStep = 0;
+  List<AppUser> _selectedFriends = [];
+  String _selectedQuestion = "";
+  final _customQuestionCtrl = TextEditingController();
+  bool _isLaunching = false;
+
+  final List<String> _suggestedQuestions = [
+    "become a millionaire?",
+    "survive a zombie apocalypse?",
+    "get married first?",
+    "become a famous actor?",
+    "forget their own birthday?",
+    "win an Olympic medal?",
+    "travel around the world?",
+    "write a best-selling book?",
   ];
-  bool _isLoading = false;
 
-  @override
-  void dispose() {
-    _questionCtrl.dispose();
-    for (var ctrl in _optionCtrls) {
-      ctrl.dispose();
-    }
-    super.dispose();
+  void _nextStep() {
+    setState(() => _currentStep++);
   }
 
-  void _addOption() {
-    if (_optionCtrls.length < 4) {
-      setState(() {
-        _optionCtrls.add(TextEditingController());
-      });
-    }
-  }
-
-  void _removeOption(int index) {
-    if (_optionCtrls.length > 2) {
-      setState(() {
-        _optionCtrls[index].dispose();
-        _optionCtrls.removeAt(index);
-      });
+  void _prevStep() {
+    if (_currentStep == 0) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _currentStep--);
     }
   }
 
   Future<void> _launchGame() async {
-    final question = _questionCtrl.text.trim();
-    final options = _optionCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+    final question = _customQuestionCtrl.text.isNotEmpty ? _customQuestionCtrl.text : _selectedQuestion;
+    if (question.isEmpty) return;
 
-    if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter a question")));
-      return;
-    }
-    if (options.length < 2) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter at least 2 options")));
-      return;
-    }
-
-    setState(() => _isLoading = true);
+    setState(() => _isLaunching = true);
     try {
       final supabase = Supabase.instance.client;
       final userId = supabase.auth.currentUser!.id;
       
-      // 1. Create the game entry
       final game = await supabase.from('most_likely_games').insert({'creator_id': userId}).select().single();
       final gameId = game['id'];
 
-      // 2. Fetch creator username
-      final creatorProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
-      final creatorUsername = creatorProfile['username'] ?? "Someone";
-
-      // 3. Add participants
-      final participantIds = {...widget.selectedFriends.map((f) => f.id), userId};
+      final participantIds = {..._selectedFriends.map((f) => f.id), userId};
       final participants = participantIds.map((id) => {
         'game_id': gameId, 
         'user_id': id,
-        'is_seen': id == userId, // Creator has seen it
+        'is_seen': id == userId,
       }).toList();
       await supabase.from('most_likely_participants').insert(participants);
 
-      // 4. Send notifications
-      for (final friendId in widget.selectedFriends.map((f) => f.id)) {
-        if (friendId != userId) {
-          NotificationService.sendGameNotification(
-            targetUserId: friendId,
-            creatorUsername: creatorUsername,
-          );
-        }
-      }
-
-      // 5. Add the setup action (question + options)
       await supabase.from('most_likely_actions').insert({
         'game_id': gameId,
         'user_id': userId,
         'action_type': 'setup',
         'data': {
-          'question': question,
-          'options': options,
+          'question': "Who is most likely to $question",
+          'options': _selectedFriends.map((f) => f.username).toList()..add("Me"),
         }
       });
 
@@ -451,117 +278,202 @@ class _MostLikelySetupState extends State<MostLikelySetup> {
         );
       }
     } catch (e) {
-      debugPrint("Error launching game: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error launching game: $e")));
-      setState(() => _isLoading = false);
+      debugPrint("Error: $e");
+      setState(() => _isLaunching = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
       appBar: AppBar(
-        title: const Text("SETUP GAME"),
-        backgroundColor: theme.primaryColor,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.pop(context),
         ),
+        title: _buildProgressIndicator(),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("What is the question?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _questionCtrl,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                decoration: InputDecoration(
-                  hintText: "Who is most likely to...",
-                  hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                  border: const OutlineInputBorder(),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12)),
-                  contentPadding: const EdgeInsets.all(16),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Options (2-4)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  if (_optionCtrls.length < 4)
-                    TextButton.icon(
-                      onPressed: _addOption,
-                      icon: const Icon(Icons.add),
-                      label: const Text("Add"),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ..._optionCtrls.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final ctrl = entry.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: TextField(
-                    controller: ctrl,
-                    style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                    decoration: InputDecoration(
-                      hintText: "Option ${idx + 1}",
-                      hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-                      border: const OutlineInputBorder(),
-                      enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      suffixIcon: _optionCtrls.length > 2
-                          ? IconButton(
-                              icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent),
-                              onPressed: () => _removeOption(idx),
-                            )
-                          : null,
+      body: Column(
+        children: [
+          Expanded(
+            child: _buildCurrentStep(),
+          ),
+          _buildBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (index) {
+        final isActive = index <= _currentStep;
+        return Container(
+          width: 40,
+          height: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFFEC4899) : Colors.grey.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildCurrentStep() {
+    switch (_currentStep) {
+      case 0:
+        return GameFriendSelectionScreen(
+          onContinue: (friends) {
+            setState(() => _selectedFriends = friends);
+            _nextStep();
+          },
+        );
+      case 1:
+        return _buildQuestionStep();
+      case 2:
+        return _buildReviewStep();
+      default:
+        return const SizedBox();
+    }
+  }
+
+  Widget _buildQuestionStep() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Choose a Question", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          const Text("Select a fun scenario or write your own.", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 32),
+          TextField(
+            controller: _customQuestionCtrl,
+            decoration: InputDecoration(
+              hintText: "Who is most likely to...",
+              filled: true,
+              fillColor: isDark ? const Color(0xFF16181D) : Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.all(20),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text("SUGGESTIONS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1)),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: _suggestedQuestions.map((q) {
+              final isSelected = _selectedQuestion == q;
+              return GestureDetector(
+                onTap: () => setState(() {
+                  _selectedQuestion = q;
+                  _customQuestionCtrl.clear();
+                }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFEC4899) : (isDark ? const Color(0xFF16181D) : Colors.white),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isSelected ? Colors.transparent : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05))),
+                  ),
+                  child: Text(
+                    "... $q",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                     ),
                   ),
-                );
-              }),
-              const SizedBox(height: 16),
-              Text("Friends who can see this: ${widget.selectedFriends.length}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
+                ),
+              );
+            }).toList(),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewStep() {
+    final question = _customQuestionCtrl.text.isNotEmpty ? _customQuestionCtrl.text : _selectedQuestion;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.rocket_launch_rounded, size: 80, color: Color(0xFFEC4899)),
+            const SizedBox(height: 32),
+            const Text("Ready to Launch?", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEC4899).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.2)),
+              ),
+              child: Text(
+                "Who is most likely to $question",
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFFEC4899)),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text("Playing with ${_selectedFriends.length} friends", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+          ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 20.0, top: 8.0),
-          child: ElevatedButton(
-            onPressed: _isLoading ? null : _launchGame,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 54),
-              backgroundColor: theme.primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    if (_currentStep == 0) return const SizedBox();
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextButton(
+                onPressed: _prevStep,
+                child: const Text("BACK", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.grey)),
+              ),
             ),
-            child: _isLoading 
-                ? const CircularProgressIndicator(color: Colors.white) 
-                : const Text("LAUNCH GAME", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton(
+                onPressed: _isLaunching ? null : (_currentStep == 2 ? _launchGame : _nextStep),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEC4899),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 56),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+                child: _isLaunching 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Text(_currentStep == 2 ? "LAUNCH" : "CONTINUE", style: const TextStyle(fontWeight: FontWeight.w900)),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// --- PLAY SCREEN ---
+// ==================================================
+// 3. MOST LIKELY PLAY (STORY STYLE)
+// ==================================================
 class MostLikelyPlay extends StatefulWidget {
   final String gameId;
   const MostLikelyPlay({super.key, required this.gameId});
@@ -572,355 +484,324 @@ class MostLikelyPlay extends StatefulWidget {
 class _MostLikelyPlayState extends State<MostLikelyPlay> {
   final supabase = Supabase.instance.client;
   Map<String, dynamic>? _game;
-  Map<String, dynamic>? _creatorProfile;
+  Map<String, dynamic>? _creator;
+  String? _question;
   List<String> _options = [];
   bool _isLoading = true;
-  String? _votedForOption;
-  String? _question;
+  String? _votedOption;
   bool _isExpired = false;
-  Map<String, int> _voteCounts = {};
+  Map<String, int> _votes = {};
   int _totalVotes = 0;
-  Timer? _countdownTimer;
-  String _timeRemaining = "";
 
   @override
   void initState() {
     super.initState();
-    _loadGame();
-    _markAsSeen();
+    _loadData();
+    _markSeen();
   }
 
-  @override
-  void dispose() {
-    _countdownTimer?.cancel();
-    super.dispose();
+  Future<void> _markSeen() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await supabase.from('most_likely_participants').update({'is_seen': true}).match({'game_id': widget.gameId, 'user_id': userId});
   }
 
-  Future<void> _markAsSeen() async {
-    try {
-      final userId = supabase.auth.currentUser?.id;
-      if (userId == null) return;
-
-      await supabase
-          .from('most_likely_participants')
-          .update({'is_seen': true})
-          .match({'game_id': widget.gameId, 'user_id': userId});
-    } catch (e) {
-      debugPrint("Error marking game as seen: $e");
-    }
-  }
-
-  Future<void> _loadGame() async {
+  Future<void> _loadData() async {
     try {
       final userId = supabase.auth.currentUser!.id;
-      final game = await supabase.from('most_likely_games').select().eq('id', widget.gameId).single();
+      final gameRes = await supabase.from('most_likely_games').select().eq('id', widget.gameId).single();
       
-      final createdAt = DateTime.parse(game['created_at']);
-      final now = DateTime.now();
-      final isExpired = now.difference(createdAt).inHours >= 24;
+      final creatorId = gameRes['creator_id'];
+      final creator = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', creatorId)
+          .single();
+      gameRes['creator'] = creator;
 
-      if (!isExpired) {
-        _startCountdown(createdAt);
-      }
+      final setup = await supabase.from('most_likely_actions').select().eq('game_id', widget.gameId).eq('action_type', 'setup').single();
+      final myVote = await supabase.from('most_likely_actions').select().eq('game_id', widget.gameId).eq('user_id', userId).eq('action_type', 'vote').maybeSingle();
 
-      final creatorProfile = await supabase.from('profiles').select().eq('id', game['creator_id']).single();
-
-      final setupAction = await supabase.from('most_likely_actions').select().eq('game_id', widget.gameId).eq('action_type', 'setup').maybeSingle();
-      
-      final List<String> options = setupAction != null ? List<String>.from(setupAction['data']['options']) : [];
-      final String? question = setupAction != null ? setupAction['data']['question'] : null;
-      
-      final vote = await supabase.from('most_likely_actions').select().eq('game_id', widget.gameId).eq('user_id', userId).eq('action_type', 'vote').maybeSingle();
+      final createdAt = DateTime.parse(gameRes['created_at']);
+      final isExpired = DateTime.now().difference(createdAt).inHours >= 24;
 
       if (isExpired) {
-        final votesResponse = await supabase.from('most_likely_actions').select('data').eq('game_id', widget.gameId).eq('action_type', 'vote');
+        final allVotes = await supabase.from('most_likely_actions').select('data').eq('game_id', widget.gameId).eq('action_type', 'vote');
         final Map<String, int> counts = {};
-        for (var v in (votesResponse as List)) {
+        for (var v in (allVotes as List)) {
           final opt = v['data']['option'] as String;
           counts[opt] = (counts[opt] ?? 0) + 1;
         }
-        _voteCounts = counts;
-        _totalVotes = votesResponse.length;
+        _votes = counts;
+        _totalVotes = allVotes.length;
       }
 
       if (mounted) {
         setState(() {
-          _game = game;
+          _game = gameRes;
+          _creator = gameRes['creator'];
+          _question = setup['data']['question'];
+          _options = List<String>.from(setup['data']['options']);
+          _votedOption = myVote?['data']?['option'];
           _isExpired = isExpired;
-          _creatorProfile = creatorProfile;
-          _question = question;
-          _options = options;
-          _votedForOption = vote?['data']?['option'];
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint("Error loading game: $e");
+      debugPrint("Error: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _startCountdown(DateTime createdAt) {
-    _countdownTimer?.cancel();
-    final expiryTime = createdAt.add(const Duration(hours: 24));
-    
-    _updateTime(expiryTime);
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateTime(expiryTime);
-    });
-  }
-
-  void _updateTime(DateTime expiryTime) {
-    final now = DateTime.now();
-    final difference = expiryTime.difference(now);
-
-    if (difference.isNegative) {
-      _countdownTimer?.cancel();
-      if (mounted) {
-        setState(() {
-          _isExpired = true;
-          _timeRemaining = "Ended";
-        });
-        _loadGame(); 
-      }
-      return;
-    }
-
-    final hours = difference.inHours;
-    final minutes = difference.inMinutes.remainder(60);
-    final seconds = difference.inSeconds.remainder(60);
-
-    if (mounted) {
-      setState(() {
-        _timeRemaining = "${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
-      });
-    }
-  }
-
-  Future<void> _vote(String optionText) async {
-    if (_votedForOption != null || _isExpired) return;
+  Future<void> _vote(String option) async {
+    if (_votedOption != null || _isExpired) return;
     try {
       final userId = supabase.auth.currentUser!.id;
       await supabase.from('most_likely_actions').insert({
         'game_id': widget.gameId,
         'user_id': userId,
         'action_type': 'vote',
-        'data': {'option': optionText},
+        'data': {'option': option},
       });
-      setState(() => _votedForOption = optionText);
+      setState(() => _votedOption = option);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vote cast! 🎯")));
     } catch (e) {
-      debugPrint("Error voting: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Vote failed: $e")));
-    }
-  }
-
-  Future<void> _deleteThisGame() async {
-    try {
-      await supabase.from('most_likely_games').delete().eq('id', widget.gameId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Game deleted")));
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      debugPrint("Error deleting game: $e");
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete game: $e")));
+      debugPrint("Error: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_game == null) return const Scaffold(body: Center(child: Text("Game not found")));
+    if (_isExpired) return MostLikelyResults(question: _question!, votes: _votes, total: _totalVotes, options: _options);
 
-    final currentUserId = supabase.auth.currentUser?.id;
-    final isCreator = _game!['creator_id'] == currentUserId;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    String? winner;
-    if (_isExpired && _voteCounts.isNotEmpty) {
-      int maxVotes = -1;
-      _voteCounts.forEach((opt, count) {
-        if (count > maxVotes) {
-          maxVotes = count;
-          winner = opt;
-        }
-      });
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(_isExpired ? "RESULTS" : "VOTE"), 
-        backgroundColor: theme.primaryColor, 
-        foregroundColor: Colors.white,
-        actions: [
-          if (isCreator)
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.white),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text("Delete Game?"),
-                    content: const Text("This action will remove the game for everyone."),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _deleteThisGame();
-                        },
-                        child: const Text("DELETE", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-      body: Center(
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                children: [
-                  if (_creatorProfile != null) ...[
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark ? [const Color(0xFF1A1A2E), const Color(0xFF0B0B0F)] : [const Color(0xFFFDF2F8), const Color(0xFFFCE7F3)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // STORY HEADER
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
                     CircleAvatar(
-                      radius: 30,
-                      backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
-                      backgroundImage: (_creatorProfile!['avatar_url'] != null && _creatorProfile!['avatar_url'] != '')
-                          ? NetworkImage(_creatorProfile!['avatar_url'])
-                          : null,
-                      child: (_creatorProfile!['avatar_url'] == null || _creatorProfile!['avatar_url'] == '')
-                          ? const Icon(Icons.person, size: 30)
-                          : null,
+                      radius: 20,
+                      backgroundImage: ImageUtils.getImageProvider(_creator?['avatar_url']),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(width: 12),
                     Text(
-                      "@${_creatorProfile!['username'] ?? 'User'}",
-                      style: TextStyle(fontSize: 14, color: isDark ? Colors.white54 : Colors.grey),
+                      _creator?['username'] ?? "Someone",
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                     ),
-                    const SizedBox(height: 16),
+                    const Spacer(),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
                   ],
-                  Text(
-                    _question ?? "Most Likely To...", 
-                    style: TextStyle(
-                      fontSize: 22, 
-                      fontWeight: FontWeight.bold,
-                      color: theme.textTheme.bodyLarge?.color,
-                    ), 
-                    textAlign: TextAlign.center,
+                ),
+              ),
+              const Spacer(),
+              // QUESTION
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  _question ?? "",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: isDark ? Colors.white : const Color(0xFFEC4899),
+                    shadows: [Shadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
                   ),
-                  
-                  if (!_isExpired) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.red.withOpacity(0.1) : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.red.shade200),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.timer_outlined, size: 16, color: Colors.red.shade700),
-                          const SizedBox(width: 4),
-                          Text(
-                            "Ends in: $_timeRemaining",
-                            style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 32),
-                  if (_isExpired) ...[
-                     Text("The winner is:", style: TextStyle(color: isDark ? Colors.white54 : Colors.grey[600], fontSize: 14)),
-                     const SizedBox(height: 4),
-                     Text(winner ?? "No votes yet", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue)),
-                     const SizedBox(height: 32),
-                  ],
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _options.length,
-                      itemBuilder: (context, i) {
-                        final opt = _options[i];
-                        final isSelected = _votedForOption == opt;
-                        final voteCount = _voteCounts[opt] ?? 0;
-                        final percentage = _totalVotes > 0 ? (voteCount / _totalVotes) : 0.0;
-                        final isWinner = winner == opt;
-
-                        return Card(
-                          color: isWinner ? Colors.blue.withOpacity(0.1) : (isSelected ? Colors.blue.withOpacity(0.05) : theme.cardColor),
-                          shape: isWinner ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.blue, width: 2)) : null,
-                          child: Column(
-                            children: [
-                              ListTile(
-                                title: Text(
-                                  opt, 
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold, 
-                                    color: isWinner ? Colors.blue : theme.textTheme.bodyLarge?.color,
-                                  ),
-                                ),
-                                trailing: _isExpired 
-                                  ? Text("$voteCount votes", style: TextStyle(fontWeight: FontWeight.bold, color: theme.textTheme.bodyLarge?.color))
-                                  : (isSelected ? const Icon(Icons.check_circle, color: Colors.blue) : null),
-                                onTap: () => _vote(opt),
+                ),
+              ),
+              const Spacer(),
+              // VOTING CARDS
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: _options.map((opt) {
+                    final isSelected = _votedOption == opt;
+                    return GestureDetector(
+                      onTap: () => _vote(opt),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFEC4899) : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: isSelected ? Colors.transparent : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05))),
+                          boxShadow: isSelected ? [BoxShadow(color: const Color(0xFFEC4899).withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))] : [],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              opt,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black),
                               ),
-                              if (_isExpired)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: percentage,
-                                      backgroundColor: isDark ? Colors.white10 : Colors.grey[200],
-                                      color: isWinner ? Colors.blue : Colors.blue.withOpacity(0.3),
-                                      minHeight: 8,
-                                    ),
-                                  ),
-                                )
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  if (_isExpired) 
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        "Total Votes: $_totalVotes", 
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold, 
-                          color: isDark ? Colors.white54 : Colors.grey,
+                            ),
+                            if (isSelected) const Icon(Icons.check_circle_rounded, color: Colors.white),
+                          ],
                         ),
                       ),
-                    )
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (_votedOption != null)
+                const Text("Waiting for game to end... ⏳", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================
+// 4. MOST LIKELY RESULTS (PODIUM STYLE)
+// ==================================================
+class MostLikelyResults extends StatelessWidget {
+  final String question;
+  final Map<String, int> votes;
+  final int total;
+  final List<String> options;
+
+  const MostLikelyResults({super.key, required this.question, required this.votes, required this.total, required this.options});
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = options.map((o) => MapEntry(o, votes[o] ?? 0)).toList();
+    sorted.sort((a, b) => b.value.compareTo(a.value));
+    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text("THE RESULTS", style: TextStyle(fontWeight: FontWeight.w900)),
+        centerTitle: true,
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 40),
+            Text(question, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 60),
+            
+            // PODIUM
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // SECOND
+                  if (sorted.length > 1) _buildPodium(sorted[1], "🥈", 120, Colors.grey, isDark),
+                  const SizedBox(width: 8),
+                  // FIRST
+                  if (sorted.isNotEmpty) _buildPodium(sorted[0], "🥇", 180, const Color(0xFFFFD700), isDark),
+                  const SizedBox(width: 8),
+                  // THIRD
+                  if (sorted.length > 2) _buildPodium(sorted[2], "🥉", 100, Colors.brown, isDark),
                 ],
+              ),
+            ),
+            
+            const SizedBox(height: 60),
+            
+            // PERCENTAGE BARS
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: sorted.map((e) {
+                  final pct = total > 0 ? e.value / total : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(e.key, style: const TextStyle(fontWeight: FontWeight.w900)),
+                            Text("${(pct * 100).toInt()}%", style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFEC4899))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: pct,
+                            minHeight: 12,
+                            backgroundColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+                            color: const Color(0xFFEC4899),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _votedForOption != null && !_isExpired
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 24.0),
-                child: Text(
-                  "Thanks for voting!",
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 18),
-                ),
+    );
+  }
+
+  Widget _buildPodium(MapEntry<String, int> entry, String medal, double height, Color color, bool isDark) {
+    return Column(
+      children: [
+        Text(medal, style: const TextStyle(fontSize: 32)),
+        const SizedBox(height: 8),
+        Container(
+          width: 80,
+          height: height,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.8), color.withOpacity(0.4)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                entry.key,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.white),
               ),
-            )
-          : null,
+              const SizedBox(height: 4),
+              Text(
+                "${entry.value} votes",
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 10, color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

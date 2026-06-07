@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../models/user.dart';
 import '../../services/meme_mania_service.dart';
+import '../../services/block_service.dart';
+import 'friend_selection_screen.dart';
 
 class CreateMemeScreen extends StatefulWidget {
   const CreateMemeScreen({super.key});
@@ -17,35 +19,12 @@ class _CreateMemeScreenState extends State<CreateMemeScreen> {
   final _picker = ImagePicker();
   
   File? _imageFile;
-  List<AppUser> _friends = [];
-  final Set<String> _selectedUserIds = {};
-  bool _isLoading = false;
+  List<AppUser> _selectedFriends = [];
   bool _isUploading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFriends();
-  }
-
-  Future<void> _loadFriends() async {
-    setState(() => _isLoading = true);
-    try {
-      final friends = await _service.getSavedUsers();
-      setState(() => _friends = friends);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading friends: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  int _currentStep = 0; // 0: Select Image/Caption, 1: Select Friends
 
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (pickedFile != null) {
       setState(() {
         _imageFile = File(pickedFile.path);
@@ -53,48 +32,25 @@ class _CreateMemeScreenState extends State<CreateMemeScreen> {
     }
   }
 
-  void _toggleFriend(String id) {
-    setState(() {
-      if (_selectedUserIds.contains(id)) {
-        _selectedUserIds.remove(id);
-      } else {
-        _selectedUserIds.add(id);
-      }
-    });
-  }
-
   Future<void> _launchGame() async {
-    if (_imageFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an image')),
-      );
-      return;
-    }
-    if (_selectedUserIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one participant')),
-      );
-      return;
-    }
+    if (_imageFile == null || _selectedFriends.isEmpty) return;
 
     setState(() => _isUploading = true);
     try {
       await _service.createMemeGame(
         imageFile: _imageFile!,
         caption: _captionController.text,
-        participantIds: _selectedUserIds.toList(),
+        participantIds: _selectedFriends.map((f) => f.id).toList(),
       );
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Meme launched successfully!')),
+          const SnackBar(content: Text('Meme Battle Started! 😂')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isUploading = false);
@@ -103,94 +59,111 @@ class _CreateMemeScreenState extends State<CreateMemeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
       appBar: AppBar(
-        title: const Text('NEW MEME'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(16),
-                  image: _imageFile != null
-                      ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover)
-                      : null,
-                ),
-                child: _imageFile == null
-                    ? const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.add_a_photo, size: 48, color: Colors.grey),
-                          SizedBox(height: 8),
-                          Text('Tap to select meme image', style: TextStyle(color: Colors.grey)),
-                        ],
-                      )
-                    : null,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _captionController,
-              decoration: InputDecoration(
-                labelText: 'Caption (Optional)',
-                hintText: 'Enter a funny caption...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 24),
-            const Text('SELECT PARTICIPANTS', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _friends.length,
-                itemBuilder: (context, index) {
-                  final friend = _friends[index];
-                  final isSelected = _selectedUserIds.contains(friend.id);
-                  return CheckboxListTile(
-                    title: Text(friend.username),
-                    subtitle: Text(friend.name ?? ''),
-                    value: isSelected,
-                    onChanged: (_) => _toggleFriend(friend.id),
-                    secondary: CircleAvatar(
-                      backgroundImage: friend.avatarUrl != null ? NetworkImage(friend.avatarUrl!) : null,
-                      child: friend.avatarUrl == null ? const Icon(Icons.person) : null,
-                    ),
-                  );
-                },
-              ),
-            const SizedBox(height: 80), // Extra space for the floating bottom button
-          ],
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(_currentStep == 0 ? "NEW MEME" : "TAG FRIENDS", style: const TextStyle(fontWeight: FontWeight.w900)),
+        leading: IconButton(
+          icon: Icon(_currentStep == 0 ? Icons.close : Icons.arrow_back_ios_new_rounded),
+          onPressed: () {
+            if (_currentStep == 0) Navigator.pop(context);
+            else setState(() => _currentStep = 0);
+          },
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ElevatedButton(
-            onPressed: _isUploading ? null : _launchGame,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      body: _currentStep == 0 ? _buildUploadStep() : _buildFriendStep(),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  Widget _buildUploadStep() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // IMAGE UPLOAD AREA
+          GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              height: 300,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF16181D) : Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
+                image: _imageFile != null
+                    ? DecorationImage(image: FileImage(_imageFile!), fit: BoxFit.cover)
+                    : null,
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10)),
+                ],
+              ),
+              child: _imageFile == null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.add_photo_alternate_rounded, size: 64, color: Color(0xFFF59E0B)),
+                        const SizedBox(height: 16),
+                        const Text('Select Meme Image', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                        const SizedBox(height: 8),
+                        Text('Tap to browse gallery', style: TextStyle(color: Colors.grey.withOpacity(0.8))),
+                      ],
+                    )
+                  : null,
             ),
-            child: _isUploading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('LAUNCH GAME', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
+          const SizedBox(height: 32),
+          // CAPTION EDITOR
+          const Text("CAPTION", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1, color: Colors.grey)),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _captionController,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              hintText: "Add a funny context...",
+              filled: true,
+              fillColor: isDark ? const Color(0xFF16181D) : Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.all(20),
+            ),
+            maxLines: 3,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFriendStep() {
+    return GameFriendSelectionScreen(
+      onContinue: (friends) {
+        setState(() => _selectedFriends = friends);
+        _launchGame();
+      },
+    );
+  }
+
+  Widget _buildBottomBar() {
+    if (_currentStep == 1) return const SizedBox();
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: ElevatedButton(
+          onPressed: _imageFile == null ? null : () => setState(() => _currentStep = 1),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFF59E0B),
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 60),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            elevation: 8,
+            shadowColor: const Color(0xFFF59E0B).withOpacity(0.4),
+          ),
+          child: const Text("CHOOSE FRIENDS", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
         ),
       ),
     );

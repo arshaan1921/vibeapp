@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import '../../models/meme_mania.dart';
 import '../../services/meme_mania_service.dart';
 import '../../providers/game_provider.dart';
+import '../../utils/image_utils.dart';
 
 class MemeGameScreen extends StatefulWidget {
   final String gameId;
-
   const MemeGameScreen({super.key, required this.gameId});
 
   @override
@@ -25,26 +25,20 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
     super.initState();
     _gameFuture = _service.getGameDetails(widget.gameId);
     _loadComments();
-    _markAsSeenAndDecrement();
+    _markSeen();
   }
 
-  Future<void> _markAsSeenAndDecrement() async {
+  Future<void> _markSeen() async {
     await _service.markAsSeen(widget.gameId);
-    if (mounted) {
-      Provider.of<GameProvider>(context, listen: false).decrementCount();
-    }
+    if (mounted) Provider.of<GameProvider>(context, listen: false).decrementCount();
   }
 
   Future<void> _loadComments() async {
     try {
       final comments = await _service.getComments(widget.gameId);
-      if (mounted) {
-        setState(() {
-          _comments = comments;
-        });
-      }
+      if (mounted) setState(() => _comments = comments);
     } catch (e) {
-      debugPrint('Error loading comments: $e');
+      debugPrint('Error: $e');
     }
   }
 
@@ -58,22 +52,14 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
       _commentController.clear();
       await _loadComments();
     } catch (e) {
-      if (mounted) {
-        debugPrint('❌ UI Comment Error: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to comment: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('Error: $e');
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
   }
 
-  Future<void> _handleToggleLike(MemeComment comment) async {
-    // Optimistic UI Update
+  Future<void> _handleVote(MemeComment comment) async {
+    // Optimistic UI
     setState(() {
       if (comment.isUpvotedByMe) {
         comment.isUpvotedByMe = false;
@@ -87,129 +73,80 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
     try {
       await _service.toggleLike(comment.id);
     } catch (e) {
-      debugPrint('Toggle like error: $e');
-      // Rollback on error
-      setState(() {
-        if (comment.isUpvotedByMe) {
-          comment.isUpvotedByMe = false;
-          comment.upvotes--;
-        } else {
-          comment.isUpvotedByMe = true;
-          comment.upvotes++;
-        }
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to update like. Please try again.')),
-        );
-      }
+      _loadComments(); // Rollback
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('MEME GAME')),
+      backgroundColor: isDark ? const Color(0xFF0B0B0F) : const Color(0xFFF8F9FC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text("MEME BATTLE", style: TextStyle(fontWeight: FontWeight.w900)),
+        centerTitle: true,
+      ),
       body: Column(
         children: [
           Expanded(
             child: FutureBuilder<MemeGame>(
               future: _gameFuture,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: Text('Game not found'));
-                }
+                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData) return const Center(child: Text("Meme not found"));
                 
                 final game = snapshot.data!;
                 return CustomScrollView(
                   slivers: [
                     SliverToBoxAdapter(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Image.network(
-                            game.imageUrl,
-                            fit: BoxFit.contain,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const SizedBox(
-                                height: 300,
-                                child: Center(child: CircularProgressIndicator()),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) => const SizedBox(
-                              height: 200,
-                              child: Center(child: Icon(Icons.broken_image, size: 64, color: Colors.grey)),
+                          Container(
+                            margin: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20)],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Image.network(game.imageUrl, fit: BoxFit.contain),
                             ),
                           ),
                           if (game.caption != null && game.caption!.isNotEmpty)
                             Padding(
-                              padding: const EdgeInsets.all(16.0),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                               child: Text(
                                 game.caption!,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                 textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                               ),
                             ),
-                          const Divider(),
                           const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                            child: Text(
-                              'COMMENTS',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                            padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text("BATTLE COMMENTS", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Colors.grey, letterSpacing: 1)),
                             ),
                           ),
                         ],
                       ),
                     ),
                     _comments.isEmpty
-                        ? const SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: Center(child: Text('No comments yet. Be the first!')),
-                          )
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final comment = _comments[index];
-                                return ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundImage: comment.user?.avatarUrl != null
-                                        ? NetworkImage(comment.user!.avatarUrl!)
-                                        : null,
-                                    child: comment.user?.avatarUrl == null
-                                        ? const Icon(Icons.person)
-                                        : null,
-                                  ),
-                                  title: Text(
-                                    comment.user?.username ?? 'Unknown',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  ),
-                                  subtitle: Text(comment.comment),
-                                  trailing: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: Icon(
-                                          comment.isUpvotedByMe ? Icons.thumb_up : Icons.thumb_up_outlined,
-                                          size: 18,
-                                          color: comment.isUpvotedByMe ? Colors.blue : Colors.grey,
-                                        ),
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                        onPressed: () => _handleToggleLike(comment),
-                                      ),
-                                      Text('${comment.upvotes}', style: const TextStyle(fontSize: 12)),
-                                    ],
-                                  ),
-                                );
-                              },
-                              childCount: _comments.length,
+                        ? const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text("No roasts yet. Be the first! 🔥", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))))
+                        : SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) => _MemeCommentTile(
+                                  comment: _comments[index],
+                                  onVote: () => _handleVote(_comments[index]),
+                                  isCreator: _comments[index].userId == game.creatorId,
+                                ),
+                                childCount: _comments.length,
+                              ),
                             ),
                           ),
                   ],
@@ -217,44 +154,113 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
               },
             ),
           ),
-          _buildCommentInput(),
+          _buildInputArea(isDark),
         ],
       ),
     );
   }
 
-  Widget _buildCommentInput() {
+  Widget _buildInputArea(bool isDark) {
     return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.of(context).padding.bottom + 8,
-        top: 8,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5)),
-        ],
+        color: isDark ? const Color(0xFF16181D) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
       ),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _commentController,
-              decoration: const InputDecoration(
-                hintText: 'Add a comment...',
-                border: InputBorder.none,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                hintText: "Roast this meme...",
+                filled: true,
+                fillColor: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF0F2F5),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-              maxLines: null,
-              onSubmitted: (_) => _sendComment(),
             ),
           ),
-          IconButton(
-            icon: _isSending
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.send, color: Colors.blue),
-            onPressed: _isSending ? null : _sendComment,
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _isSending ? null : _sendComment,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle),
+              child: _isSending 
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send_rounded, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemeCommentTile extends StatelessWidget {
+  final MemeComment comment;
+  final VoidCallback onVote;
+  final bool isCreator;
+
+  const _MemeCommentTile({required this.comment, required this.onVote, required this.isCreator});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF16181D) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isCreator ? const Color(0xFFF59E0B).withOpacity(0.3) : (isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03))),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundImage: ImageUtils.getImageProvider(comment.user?.avatarUrl),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(comment.user?.username ?? "Someone", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13)),
+                    if (isCreator) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0xFFF59E0B), borderRadius: BorderRadius.circular(4)),
+                        child: const Text("OP", style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(comment.comment, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: onVote,
+            child: Column(
+              children: [
+                Icon(
+                  comment.isUpvotedByMe ? Icons.favorite_rounded : Icons.favorite_outline_rounded,
+                  size: 20,
+                  color: comment.isUpvotedByMe ? Colors.redAccent : Colors.grey,
+                ),
+                Text("${comment.upvotes}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+              ],
+            ),
           ),
         ],
       ),
