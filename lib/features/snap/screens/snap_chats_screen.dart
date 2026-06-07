@@ -20,6 +20,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
   List<Map<String, dynamic>> _chats = [];
+  Map<String, int> _streakMap = {};
   int _pendingRequestsCount = 0;
   RealtimeChannel? _realtimeChannel;
   Timer? _refreshTimer;
@@ -120,6 +121,25 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           .eq('status', 'pending');
       
       if (mounted) setState(() => _pendingRequestsCount = (requestsRes as List).length);
+
+      // 1.7. Fetch streaks
+      Map<String, int> streakMap = {};
+      try {
+        final streaksRes = await supabase
+            .from('snap_streaks')
+            .select('user1_id, user2_id, streak_count')
+            .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
+        
+        final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
+        for (var row in streaksData) {
+          final u1 = row['user1_id'] as String;
+          final u2 = row['user2_id'] as String;
+          final friendId = (u1 == user.id) ? u2 : u1;
+          streakMap[friendId] = row['streak_count'] as int;
+        }
+      } catch (e) {
+        debugPrint("CHAT_SCREEN: Streaks fetch error: $e");
+      }
 
       // 2. Fetch recent messages and snaps
       final messagesRes = await supabase
@@ -295,6 +315,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
       if (mounted) {
         setState(() {
           _chats = chatList;
+          _streakMap = streakMap;
           _isLoading = false;
         });
       }
@@ -421,9 +442,10 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   Widget _buildChatTile(Map<String, dynamic> chat) {
     final isUnread = chat['is_unread'] as bool? ?? false;
     final isSnap = chat['type'] == 'snap';
+    final streak = _streakMap[chat['id']] ?? 0;
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       onTap: () {
         Navigator.push(
           context,
@@ -452,7 +474,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
         ),
       ),
       subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
+        padding: const EdgeInsets.only(top: 2),
         child: Row(
           children: [
             if (isSnap) ...[
@@ -466,12 +488,42 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
               const SizedBox(width: 4),
             ],
             Expanded(
-              child: Text(
-                "${chat['last_activity']} • ${chat['timestamp']}",
-                style: TextStyle(
-                  color: isUnread ? Colors.black : Colors.grey[600],
-                  fontWeight: isUnread ? FontWeight.w700 : FontWeight.normal,
-                  fontSize: 14,
+              child: Text.rich(
+                TextSpan(
+                  style: const TextStyle(fontSize: 13),
+                  children: [
+                    TextSpan(
+                      text: chat['last_activity'],
+                      style: TextStyle(
+                        color: isUnread ? Colors.black : Colors.grey[600],
+                        fontWeight: isUnread ? FontWeight.w700 : FontWeight.normal,
+                      ),
+                    ),
+                    TextSpan(
+                      text: " • ",
+                      style: TextStyle(color: Colors.grey[400]),
+                    ),
+                    TextSpan(
+                      text: chat['timestamp'],
+                      style: TextStyle(
+                        color: isUnread ? Colors.black : Colors.grey[600],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (streak > 0) ...[
+                      TextSpan(
+                        text: " • ",
+                        style: TextStyle(color: Colors.grey[400]),
+                      ),
+                      TextSpan(
+                        text: "${streak}🔥",
+                        style: TextStyle(
+                          color: isUnread ? Colors.black : Colors.grey[600],
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

@@ -120,7 +120,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       Map<String, int> streaksMap = {};
       try {
         final streaksResponse = await supabase
-            .from('user_streaks')
+            .from('snap_streaks')
             .select('user1_id, user2_id, streak_count')
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         

@@ -92,7 +92,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       if (currentUser != null) {
         try {
           final streaksResponse = await supabase
-              .from('user_streaks')
+              .from('snap_streaks')
               .select('user1_id, user2_id, streak_count')
               .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
           
@@ -178,20 +178,14 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                                     ),
                                     const SizedBox(width: 4),
                                     PremiumUtils.buildBadge(plan),
+                                    if (streak > 0) ...[
+                                      const SizedBox(width: 4),
+                                      Text("${streak}🔥", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal, color: Colors.grey)),
+                                    ],
                                   ],
                                 ),
-                                subtitle: Text("@${profile['username']}", style: const TextStyle(color: Colors.grey)),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (streak > 0)
-                                      Padding(
-                                        padding: const EdgeInsets.only(right: 8),
-                                        child: Text("🔥 $streak", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orangeAccent)),
-                                      ),
-                                    const Icon(Icons.chevron_right_rounded, size: 24, color: Colors.grey),
-                                  ],
-                                ),
+                                subtitle: Text("@${profile['username']}", style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                                trailing: const Icon(Icons.chevron_right_rounded, size: 24, color: Colors.grey),
                                 onTap: () {
                                   Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(userId: profile['id']))).then((_) => _loadData());
                                 },
