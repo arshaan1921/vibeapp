@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
 
 class FriendService {
   final _supabase = Supabase.instance.client;
@@ -8,11 +9,39 @@ class FriendService {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
 
+    // 1. Insert into friend_requests table
     await _supabase.from('friend_requests').insert({
       'sender_id': user.id,
       'receiver_id': receiverId,
       'status': 'pending',
     });
+
+    // 2. Send push notification
+    try {
+      // Fetch sender username from profiles table
+      final profileRes = await _supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      final username = profileRes?['username'] ?? "Someone";
+
+      // Send push notification to receiver using NotificationService
+      await NotificationService.sendNotification(
+        userId: receiverId,
+        title: "Friend Request",
+        body: "$username sent you a friend request",
+        data: {
+          "type": "friend_request",
+          "sender_id": user.id,
+        },
+      );
+      debugPrint("✅ Friend request notification sent to $receiverId");
+    } catch (e) {
+      debugPrint("⚠️ Friend request notification failed: $e");
+      // Notification failure shouldn't affect the friend request itself
+    }
   }
 
   Future<void> acceptFriendRequest(String requestId, String senderId) async {
@@ -30,6 +59,33 @@ class FriendService {
       'user1_id': senderId.compareTo(user.id) < 0 ? senderId : user.id,
       'user2_id': senderId.compareTo(user.id) < 0 ? user.id : senderId,
     });
+
+    // 3. Send push notification
+    try {
+      // Fetch current user's username
+      final profileRes = await _supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      final username = profileRes?['username'] ?? "Someone";
+
+      // Send notification to the person who sent the request (senderId)
+      await NotificationService.sendNotification(
+        userId: senderId,
+        title: "Friend Request Accepted",
+        body: "$username accepted your friend request",
+        data: {
+          "type": "friend_accepted",
+          "friend_id": user.id,
+        },
+      );
+      debugPrint("✅ Friend acceptance notification sent to $senderId");
+    } catch (e) {
+      debugPrint("⚠️ Friend acceptance notification failed: $e");
+      // Notification failure shouldn't affect the friendship itself
+    }
   }
 
   Future<void> declineFriendRequest(String requestId) async {

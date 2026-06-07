@@ -11,6 +11,7 @@ import '../screens/questions_screen.dart';
 import '../screens/answer_detail_screen.dart';
 import '../screens/my_tickets_screen.dart';
 import '../features/games/games_screen.dart';
+import '../screens/friend_requests_screen.dart';
 import 'update_service.dart';
 
 class NotificationService {
@@ -108,8 +109,8 @@ class NotificationService {
     FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
         debugPrint("🚀 App opened from terminated state: ${message.data}");
-        // Wait slightly longer than splash screen (3000ms) to ensure navigation persists
-        Future.delayed(const Duration(milliseconds: 3500), () {
+        // Wait slightly longer than splash screen (1000ms) to ensure navigation persists
+        Future.delayed(const Duration(milliseconds: 1500), () {
           _handleNavigation(message.data);
         });
       }
@@ -214,6 +215,15 @@ class NotificationService {
       navigatorKey.currentState?.push(
         MaterialPageRoute(builder: (_) => const GamesScreen()),
       );
+    } else if (type == 'friend_request') {
+      debugPrint("👥 Friend request notification tapped");
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
+      );
+    } else if (type == 'friend_accepted' || type == 'snap') {
+      debugPrint("👻 Friend accepted/Snap notification tapped");
+      tabIndexNotifier.value = 3; // Navigate to SnapChats tab
+      navigatorKey.currentState?.popUntil((route) => route.isFirst);
     }
   }
 

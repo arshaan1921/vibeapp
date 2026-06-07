@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../main.dart';
 import '../../../utils/image_utils.dart';
+import '../../../services/notification_service.dart';
 
 class SendSnapScreen extends StatefulWidget {
   final String imagePath;
@@ -226,6 +227,36 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
         try {
           final res = await supabase.from('snap_recipients').insert(recipients).select();
           debugPrint('SNAP_RECIPIENT_SUCCESS: $res');
+
+          // 4. Send Push Notifications
+          try {
+            // Fetch sender username
+            final profileRes = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', user.id)
+                .maybeSingle();
+            
+            final username = profileRes?['username'] ?? "Someone";
+
+            // Send notifications in parallel
+            await Future.wait(_selectedUserIds.map((recipientId) {
+              return NotificationService.sendNotification(
+                userId: recipientId,
+                title: "New Snap 👻",
+                body: "$username sent you a snap",
+                data: {
+                  "type": "snap",
+                  "snap_id": snapId,
+                  "sender_id": user.id,
+                },
+              );
+            }));
+            debugPrint("✅ Snap notifications sent to ${_selectedUserIds.length} recipients");
+          } catch (e) {
+            debugPrint("⚠️ Snap notification sending failed: $e");
+            // Notification failure shouldn't stop the snap success flow
+          }
         } catch (e, st) {
           debugPrint('SNAP_RECIPIENT_ERROR: Failed to insert recipients');
           debugPrint('SNAP_RECIPIENT_ERROR_DETAILS: $e');

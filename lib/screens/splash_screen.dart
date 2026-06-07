@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   void _navigateToNext() async {
     print("🔍 Checking user/session...");
-    await Future.delayed(const Duration(milliseconds: 3000));
+    await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
 
     final session = Supabase.instance.client.auth.currentSession;
