@@ -14,6 +14,7 @@ import 'services/notification_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/reset_password_page.dart';
 import 'services/iap_service.dart';
+import 'services/streak_restore_service.dart';
 import 'widgets/update_popup.dart';
 import 'services/update_service.dart';
 import 'features/ai_companion/screens/ai_companion_screen.dart';
@@ -71,6 +72,7 @@ void main() async {
 
   // Initialize In-App Purchases
   IAPService().initialize();
+  StreakRestoreService().initialize();
 
   /// 🔥 PASSWORD RECOVERY LISTENER
   Supabase.instance.client.auth.onAuthStateChange.listen((data) {

@@ -108,6 +108,9 @@ class IAPService {
     final user = supabase.auth.currentUser;
     if (user == null) return false;
 
+    // Ignore streak restore products, they are handled by StreakRestoreService
+    if (purchase.productID.startsWith('high5_restore_')) return false;
+
     try {
       if (_subIds.contains(purchase.productID)) {
         String plan = purchase.productID.split('_')[0];

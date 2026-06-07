@@ -49,6 +49,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       "Choose Your Plan",
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 16),
+                    _buildRestoreFeaturesInfo(),
                     const SizedBox(height: 24),
                     _buildPlanCard(
                       context,
@@ -58,6 +60,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       features: [
                         "50 questions per day",
                         "100 AI chats per day ❤️",
+                        "3 streak restores per month 🔥",
+                        "72 hour restore window",
                         "Green verified badge",
                         "Green profile ring"
                       ],
@@ -71,6 +75,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       features: [
                         "Unlimited questions",
                         "300 AI chats per day ❤️",
+                        "10 streak restores per month 🔥",
+                        "Priority streak support",
                         "Blue verified badge",
                         "Blue profile ring"
                       ],
@@ -84,6 +90,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       features: [
                         "Unlimited questions",
                         "1000 AI chats per day ❤️",
+                        "Unlimited streak restores 🔥",
+                        "Future streak protection",
                         "Yellow verified badge",
                         "Yellow profile ring"
                       ],
@@ -94,6 +102,55 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildRestoreFeaturesInfo() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.local_fire_department, color: Colors.orange),
+              SizedBox(width: 8),
+              Text(
+                "STREAK RESTORES",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildRestoreFeatureRow("Free", "1 restore/month • 72h window"),
+          _buildRestoreFeatureRow("Green", "3 restores/month • 72h window"),
+          _buildRestoreFeatureRow("Blue", "10 restores/month • Priority Support"),
+          _buildRestoreFeatureRow("Yellow", "Unlimited restores • Priority Support"),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestoreFeatureRow(String plan, String details) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(plan, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          Text(details, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+        ],
+      ),
     );
   }
 
@@ -138,6 +195,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 const SizedBox(height: 16),
                 ...features.map((f) {
                   final isAiFeature = f.contains("AI chats");
+                  final isStreakFeature = f.contains("streak restores") || f.contains("streak support") || f.contains("streak protection");
                   final isBadgeFeature = f.contains("verified badge");
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8.0),
@@ -146,7 +204,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         Icon(
                           isBadgeFeature ? Icons.verified_rounded : Icons.check_circle, 
                           size: 18, 
-                          color: color
+                          color: isStreakFeature ? Colors.orange : color
                         ),
                         const SizedBox(width: 8),
                         if (isAiFeature)
@@ -158,6 +216,13 @@ class _PremiumScreenState extends State<PremiumScreen> {
                                 const SizedBox(width: 4),
                                 Icon(Icons.auto_awesome, size: 16, color: color),
                               ],
+                            ),
+                          )
+                        else if (isStreakFeature)
+                          Expanded(
+                            child: Text(
+                              f.replaceAll("🔥", "").trim(),
+                              style: const TextStyle(fontWeight: FontWeight.w500),
                             ),
                           )
                         else

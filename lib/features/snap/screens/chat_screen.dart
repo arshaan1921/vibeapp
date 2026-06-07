@@ -4,8 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../utils/image_utils.dart';
 import '../models/snap_message.dart';
+import '../models/streak.dart';
 import 'camera_screen.dart';
 import 'snap_viewer_screen.dart';
+import '../../../screens/premium.dart';
+import '../../../widgets/streak_restore_store_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -25,6 +28,14 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
 
+  // Streak Restore state
+  SnapStreak? _currentStreakData;
+  int _freeRestores = 0;
+  int _restoresUsed = 0;
+  int _purchasedRestores = 0;
+  Timer? _countdownTimer;
+  bool _isRestoring = false;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _realtimeChannel?.unsubscribe();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
@@ -81,11 +93,127 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
 
+      await _fetchStreakData();
+      await _fetchUserRestoreLimits();
       await _loadMessages();
     } catch (e) {
       debugPrint("Error loading chat data: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchStreakData() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final streakRes = await supabase
+          .from('snap_streaks')
+          .select()
+          .or('and(user1_id.eq.${user.id},user2_id.eq.${widget.userId}),and(user1_id.eq.${widget.userId},user2_id.eq.${user.id})')
+          .maybeSingle();
+
+      if (streakRes != null && mounted) {
+        final streak = SnapStreak.fromMap(streakRes);
+        setState(() {
+          _currentStreakData = streak;
+          _streak = streak.streakCount;
+        });
+
+        if (streak.canBeRestored) {
+          _startCountdownTimer();
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching streak data: $e");
+    }
+  }
+
+  Future<void> _fetchUserRestoreLimits() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final profileRes = await supabase
+          .from('profiles')
+          .select('free_streak_restores, streak_restores_used_this_month, purchased_streak_restores')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (profileRes != null && mounted) {
+        setState(() {
+          _freeRestores = profileRes['free_streak_restores'] ?? 0;
+          _restoresUsed = profileRes['streak_restores_used_this_month'] ?? 0;
+          _purchasedRestores = profileRes['purchased_streak_restores'] ?? 0;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching restore limits: $e");
+    }
+  }
+
+  void _startCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        if (_currentStreakData != null && !_currentStreakData!.canBeRestored) {
+          timer.cancel();
+          _fetchStreakData(); // Refresh to hide banner
+        } else {
+          setState(() {}); // Trigger rebuild to update timer text
+        }
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _restoreStreak() async {
+    if (_isRestoring || _currentStreakData == null) return;
+
+    setState(() => _isRestoring = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final result = await supabase.rpc(
+        'restore_streak',
+        params: {
+          'p_streak_id': _currentStreakData!.id,
+          'p_user_id': user.id,
+        },
+      );
+
+      if (result == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("🔥 Streak restored successfully!")),
+          );
+          await _fetchStreakData();
+          await _fetchUserRestoreLimits();
+          await _loadMessages();
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Unable to restore streak")),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Error restoring streak: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Unable to restore streak")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRestoring = false);
     }
   }
 
@@ -298,6 +426,8 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (_currentStreakData != null && _currentStreakData!.canBeRestored)
+            _buildRestoreBanner(),
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator(color: Colors.green))
@@ -313,6 +443,176 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
           ),
           _buildInputArea(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRestoreBanner() {
+    final remainingRestores = (_freeRestores - _restoresUsed).clamp(0, 999) + _purchasedRestores;
+    final deadline = _currentStreakData!.timeUntilDeadline;
+    final countdownText = deadline != null 
+        ? "${deadline.inHours}h ${deadline.inMinutes % 60}m remaining"
+        : "";
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF9D42), Color(0xFFFF6B00)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.local_fire_department, color: Colors.white, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Streak Lost",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "You lost a ${_currentStreakData!.brokenStreakCount} day streak with ${widget.userName}",
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Restore available for:",
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  Text(
+                    countdownText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              if (remainingRestores > 0)
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.orange,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  onPressed: _isRestoring ? null : _restoreStreak,
+                  child: _isRestoring
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.orange,
+                          ),
+                        )
+                      : const Text(
+                          "Restore Streak",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                ),
+            ],
+          ),
+          if (remainingRestores > 0) ...[
+            const SizedBox(height: 12),
+            Text(
+              "Restores remaining: $remainingRestores",
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            const Text(
+              "No free restores remaining",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            const Text(
+              "Upgrade to Premium for additional streak restores",
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white24,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => const StreakRestoreStoreDialog(),
+                  ).then((value) {
+                    if (value == true) {
+                      _fetchUserRestoreLimits();
+                    }
+                  });
+                },
+                child: const Text("Buy Streak Restores"),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white24,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  // Navigate to Premium Screen
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PremiumScreen()),
+                  );
+                },
+                child: const Text("View Premium Plans"),
+              ),
+            ),
+          ],
         ],
       ),
     );

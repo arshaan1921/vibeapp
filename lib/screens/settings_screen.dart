@@ -7,6 +7,7 @@ import 'premium.dart';
 import 'blocked_users_screen.dart';
 import 'report_problem_screen.dart';
 import 'booster_pack_screen.dart';
+import 'streak_restore_screen.dart';
 import 'delete_account_screen.dart';
 import 'my_tickets_screen.dart';
 
@@ -60,8 +61,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildSettingRow(Icons.star_outline_rounded, "Premium Plan", () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen()));
                     }),
-                    _buildSettingRow(Icons.bolt_rounded, "Question Booster", () {
+                    _buildSettingRow(Icons.bolt_outlined, "Question Booster", () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const BoosterPackScreen()));
+                    }),
+                    _buildSettingRow(Icons.local_fire_department_outlined, "Streak Restore", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const StreakRestoreScreen()));
                     }),
                   ]),
                   _buildSection("About", [
