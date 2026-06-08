@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/notification_service.dart';
 
 class AnswerQuestionScreen extends StatefulWidget {
   final String questionId;
@@ -48,13 +49,13 @@ class _AnswerQuestionScreenState extends State<AnswerQuestionScreen> {
         'answer_text': text,
       });
 
-      // Step: Fetch the question owner (receiver) from "questions" table
+      // Step: Fetch the question asker from "questions" table
       final questionData = await supabase
           .from('questions')
-          .select('to_user')
+          .select('from_user')
           .eq('id', widget.questionId)
           .single();
-      final questionOwnerId = questionData['to_user'];
+      final askerId = questionData['from_user'];
 
       // Step 4: Fetch current user's username from "profiles"
       final profile = await supabase
@@ -64,30 +65,21 @@ class _AnswerQuestionScreenState extends State<AnswerQuestionScreen> {
           .single();
       final username = profile['username'] ?? "Someone";
 
-      // Step 5: Send push notification using same method as question push
-      try {
-        final session = supabase.auth.currentSession;
-        final accessToken = session?.accessToken;
-
-        if (accessToken != null && questionOwnerId != null) {
-          await supabase.functions.invoke(
-            'supabase-functions-new-send-push-notification',
-            body: {
-              "user_id": questionOwnerId,
-              "title": "New Answer 💬",
-              "body": "@$username answered your question",
-              "data": {
-                "type": "answer",
-                "question_id": widget.questionId
-              }
-            },
-            headers: {
-              "Authorization": "Bearer $accessToken",
+      // Step 5: Send push notification to the asker
+      if (askerId != null && askerId != currentUser.id) {
+        try {
+          await NotificationService.sendNotification(
+            userId: askerId,
+            title: "New Answer 💬",
+            body: "@$username answered your question",
+            data: {
+              "type": "answer",
+              "question_id": widget.questionId
             },
           );
+        } catch (e) {
+          debugPrint("Push failed: $e");
         }
-      } catch (e) {
-        debugPrint("Push failed: $e");
       }
 
       if (mounted) {

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/notification_service.dart';
 import 'premium.dart';
 
 class AskAnyUserScreen extends StatefulWidget {
@@ -104,6 +105,21 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
         'is_anonymous': isAnonymous,
         'image_url': imageUrl,
       });
+
+      // Send Push Notification
+      try {
+        final profileRes = await supabase.from('profiles').select('username').eq('id', currentUser.id).maybeSingle();
+        final senderName = isAnonymous ? "Someone" : (profileRes?['username'] ?? "Someone");
+        
+        await NotificationService.sendNotification(
+          userId: selectedUserId!,
+          title: "New Question 📥",
+          body: isAnonymous ? "You got a new anonymous question!" : "@$senderName asked you a question",
+          data: {"type": "question"},
+        );
+      } catch (e) {
+        debugPrint("Error sending question notification: $e");
+      }
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {

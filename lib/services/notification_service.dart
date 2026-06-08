@@ -11,6 +11,9 @@ import '../screens/questions_screen.dart';
 import '../screens/answer_detail_screen.dart';
 import '../screens/my_tickets_screen.dart';
 import '../features/games/games_screen.dart';
+import '../features/games/most_likely_game.dart';
+import '../features/games/truth_lie_game.dart';
+import '../features/games/meme_game_screen.dart';
 import '../screens/friend_requests_screen.dart';
 import 'update_service.dart';
 
@@ -83,7 +86,7 @@ class NotificationService {
         ?.createNotificationChannel(channel);
 
     // 3. Setup Listeners
-    
+
     // Listen for token refresh
     FirebaseMessaging.instance.onTokenRefresh.listen((token) {
       debugPrint("🔄 FCM Token refreshed: $token");
@@ -121,14 +124,14 @@ class NotificationService {
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final AuthChangeEvent event = data.event;
       final user = data.session?.user;
-      
+
       debugPrint("🔐 NotificationService: Auth Event - $event");
 
-      if (user != null && 
-          (event == AuthChangeEvent.signedIn || 
-           event == AuthChangeEvent.initialSession || 
+      if (user != null &&
+          (event == AuthChangeEvent.signedIn ||
+           event == AuthChangeEvent.initialSession ||
            event == AuthChangeEvent.tokenRefreshed)) {
-        
+
         debugPrint("👤 User session active ($event), retrying token save...");
         if (_cachedToken != null) {
           saveTokenToSupabase(_cachedToken!);
@@ -169,24 +172,8 @@ class NotificationService {
       debugPrint("➡️ Opening Questions tab (Inbox)");
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
       navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const QuestionsScreen()));
-    } else if (type == 'answer') {
-      debugPrint("💬 Answer notification tapped");
-      if (answerId != null) {
-        debugPrint("➡️ Opening AnswerDetailScreen");
-        navigatorKey.currentState?.push(
-          MaterialPageRoute(builder: (_) => AnswerDetailScreen(answerId: answerId)),
-        );
-      }
-    } else if (type == 'reply' || type == 'answer_reply') {
-      debugPrint("💬 Reply notification tapped");
-      if (answerId != null) {
-        debugPrint("➡️ Opening AnswerDetailScreen");
-        navigatorKey.currentState?.push(
-          MaterialPageRoute(builder: (_) => AnswerDetailScreen(answerId: answerId)),
-        );
-      }
-    } else if (type == 'like' || type == 'answer_like') {
-      debugPrint("❤️ Like notification tapped");
+    } else if (type == 'answer' || type == 'reply' || type == 'answer_reply' || type == 'like' || type == 'answer_like') {
+      debugPrint("💬 Answer/Reply/Like notification tapped: $type");
       if (answerId != null) {
         debugPrint("➡️ Opening AnswerDetailScreen");
         navigatorKey.currentState?.push(
@@ -211,10 +198,31 @@ class NotificationService {
       }
     } else if (type == 'game') {
       debugPrint("🎮 Game notification tapped");
-      debugPrint("➡️ Opening GamesScreen");
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => const GamesScreen()),
-      );
+      final gameType = data['game_type'];
+      final gameId = data['game_id']?.toString();
+      
+      if (gameId != null && gameType != null) {
+        debugPrint("➡️ Opening game: $gameType, ID: $gameId");
+        Widget target;
+        if (gameType == 'most_likely') {
+          target = MostLikelyPlay(gameId: gameId);
+        } else if (gameType == 'truth_lie') {
+          target = TruthLiePlay(gameId: gameId);
+        } else if (gameType == 'meme') {
+          target = MemeGameScreen(gameId: gameId);
+        } else {
+          target = const GamesScreen();
+        }
+        
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => target),
+        );
+      } else {
+        debugPrint("➡️ No game details, opening GamesScreen");
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const GamesScreen()),
+        );
+      }
     } else if (type == 'friend_request') {
       debugPrint("👥 Friend request notification tapped");
       navigatorKey.currentState?.push(
@@ -273,7 +281,7 @@ class NotificationService {
 
     try {
       debugPrint("💾 Saving token to Supabase for user: ${user.id}");
-      
+
       await supabase.from('device_tokens').upsert(
         {
           'user_id': user.id,
@@ -282,7 +290,7 @@ class NotificationService {
         },
         onConflict: 'user_id,token',
       );
-      
+
       debugPrint("✅ Token saved successfully to Supabase");
       _lastToken = token;
       _cachedToken = null; // Clear cache after successful save
@@ -300,7 +308,7 @@ class NotificationService {
     Map<String, dynamic>? payload,
   }) async {
     debugPrint("🔔 Showing local notification: $title");
-    
+
     const androidDetails = AndroidNotificationDetails(
       'high5_channel',
       'High5 Notifications',
@@ -331,10 +339,40 @@ class NotificationService {
     Map<String, dynamic>? data,
   }) async {
     final supabase = Supabase.instance.client;
+    final senderId = supabase.auth.currentUser?.id;
 
     try {
-      debugPrint("🚀 Invoking Edge Function for user_id: $userId");
+      final type = data?['type'] ?? 'unknown';
+      debugPrint("🚀 PUSH AUDIT START");
+      debugPrint("🚀 PUSH AUDIT: Type: $type");
+      debugPrint("🚀 PUSH AUDIT: Recipient ID: $userId");
+      debugPrint("🚀 PUSH AUDIT: Sender ID: $senderId");
+      debugPrint("🚀 PUSH AUDIT: Title: $title");
+      debugPrint("🚀 PUSH AUDIT: Body: $body");
+      debugPrint("🚀 PUSH AUDIT: Payload Data: $data");
 
+      // Verify if recipient has a token (Debug check)
+      try {
+        final tokenCheck = await supabase
+            .from('device_tokens')
+            .select('id')
+            .eq('user_id', userId)
+            .limit(1)
+            .maybeSingle();
+        
+        if (tokenCheck == null) {
+          debugPrint("⚠️ PUSH AUDIT WARNING: Recipient $userId has NO tokens in 'device_tokens' table according to client-side check.");
+        } else {
+          debugPrint("✅ PUSH AUDIT INFO: Recipient $userId has at least one token registered.");
+        }
+      } catch (e) {
+        debugPrint("ℹ️ PUSH AUDIT: Could not verify token existence client-side (possibly RLS): $e");
+      }
+
+      // We invoke the Edge Function. 
+      // Note: We don't manually pass the Authorization header here because 
+      // supabaseKey was removed in newer supabase_flutter versions.
+      // The Edge Function should use its SERVICE_ROLE internally to bypass RLS.
       final res = await supabase.functions.invoke(
         'supabase-functions-new-send-push-notification',
         body: {
@@ -345,16 +383,24 @@ class NotificationService {
         },
       );
 
-      debugPrint("✅ Edge Function Result: ${res.data}");
+      debugPrint("✅ PUSH AUDIT SUCCESS: Status ${res.status}");
+      debugPrint("✅ PUSH AUDIT Response Data: ${res.data}");
+      
+      if (res.status == 404) {
+        debugPrint("❌ PUSH AUDIT FAILURE: Edge Function returned 404. It could not find tokens for $userId in the database.");
+      } else if (res.status != 200) {
+        debugPrint("⚠️ PUSH AUDIT WARNING: Unexpected status ${res.status}");
+      }
+      debugPrint("🚀 PUSH AUDIT END");
     } catch (e) {
-      debugPrint("🔥 Edge Function Invocation Error: $e");
+      debugPrint("🔥 PUSH AUDIT CRITICAL ERROR: $e");
     }
   }
 
   static Future<void> sendTestNotification() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
-    
+
     debugPrint("🧪 Sending TEST notification to self...");
     await sendNotification(
       userId: user.id,

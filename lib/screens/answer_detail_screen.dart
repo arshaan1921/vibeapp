@@ -6,6 +6,7 @@ import 'profile.dart';
 import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
 import '../services/like_service.dart';
+import '../services/notification_service.dart';
 import '../main.dart';
 
 class AnswerDetailScreen extends StatefulWidget {
@@ -270,32 +271,19 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
           'seen': false,
         });
 
-        try {
-          final session = supabase.auth.currentSession;
-          final accessToken = session?.accessToken;
-          final profile = await supabase.from('profiles').select('username').eq('id', user.id).single();
-          final String username = profile['username'] ?? "Someone";
+        // Fetch sender username
+        final profileRes = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle();
+        final username = profileRes?['username'] ?? "Someone";
 
-          if (accessToken != null) {
-            await supabase.functions.invoke(
-              'supabase-functions-new-send-push-notification',
-              body: {
-                "user_id": answerOwnerId,
-                "title": "New Reply 💬",
-                "body": "@$username replied on your answer",
-                "data": {
-                  "type": "reply",
-                  "answer_id": widget.answerId
-                }
-              },
-              headers: {
-                "Authorization": "Bearer $accessToken",
-              },
-            );
-          }
-        } catch (e) {
-          debugPrint("Push notification failed: $e");
-        }
+        await NotificationService.sendNotification(
+          userId: answerOwnerId,
+          title: "New Reply 💬",
+          body: "@$username replied on your answer",
+          data: {
+            "type": "reply",
+            "answer_id": widget.answerId
+          },
+        );
       }
 
       if (mounted) {

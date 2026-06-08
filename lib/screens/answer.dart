@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import '../models/question.dart';
 import '../utils/link_utils.dart';
+import '../services/notification_service.dart';
 
 class AnswerScreen extends StatefulWidget {
   final Question question;
@@ -131,7 +132,16 @@ class _AnswerScreenState extends State<AnswerScreen> {
           'seen': false,
         });
 
-        _sendPushNotification(questionSenderId, answerResponse['id'], user.id);
+        // Fetch sender username
+        final profileRes = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle();
+        final username = profileRes?['username'] ?? "Someone";
+
+        await NotificationService.sendNotification(
+          userId: questionSenderId,
+          title: "New Answer 💬",
+          body: "@$username answered your question",
+          data: {"type": "answer", "answer_id": answerResponse['id']},
+        );
       }
 
       if (mounted) Navigator.pop(context, true);
@@ -141,31 +151,6 @@ class _AnswerScreenState extends State<AnswerScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  Future<void> _sendPushNotification(String targetUserId, String answerId, String currentUserId) async {
-    try {
-      final supabase = Supabase.instance.client;
-      final session = supabase.auth.currentSession;
-      final accessToken = session?.accessToken;
-      if (accessToken == null) return;
-
-      final profile = await supabase.from('profiles').select('username').eq('id', currentUserId).single();
-      final username = profile['username'] ?? "Someone";
-
-      await supabase.functions.invoke(
-        'supabase-functions-new-send-push-notification',
-        body: {
-          "user_id": targetUserId,
-          "title": "New Answer 💬",
-          "body": "@$username answered your question",
-          "data": {"type": "answer", "answer_id": answerId}
-        },
-        headers: {"Authorization": "Bearer $accessToken"},
-      );
-    } catch (e) {
-      debugPrint("Push notification failed: $e");
     }
   }
 
