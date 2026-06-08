@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/legal_links.dart';
+import '../services/notification_service.dart';
 import 'auth/welcome.dart';
 import 'edit_profile.dart';
 import 'premium.dart';
@@ -44,6 +45,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     }),
                     _buildSettingRow(Icons.lock_outline_rounded, "Change Password", () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                    }),
+                  ]),
+                  _buildSection("Notifications", [
+                    _buildSettingRow(Icons.notifications_outlined, "Test Push Notification", () async {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Sending test notification...")),
+                      );
+                      await NotificationService.sendTestNotification();
                     }),
                   ]),
                   _buildSection("Privacy & Safety", [

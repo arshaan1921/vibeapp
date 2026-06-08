@@ -95,6 +95,18 @@ class FriendService {
     }).eq('id', requestId);
   }
 
+  Future<void> cancelFriendRequest(String receiverId) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    await _supabase
+        .from('friend_requests')
+        .delete()
+        .eq('sender_id', user.id)
+        .eq('receiver_id', receiverId)
+        .eq('status', 'pending');
+  }
+
   Future<void> blockUser(String requestId) async {
     await _supabase.from('friend_requests').update({
       'status': 'blocked',

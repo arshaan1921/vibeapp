@@ -240,6 +240,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       if (_friendshipStatus == 'none' || _friendshipStatus == 'declined') {
         await friendService.sendFriendRequest(widget.userId);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
+      } else if (_friendshipStatus == 'pending_sent') {
+        await friendService.cancelFriendRequest(widget.userId);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request cancelled")));
       } else if (_friendshipStatus == 'pending_received') {
         final res = await Supabase.instance.client
             .from('friend_requests')

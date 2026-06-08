@@ -259,6 +259,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       if (_friendshipStatus == 'none' || _friendshipStatus == 'declined') {
         await friendService.sendFriendRequest(widget.userId!);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
+      } else if (_friendshipStatus == 'pending_sent') {
+        await friendService.cancelFriendRequest(widget.userId!);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request cancelled")));
       } else if (_friendshipStatus == 'pending_received') {
         // Find the request ID and accept it. 
         // For simplicity in this UI, we can navigate to the requests screen or handle it here.
