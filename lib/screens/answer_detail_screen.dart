@@ -250,40 +250,61 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
 
   Future<void> _submitReply(String text, Function(VoidCallback) setModalState) async {
     try {
+      debugPrint("💬 REPLY_NOTIFICATION: Starting reply submission");
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        debugPrint("💬 REPLY_NOTIFICATION: ⚠️ No user logged in");
+        return;
+      }
 
+      // 1. Insert reply
       await supabase.from('answer_replies').insert({
         'answer_id': widget.answerId,
         'user_id': user.id,
         'reply': text,
       });
+      debugPrint("💬 REPLY_NOTIFICATION: ✅ Reply inserted into DB");
 
-      final String answerOwnerId = _answer!['user_id'];
+      // 2. Identify recipient (Answer Owner)
+      final String? answerOwnerId = _answer?['user_id']?.toString();
+      debugPrint("💬 REPLY_NOTIFICATION: Answer owner ID: $answerOwnerId");
 
-      if (answerOwnerId != user.id) {
-        await supabase.from('notifications').insert({
-          'user_id': answerOwnerId,
-          'source_user': user.id,
-          'source_id': widget.answerId,
-          'type': 'reply',
-          'seen': false,
-        });
+      if (answerOwnerId != null && answerOwnerId != user.id) {
+        // 3. Insert database notification for activity feed
+        try {
+          await supabase.from('notifications').insert({
+            'user_id': answerOwnerId,
+            'source_user': user.id,
+            'source_id': widget.answerId,
+            'type': 'reply', // Using 'reply' to match AnswersActivityScreen
+            'seen': false,
+          });
+          debugPrint("💬 REPLY_NOTIFICATION: ✅ DB notification record created");
+        } catch (e) {
+          debugPrint("💬 REPLY_NOTIFICATION: ⚠️ Failed to create DB notification: $e");
+        }
 
-        // Fetch sender username
+        // 4. Fetch replier username
         final profileRes = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle();
         final username = profileRes?['username'] ?? "Someone";
+        debugPrint("💬 REPLY_NOTIFICATION: Replier username: $username");
 
+        // 5. Send push notification
+        debugPrint("💬 REPLY_NOTIFICATION: 🚀 Calling NotificationService.sendNotification for recipient: $answerOwnerId");
         await NotificationService.sendNotification(
           userId: answerOwnerId,
           title: "New Reply 💬",
           body: "@$username replied on your answer",
           data: {
             "type": "reply",
-            "answer_id": widget.answerId
+            "answer_id": widget.answerId,
+            "sender_id": user.id, // Added to match working notifications
           },
         );
+        debugPrint("💬 REPLY_NOTIFICATION: ✅ Reply notification flow complete");
+      } else {
+        debugPrint("💬 REPLY_NOTIFICATION: ℹ️ Skipping notification: Self-reply or owner not found (ID: $answerOwnerId)");
       }
 
       if (mounted) {
@@ -293,7 +314,7 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
         _fetchReplies();
       }
     } catch (e) {
-      debugPrint("Error sending reply: $e");
+      debugPrint("💬 REPLY_NOTIFICATION: 🔥 CRITICAL ERROR: $e");
     } finally {
       setModalState(() => {});
     }

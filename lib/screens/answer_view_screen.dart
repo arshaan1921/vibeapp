@@ -11,6 +11,7 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/link_utils.dart';
 import 'profile.dart';
+import '../services/notification_service.dart';
 
 class AnswerViewScreen extends StatefulWidget {
   final String answerId;
@@ -272,20 +273,55 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
 
+    debugPrint("💬 REPLY_NOTIFICATION: Starting reply submission in AnswerViewScreen");
+
+    // 1. Insert reply
     await supabase.from('answer_replies').insert({
       'answer_id': widget.answerId,
       'user_id': user.id,
       'reply': text,
     });
+    debugPrint("💬 REPLY_NOTIFICATION: ✅ Reply inserted into DB");
 
-    if (_answer!['user_id'] != user.id) {
-      await supabase.from('notifications').insert({
-        'user_id': _answer!['user_id'],
-        'source_user': user.id,
-        'source_id': widget.answerId,
-        'type': 'answer',
-        'seen': false,
-      });
+    // 2. Identify recipient (Answer Owner)
+    final String? answerOwnerId = _answer?['user_id']?.toString();
+    debugPrint("💬 REPLY_NOTIFICATION: Answer owner ID: $answerOwnerId");
+
+    if (answerOwnerId != null && answerOwnerId != user.id) {
+      // 3. Insert database notification for activity feed
+      try {
+        await supabase.from('notifications').insert({
+          'user_id': answerOwnerId,
+          'source_user': user.id,
+          'source_id': widget.answerId,
+          'type': 'reply',
+          'seen': false,
+        });
+        debugPrint("💬 REPLY_NOTIFICATION: ✅ DB notification record created");
+      } catch (e) {
+        debugPrint("💬 REPLY_NOTIFICATION: ⚠️ Failed to create DB notification: $e");
+      }
+
+      // 4. Fetch replier username
+      final profileRes = await supabase.from('profiles').select('username').eq('id', user.id).maybeSingle();
+      final username = profileRes?['username'] ?? "Someone";
+      debugPrint("💬 REPLY_NOTIFICATION: Replier username: $username");
+
+      // 5. Send push notification
+      debugPrint("💬 REPLY_NOTIFICATION: 🚀 Calling NotificationService.sendNotification for recipient: $answerOwnerId");
+      await NotificationService.sendNotification(
+        userId: answerOwnerId,
+        title: "New Reply 💬",
+        body: "@$username replied on your answer",
+        data: {
+          "type": "reply",
+          "answer_id": widget.answerId,
+          "sender_id": user.id,
+        },
+      );
+      debugPrint("💬 REPLY_NOTIFICATION: ✅ Reply notification flow complete");
+    } else {
+      debugPrint("💬 REPLY_NOTIFICATION: ℹ️ Skipping notification: Self-reply or owner not found (ID: $answerOwnerId)");
     }
   }
 

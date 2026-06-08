@@ -49,9 +49,11 @@ class LikeService {
     }
   }
 
-  static Future<void> _sendLikePushNotification(String answerId, String userId) async {
+  static Future<void> _sendLikePushNotification(String answerId, String likerId) async {
     try {
-      // 1. Find answer owner
+      debugPrint("💓 LIKE_NOTIFICATION: Starting flow for answer: $answerId by liker: $likerId");
+      
+      // 1. Find answer owner ID (recipient)
       final answerData = await _supabase
           .from('answers')
           .select('user_id')
@@ -59,63 +61,65 @@ class LikeService {
           .maybeSingle();
 
       if (answerData == null) {
-        debugPrint("⚠️ Could not find answer owner for notification");
+        debugPrint("💓 LIKE_NOTIFICATION: ⚠️ Could not find answer owner for answerId: $answerId");
         return;
       }
 
-      final ownerId = answerData['user_id'];
-      debugPrint("👤 Answer owner found: $ownerId");
+      final String? ownerId = answerData['user_id']?.toString();
+      debugPrint("💓 LIKE_NOTIFICATION: Answer owner ID found: $ownerId");
+
+      if (ownerId == null) {
+        debugPrint("💓 LIKE_NOTIFICATION: ⚠️ ownerId is null");
+        return;
+      }
 
       // ❌ Do not notify yourself
-      if (ownerId == userId) {
-        debugPrint("ℹ️ Skipping notification: Self-like");
+      if (ownerId == likerId) {
+        debugPrint("💓 LIKE_NOTIFICATION: ℹ️ Skipping notification: Self-like");
         return;
       }
 
-      // 2. Get liker's username
+      // 2. Get liker's username (sender)
       final profileData = await _supabase
           .from('profiles')
           .select('username')
-          .eq('id', userId)
+          .eq('id', likerId)
           .maybeSingle();
 
       final likerUsername = profileData?['username'] ?? "Someone";
+      debugPrint("💓 LIKE_NOTIFICATION: Liker username: $likerUsername");
 
       // 3. Save notification in DB for Activity Feed
-      await _supabase.from('notifications').upsert({
-        'user_id': ownerId,
-        'source_user': userId,
-        'type': 'answer_like',
-        'source_id': answerId,
-        'seen': false,
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-      });
+      // We use 'like' to match LikesActivityScreen expectations
+      try {
+        await _supabase.from('notifications').insert({
+          'user_id': ownerId,
+          'source_user': likerId,
+          'type': 'like',
+          'source_id': answerId,
+          'seen': false,
+        });
+        debugPrint("💓 LIKE_NOTIFICATION: ✅ DB notification record created");
+      } catch (e) {
+        debugPrint("💓 LIKE_NOTIFICATION: ⚠️ Failed to create DB notification: $e");
+      }
 
       // 4. Invoke Edge Function for Push
-      final payload = {
-        "user_id": ownerId,
-        "title": "❤️ New Like",
-        "body": "$likerUsername liked your answer",
-        "data": {
-          "type": "answer_like",
-          "answer_id": answerId,
-          "liker_id": userId
-        }
-      };
-
-      debugPrint("🚀 Sending notification payload: $payload");
-
+      debugPrint("💓 LIKE_NOTIFICATION: 🚀 Calling NotificationService.sendNotification for recipient: $ownerId");
       await NotificationService.sendNotification(
         userId: ownerId,
-        title: payload["title"] as String,
-        body: payload["body"] as String,
-        data: payload["data"] as Map<String, dynamic>,
+        title: "New Like ❤️",
+        body: "@$likerUsername liked your answer",
+        data: {
+          "type": "like",
+          "answer_id": answerId,
+          "sender_id": likerId, // Added to match working notifications
+        },
       );
-
-      debugPrint("✅ Like notification sent successfully");
+      debugPrint("💓 LIKE_NOTIFICATION: ✅ Like notification flow complete");
       
     } catch (e) {
-      debugPrint("❌ Error sending like notification: $e");
+      debugPrint("💓 LIKE_NOTIFICATION: 🔥 CRITICAL ERROR: $e");
     }
   }
 
