@@ -96,11 +96,16 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
               .select('user1_id, user2_id, streak_count')
               .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
           
-          final List<dynamic> streaksData = streaksResponse as List<dynamic>;
+          final List<dynamic> streaksData = List<dynamic>.from(streaksResponse as List);
+          debugPrint('Loaded streaks: ${streaksData.length}');
+
           for (var row in streaksData) {
             final u1 = row['user1_id'] as String;
             final u2 = row['user2_id'] as String;
-            streaksMap[(u1 == currentUser.id) ? u2 : u1] = row['streak_count'] as int;
+            final friendId = (u1 == currentUser.id) ? u2 : u1;
+            final count = row['streak_count'] as int;
+            streaksMap[friendId] = count;
+            debugPrint('Friend $friendId streak: $count');
           }
         } catch (e) {
           debugPrint("Streaks fetch error: $e");

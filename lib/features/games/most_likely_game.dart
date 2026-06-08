@@ -186,7 +186,7 @@ class _LobbyGameCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isUnseen ? "Waiting for your vote! 🔥" : "Active Game",
+                      isUnseen ? "Waiting for your vote!" : "Active Game",
                       style: TextStyle(color: isUnseen ? const Color(0xFFEC4899) : Colors.grey, fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -330,7 +330,7 @@ class _MostLikelyWizardState extends State<MostLikelyWizard> {
   Widget _buildCurrentStep() {
     switch (_currentStep) {
       case 0:
-        return GameFriendSelectionScreen(
+        return FriendSelectionScreen(
           onContinue: (friends) {
             setState(() => _selectedFriends = friends);
             _nextStep();

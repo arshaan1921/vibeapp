@@ -140,7 +140,7 @@ class _CreateMemeScreenState extends State<CreateMemeScreen> {
   }
 
   Widget _buildFriendStep() {
-    return GameFriendSelectionScreen(
+    return FriendSelectionScreen(
       onContinue: (friends) {
         setState(() => _selectedFriends = friends);
         _launchGame();

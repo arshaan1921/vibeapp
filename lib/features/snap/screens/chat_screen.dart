@@ -112,19 +112,33 @@ class _ChatScreenState extends State<ChatScreen> {
       final streakRes = await supabase
           .from('snap_streaks')
           .select()
-          .or('and(user1_id.eq.${user.id},user2_id.eq.${widget.userId}),and(user1_id.eq.${widget.userId},user2_id.eq.${user.id})')
-          .maybeSingle();
+          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
+      
+      final streaks = List<dynamic>.from(streakRes as List);
+      debugPrint('Loaded streaks: ${streaks.length}');
 
-      if (streakRes != null && mounted) {
-        final streak = SnapStreak.fromMap(streakRes);
+      final streakMap = streaks.firstWhere(
+        (s) =>
+            (s['user1_id'] == user.id && s['user2_id'] == widget.userId) ||
+            (s['user2_id'] == user.id && s['user1_id'] == widget.userId),
+        orElse: () => null,
+      );
+
+      if (streakMap != null && mounted) {
+        final streak = SnapStreak.fromMap(streakMap);
+        final count = streak.streakCount;
+        debugPrint('Friend ${widget.userId} streak: $count');
+
         setState(() {
           _currentStreakData = streak;
-          _streak = streak.streakCount;
+          _streak = count;
         });
 
         if (streak.canBeRestored) {
           _startCountdownTimer();
         }
+      } else {
+        debugPrint('Friend ${widget.userId} streak: 0');
       }
     } catch (e) {
       debugPrint("Error fetching streak data: $e");
@@ -410,9 +424,23 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.userName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.userName,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_streak > 0) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          "$_streak🔥",
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange),
+                        ),
+                      ],
+                    ],
                   ),
                   Text(
                     _isOnline ? "Online" : "Recently active",

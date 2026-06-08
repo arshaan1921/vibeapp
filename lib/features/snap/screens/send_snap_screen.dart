@@ -125,11 +125,16 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
             .select('user1_id, user2_id, streak_count')
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
-        final List<dynamic> streaks = List<dynamic>.from(streaksResponse as List);
-        for (var row in streaks) {
+        final List<dynamic> streaksData = List<dynamic>.from(streaksResponse as List);
+        debugPrint('Loaded streaks: ${streaksData.length}');
+
+        for (var row in streaksData) {
           final u1 = row['user1_id'] as String;
           final u2 = row['user2_id'] as String;
-          streaksMap[(u1 == user.id) ? u2 : u1] = row['streak_count'] as int;
+          final friendId = (u1 == user.id) ? u2 : u1;
+          final count = row['streak_count'] as int;
+          streaksMap[friendId] = count;
+          debugPrint('Friend $friendId streak: $count');
         }
       } catch (e) {
         debugPrint("SEND_SNAP: Streaks fetch error: $e");

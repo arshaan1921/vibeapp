@@ -315,7 +315,7 @@ class _TruthLieWizardState extends State<TruthLieWizard> {
   Widget _buildCurrentStep() {
     switch (_currentStep) {
       case 0:
-        return GameFriendSelectionScreen(
+        return FriendSelectionScreen(
           onContinue: (friends) {
             setState(() => _selectedFriends = friends);
             _nextStep();

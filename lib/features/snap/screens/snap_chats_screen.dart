@@ -131,11 +131,15 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
         final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
+        debugPrint('Loaded streaks: ${streaksData.length}');
+
         for (var row in streaksData) {
           final u1 = row['user1_id'] as String;
           final u2 = row['user2_id'] as String;
           final friendId = (u1 == user.id) ? u2 : u1;
-          streakMap[friendId] = row['streak_count'] as int;
+          final count = row['streak_count'] as int;
+          streakMap[friendId] = count;
+          debugPrint('Friend $friendId streak: $count');
         }
       } catch (e) {
         debugPrint("CHAT_SCREEN: Streaks fetch error: $e");

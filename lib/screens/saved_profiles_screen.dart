@@ -12,11 +12,49 @@ class SavedProfilesScreen extends StatefulWidget {
 class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _friends = [];
+  Map<String, int> _streaksMap = {};
 
   @override
   void initState() {
     super.initState();
-    _fetchFriends();
+    await Future.wait([
+      _fetchFriends(),
+      _fetchStreaks(),
+    ]);
+  }
+
+  Future<void> _fetchStreaks() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final streaksRes = await supabase
+          .from('snap_streaks')
+          .select('user1_id, user2_id, streak_count')
+          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
+      
+      final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
+      debugPrint('Loaded streaks: ${streaksData.length}');
+      
+      Map<String, int> streaksMap = {};
+      for (var row in streaksData) {
+        final u1 = row['user1_id'] as String;
+        final u2 = row['user2_id'] as String;
+        final friendId = (u1 == user.id) ? u2 : u1;
+        final count = row['streak_count'] as int;
+        streaksMap[friendId] = count;
+        debugPrint('Friend $friendId streak: $count');
+      }
+
+      if (mounted) {
+        setState(() {
+          _streaksMap = streaksMap;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching streaks: $e");
+    }
   }
 
   Future<void> _fetchFriends() async {
@@ -78,6 +116,7 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                       itemBuilder: (context, index) {
                         final user = _friends[index];
                         final avatarUrl = user['avatar_url'];
+                        final streak = _streaksMap[user['id']] ?? 0;
 
                         return ListTile(
                           leading: CircleAvatar(
@@ -90,9 +129,25 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                                 ? const Icon(Icons.person, color: Colors.white)
                                 : null,
                           ),
-                          title: Text(user["username"] ?? "User",
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 14)),
+                          title: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(user["username"] ?? "User",
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold, fontSize: 14)),
+                              ),
+                              if (streak > 0) ...[
+                                const SizedBox(width: 4),
+                                Text("${streak}🔥",
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.normal, 
+                                        fontSize: 12,
+                                        color: Colors.grey)),
+                              ],
+                            ],
+                          ),
                           subtitle: Text(user["name"] ?? "",
                               style: const TextStyle(
                                   fontSize: 12, color: Colors.grey)),

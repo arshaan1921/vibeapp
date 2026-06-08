@@ -75,6 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
   int _friendsCount = 0;
   String? _friendshipStatus;
   int _mutualFriendsCount = 0;
+  int _streak = 0;
   RealtimeChannel? _realtimeChannel;
 
   @override
@@ -194,6 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       _checkFriendship(),
       _fetchRemainingQuestions(),
       _fetchFriendsCount(),
+      _fetchStreak(),
     ]);
   }
 
@@ -236,6 +238,45 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       }
     } catch (e) {
       debugPrint('ERROR checking friendship: $e');
+    }
+  }
+
+  Future<void> _fetchStreak() async {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (currentUser == null) return;
+    final targetId = widget.userId;
+    if (targetId == null || targetId == currentUser.id) return;
+
+    try {
+      final supabase = Supabase.instance.client;
+      final streaksRes = await supabase
+          .from('snap_streaks')
+          .select('user1_id, user2_id, streak_count')
+          .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
+      
+      final streaks = List<dynamic>.from(streaksRes as List);
+      debugPrint('Loaded streaks: ${streaks.length}');
+
+      final streakRow = streaks.firstWhere(
+        (s) =>
+            (s['user1_id'] == currentUser.id && s['user2_id'] == targetId) ||
+            (s['user2_id'] == currentUser.id && s['user1_id'] == targetId),
+        orElse: () => null,
+      );
+
+      if (streakRow != null) {
+        final count = streakRow['streak_count'] as int;
+        debugPrint('Friend $targetId streak: $count');
+        if (mounted) {
+          setState(() {
+            _streak = count;
+          });
+        }
+      } else {
+        debugPrint('Friend $targetId streak: 0');
+      }
+    } catch (e) {
+      debugPrint("Error fetching streak: $e");
     }
   }
 
@@ -691,6 +732,18 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                       const Padding(
                                         padding: EdgeInsets.only(left: 4),
                                         child: Icon(Icons.star_rounded, color: Colors.orange, size: 18),
+                                      ),
+                                    if (_streak > 0)
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 8),
+                                        child: Text(
+                                          "🔥 $_streak",
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
                                       ),
                                   ],
                                 ),

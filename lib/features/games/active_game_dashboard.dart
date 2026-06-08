@@ -194,7 +194,7 @@ class _ActiveGameDashboardState extends State<ActiveGameDashboard> {
                 padding: const EdgeInsets.all(20),
                 children: [
                   if (_waitingForYou.isNotEmpty) ...[
-                    _buildSectionHeader("Waiting For You 🔥"),
+                    _buildSectionHeader("Waiting For You"),
                     ..._waitingForYou.map((g) => _DashboardCard(game: g, isForYou: true, onTap: () => _openGame(g))),
                     const SizedBox(height: 24),
                   ],

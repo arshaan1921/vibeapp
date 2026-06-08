@@ -140,7 +140,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
         ),
         const Text(
-          'Be brutally honest! 🔥🤡💀',
+          'Be brutally honest! 🤡💀',
           style: TextStyle(color: Colors.grey),
         ),
       ],
@@ -155,7 +155,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _voteButton('🔥', 'Attractive', 'attractive', Colors.orange),
+            _voteButton('🌟', 'Attractive', 'attractive', Colors.orange),
             _voteButton('🤡', 'Mid', 'mid', Colors.blue),
             _voteButton('💀', 'Roast', 'roast', Colors.red),
           ],
@@ -205,7 +205,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
       children: [
         _ResultBar(
           label: 'Attractive',
-          emoji: '🔥',
+          emoji: '🌟',
           percent: counts['attractive']! / totalVotes,
           color: Colors.orange,
         ),

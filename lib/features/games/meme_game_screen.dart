@@ -135,7 +135,7 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
                       ),
                     ),
                     _comments.isEmpty
-                        ? const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text("No roasts yet. Be the first! 🔥", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))))
+                        ? const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text("No roasts yet. Be the first!", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))))
                         : SliverPadding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             sliver: SliverList(

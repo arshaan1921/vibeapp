@@ -26,6 +26,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   bool isLoading = true;
   String? _friendshipStatus;
   int _mutualFriendsCount = 0;
+  int _streak = 0;
   String? errorMessage;
 
   @override
@@ -64,6 +65,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     await Future.wait([
       _fetchProfile(),
       _checkFriendship(),
+      _fetchStreak(),
     ]);
     if (mounted) setState(() => isLoading = false);
   }
@@ -186,6 +188,43 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       }
     } catch (e) {
       debugPrint("Error checking friendship: $e");
+    }
+  }
+
+  Future<void> _fetchStreak() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      final streaksRes = await supabase
+          .from('snap_streaks')
+          .select('user1_id, user2_id, streak_count')
+          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
+      
+      final streaks = List<dynamic>.from(streaksRes as List);
+      debugPrint('Loaded streaks: ${streaks.length}');
+
+      final streakRow = streaks.firstWhere(
+        (s) =>
+            (s['user1_id'] == user.id && s['user2_id'] == widget.userId) ||
+            (s['user2_id'] == user.id && s['user1_id'] == widget.userId),
+        orElse: () => null,
+      );
+
+      if (streakRow != null) {
+        final count = streakRow['streak_count'] as int;
+        debugPrint('Friend ${widget.userId} streak: $count');
+        if (mounted) {
+          setState(() {
+            _streak = count;
+          });
+        }
+      } else {
+        debugPrint('Friend ${widget.userId} streak: 0');
+      }
+    } catch (e) {
+      debugPrint("Error fetching streak: $e");
     }
   }
 
@@ -487,6 +526,18 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                       const Padding(
                         padding: EdgeInsets.only(left: 4),
                         child: Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
+                      ),
+                    if (_streak > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          "🔥 $_streak",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
                       ),
                   ],
                 ),

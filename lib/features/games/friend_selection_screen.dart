@@ -4,25 +4,29 @@ import '../../models/user.dart';
 import '../../services/block_service.dart';
 import '../../utils/image_utils.dart';
 
-class GameFriendSelectionScreen extends StatefulWidget {
+class FriendSelectionScreen extends StatefulWidget {
   final String title;
-  final Function(List<AppUser>) onContinue;
+  final Function(List<AppUser>)? onContinue;
   final int minSelection;
   final int maxSelection;
+  final String? gameType;
+  final List<Map<String, dynamic>>? savedUsers;
 
-  const GameFriendSelectionScreen({
+  const FriendSelectionScreen({
     super.key,
     this.title = "SELECT FRIENDS",
-    required this.onContinue,
+    this.onContinue,
     this.minSelection = 1,
     this.maxSelection = 20,
+    this.gameType,
+    this.savedUsers,
   });
 
   @override
-  State<GameFriendSelectionScreen> createState() => _GameFriendSelectionScreenState();
+  State<FriendSelectionScreen> createState() => _FriendSelectionScreenState();
 }
 
-class _GameFriendSelectionScreenState extends State<GameFriendSelectionScreen> {
+class _FriendSelectionScreenState extends State<FriendSelectionScreen> {
   final supabase = Supabase.instance.client;
   List<AppUser> _friends = [];
   List<AppUser> _filteredFriends = [];
@@ -64,29 +68,35 @@ class _GameFriendSelectionScreenState extends State<GameFriendSelectionScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      final friendsRes = await supabase
-          .from('friends')
-          .select('user1_id, user2_id')
-          .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
+      List<dynamic> profilesResponse;
 
-      final List<String> friendIds = (friendsRes as List)
-          .map((item) => item['user1_id'] == user.id ? item['user2_id'].toString() : item['user1_id'].toString())
-          .toList();
+      if (widget.savedUsers != null && widget.savedUsers!.isNotEmpty) {
+        profilesResponse = widget.savedUsers!;
+      } else {
+        final friendsRes = await supabase
+            .from('friends')
+            .select('user1_id, user2_id')
+            .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
 
-      if (friendIds.isEmpty) {
-        if (mounted) setState(() { _friends = []; _filteredFriends = []; _isLoading = false; });
-        return;
+        final List<String> friendIds = (friendsRes as List)
+            .map((item) => item['user1_id'] == user.id ? item['user2_id'].toString() : item['user1_id'].toString())
+            .toList();
+
+        if (friendIds.isEmpty) {
+          if (mounted) setState(() { _friends = []; _filteredFriends = []; _isLoading = false; });
+          return;
+        }
+
+        profilesResponse = await supabase
+            .from('profiles')
+            .select('*')
+            .inFilter('id', friendIds);
       }
-
-      final profilesResponse = await supabase
-          .from('profiles')
-          .select('*')
-          .inFilter('id', friendIds);
 
       if (mounted) {
         setState(() {
-          _friends = (profilesResponse as List)
-              .map((p) => AppUser.fromJson(p))
+          _friends = profilesResponse
+              .map((p) => AppUser.fromJson(Map<String, dynamic>.from(p)))
               .where((f) => !blockService.isBlocked(f.id))
               .toList();
           _filteredFriends = List.from(_friends);
@@ -238,7 +248,13 @@ class _GameFriendSelectionScreenState extends State<GameFriendSelectionScreen> {
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _selectedIds.length >= widget.minSelection
           ? FloatingActionButton.extended(
-              onPressed: () => widget.onContinue(selectedUsers),
+              onPressed: () {
+                if (widget.onContinue != null) {
+                  widget.onContinue!(selectedUsers);
+                } else {
+                  Navigator.pop(context, true);
+                }
+              },
               backgroundColor: theme.primaryColor,
               elevation: 8,
               icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
@@ -338,28 +354,6 @@ class _FriendCard extends StatelessWidget {
                   Text(
                     "@${user.username}",
                     style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.03),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.local_fire_department_rounded, color: Colors.orange, size: 14),
-                  const SizedBox(width: 4),
-                  Text(
-                    "7🔥", // Placeholder for actual streak if available
-                    style: TextStyle(
-                      fontSize: 12, 
-                      fontWeight: FontWeight.w900,
-                      color: isDark ? Colors.white70 : Colors.black87,
-                    ),
                   ),
                 ],
               ),
