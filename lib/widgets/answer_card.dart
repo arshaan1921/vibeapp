@@ -15,6 +15,7 @@ import '../services/block_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../utils/link_utils.dart';
 
 class AnswerCard extends StatefulWidget {
   final AnswerModel answer;
@@ -514,10 +515,7 @@ class _AnswerCardState extends State<AnswerCard> {
   }
 
   Future<void> _onOpen(LinkableElement link) async {
-    final Uri url = Uri.parse(link.url);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      debugPrint('Could not launch $url');
-    }
+    await LinkUtils.handleLinkClick(context, link);
   }
 
   @override
@@ -634,6 +632,11 @@ class _AnswerCardState extends State<AnswerCard> {
                     Linkify(
                       onOpen: _onOpen,
                       text: widget.answer.questionText,
+                      linkifiers: const [
+                        UrlLinkifier(),
+                        EmailLinkifier(),
+                        UserLinkifier(),
+                      ],
                       style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, fontSize: 15, height: 1.3),
                       maxLines: null,
                     ),
@@ -645,7 +648,7 @@ class _AnswerCardState extends State<AnswerCard> {
                             widget.answer.questionImageUrl!,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            cacheWidth: 800,
+                            gaplessPlayback: true,
                           ),
                         ),
                       ],
@@ -661,6 +664,11 @@ class _AnswerCardState extends State<AnswerCard> {
                   child: Linkify(
                     onOpen: _onOpen,
                     text: widget.answer.text,
+                    linkifiers: const [
+                      UrlLinkifier(),
+                      EmailLinkifier(),
+                      UserLinkifier(),
+                    ],
                     style: textTheme.bodyMedium?.copyWith(
                       fontSize: 15, 
                       height: 1.5,

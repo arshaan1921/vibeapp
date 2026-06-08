@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
 import '../models/question.dart';
+import '../utils/link_utils.dart';
 
 class AnswerScreen extends StatefulWidget {
   final Question question;
@@ -212,8 +214,16 @@ class _AnswerScreenState extends State<AnswerScreen> {
                     if (_isLoadingQuestion)
                       const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()))
                     else ...[
-                      Text(
-                        questionText,
+                      Linkify(
+                        onOpen: (link) async {
+                          await LinkUtils.handleLinkClick(context, link);
+                        },
+                        text: questionText,
+                        linkifiers: const [
+                          UrlLinkifier(),
+                          EmailLinkifier(),
+                          UserLinkifier(),
+                        ],
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16,
@@ -229,6 +239,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
                             width: double.infinity,
                             height: 200,
                             fit: BoxFit.cover,
+                            gaplessPlayback: true,
                             loadingBuilder: (context, child, loadingProgress) {
                               if (loadingProgress == null) return child;
                               return Container(

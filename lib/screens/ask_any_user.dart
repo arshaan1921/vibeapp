@@ -45,7 +45,7 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
   }
 
   Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) setState(() => _selectedImage = File(image.path));
   }
 
@@ -79,8 +79,20 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
 
       String? imageUrl;
       if (_selectedImage != null) {
-        final path = "questions/${DateTime.now().millisecondsSinceEpoch}.jpg";
-        await supabase.storage.from('question-images').upload(path, _selectedImage!);
+        final extension = _selectedImage!.path.split('.').last.toLowerCase();
+        final path = "questions/${DateTime.now().millisecondsSinceEpoch}.$extension";
+        
+        // Define content type for proper serving
+        String contentType = 'image/jpeg';
+        if (extension == 'gif') contentType = 'image/gif';
+        else if (extension == 'png') contentType = 'image/png';
+        else if (extension == 'webp') contentType = 'image/webp';
+
+        await supabase.storage.from('question-images').upload(
+          path, 
+          _selectedImage!,
+          fileOptions: FileOptions(contentType: contentType),
+        );
         imageUrl = supabase.storage.from('question-images').getPublicUrl(path);
       }
 
@@ -137,7 +149,7 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
                   const SizedBox(width: 12),
                   Stack(
                     children: [
-                      ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(_selectedImage!, height: 44, width: 44, fit: BoxFit.cover)),
+                      ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(_selectedImage!, height: 44, width: 44, fit: BoxFit.cover, gaplessPlayback: true)),
                       Positioned(right: -8, top: -8, child: IconButton(icon: const Icon(Icons.cancel, size: 16), onPressed: () => setState(() => _selectedImage = null))),
                     ],
                   ),

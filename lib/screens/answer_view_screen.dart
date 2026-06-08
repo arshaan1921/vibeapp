@@ -9,6 +9,7 @@ import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../utils/link_utils.dart';
 import 'profile.dart';
 
 class AnswerViewScreen extends StatefulWidget {
@@ -436,8 +437,16 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Text(
-                                _answer!['questions']?['text'] ?? "",
+                              Linkify(
+                                onOpen: (link) async {
+                                  await LinkUtils.handleLinkClick(context, link);
+                                },
+                                text: _answer!['questions']?['text'] ?? "",
+                                linkifiers: const [
+                                  UrlLinkifier(),
+                                  EmailLinkifier(),
+                                  UserLinkifier(),
+                                ],
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800, 
                                   fontSize: 15,
@@ -454,6 +463,7 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                                     _answer!['questions']['image_url'],
                                     width: double.infinity,
                                     fit: BoxFit.cover,
+                                    gaplessPlayback: true,
                                     loadingBuilder: (context, child, loadingProgress) {
                                       if (loadingProgress == null) return child;
                                       return Container(
@@ -480,11 +490,14 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                               const SizedBox(height: 8),
                               Linkify(
                                 onOpen: (link) async {
-                                  if (await canLaunchUrl(Uri.parse(link.url))) {
-                                    await launchUrl(Uri.parse(link.url), mode: LaunchMode.externalApplication);
-                                  }
+                                  await LinkUtils.handleLinkClick(context, link);
                                 },
                                 text: _answer!['answer_text'] ?? "",
+                                linkifiers: const [
+                                  UrlLinkifier(),
+                                  EmailLinkifier(),
+                                  UserLinkifier(),
+                                ],
                                 style: TextStyle(
                                   fontSize: 15, 
                                   color: isDark ? Colors.grey[300] : Colors.black87,

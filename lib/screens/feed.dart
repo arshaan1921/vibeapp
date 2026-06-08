@@ -30,7 +30,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
   int likesCount = 0;
   int questionsCount = 0;
   int answersCount = 0;
-  int gamesCount = 0;
   RealtimeChannel? _notificationChannel;
   StreamSubscription? _realtimeSubscription;
 
@@ -75,7 +74,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
     
     // Realtime badge updates
     _realtimeSubscription = RealtimeService().events.listen((event) {
-      if (event == 'update_game_badge' || event == 'refresh_inbox') {
+      if (event == 'refresh_inbox') {
         fetchNotificationCounts();
       }
     });
@@ -196,14 +195,11 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
         return !isAnsweredField && !hasAnswers && !isBlocked;
       }).toList();
 
-      final activeGamesCount = await GameService().getUnvotedGamesCount();
-
       if (mounted) {
         setState(() {
           likesCount = (likesRes as List).length;
           answersCount = (answersRes as List).length;
           questionsCount = filteredQuestions.length;
-          gamesCount = activeGamesCount;
         });
       }
     } catch (e, st) {
@@ -448,9 +444,10 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                   _buildBadgeIcon(Icons.reply_rounded, answersCount, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AnswersActivityScreen())).then((_) => fetchNotificationCounts());
                   }),
-                  _buildBadgeIcon(Icons.sports_esports_rounded, gamesCount, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())).then((_) => fetchNotificationCounts());
-                  }),
+                  IconButton(
+                    icon: Icon(Icons.sports_esports_rounded, size: 26, color: theme.colorScheme.onSurface),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
+                  ),
                   IconButton(
                     icon: Icon(Icons.add_circle_outline_rounded, size: 26, color: theme.colorScheme.onSurface),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AskAnyUserScreen())),

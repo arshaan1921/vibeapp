@@ -20,40 +20,7 @@ import '../services/block_service.dart';
 import '../services/safety_service.dart';
 import 'saved_screen.dart';
 import '../services/friend_service.dart';
-
-class UserLinkifier extends Linkifier {
-  const UserLinkifier();
-
-  @override
-  List<LinkifyElement> parse(List<LinkifyElement> elements, LinkifyOptions options) {
-    final list = <LinkifyElement>[];
-    final regex = RegExp(r"@[a-zA-Z0-9_]+", multiLine: true);
-
-    for (var element in elements) {
-      if (element is TextElement) {
-        final matches = regex.allMatches(element.text);
-        if (matches.isEmpty) {
-          list.add(element);
-        } else {
-          int lastIndex = 0;
-          for (var match in matches) {
-            if (match.start > lastIndex) {
-              list.add(TextElement(element.text.substring(lastIndex, match.start)));
-            }
-            list.add(LinkableElement(match.group(0)!, match.group(0)!));
-            lastIndex = match.end;
-          }
-          if (lastIndex < element.text.length) {
-            list.add(TextElement(element.text.substring(lastIndex)));
-          }
-        }
-      } else {
-        list.add(element);
-      }
-    }
-    return list;
-  }
-}
+import '../utils/link_utils.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -596,35 +563,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
   }
 
   Future<void> _handleLinkClick(LinkableElement link) async {
-    if (link.url.startsWith('@')) {
-      final username = link.url.substring(1).toLowerCase();
-      try {
-        final data = await Supabase.instance.client
-            .from('profiles')
-            .select('id')
-            .eq('username', username)
-            .maybeSingle();
-
-        if (data != null && mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ProfileScreen(userId: data['id'])),
-          );
-        } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("User @$username not found")),
-          );
-        }
-      } catch (e, st) {
-        debugPrint('ERROR: $e');
-        debugPrintStack(stackTrace: st);
-      }
-    } else {
-      final Uri url = Uri.parse(link.url);
-      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        debugPrint('Could not launch $url');
-      }
-    }
+    await LinkUtils.handleLinkClick(context, link);
   }
 
   @override
