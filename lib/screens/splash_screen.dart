@@ -44,7 +44,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   void _navigateToNext() async {
     print("🔍 Checking user/session...");
-    await Future.delayed(const Duration(milliseconds: 1000));
+    // Increased delay to 2 seconds to ensure splash is seen
+    await Future.delayed(const Duration(milliseconds: 2000));
     if (!mounted) return;
 
     final session = Supabase.instance.client.auth.currentSession;
@@ -94,39 +95,48 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A3321),
+      backgroundColor: const Color(0xFFFEDC00), // Match yellow from image
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              RichText(
-                text: TextSpan(
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 64,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 8,
+          child: Image.asset(
+            'assets/splash.png',
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              // Fallback if asset fails to load
+              return Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.poppins(
+                        color: Colors.black,
+                        fontSize: 64,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 8,
+                      ),
+                      children: const [
+                        TextSpan(text: "HIGH"),
+                        TextSpan(text: "5", style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
                   ),
-                  children: [
-                    const TextSpan(text: "HIGH"),
-                    const TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                "Ask, Answer, Play\nwith your own AI Companion",
-                style: GoogleFonts.poppins(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w300,
-                  letterSpacing: 1.2,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+                  const SizedBox(height: 10),
+                  Text(
+                    "Snap. Ask. Connect.",
+                    style: GoogleFonts.poppins(
+                      color: Colors.black.withOpacity(0.8),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

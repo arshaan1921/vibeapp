@@ -14,14 +14,8 @@ class WelcomeScreen extends StatelessWidget {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark 
-              ? [const Color(0xFF121212), const Color(0xFF1E1E1E)]
-              : [const Color(0xFF0A3321), const Color(0xFF144D3A)],
-          ),
+        decoration: const BoxDecoration(
+          color: Color(0xFFFEDC00), // Match splash yellow
         ),
         child: SafeArea(
           child: Column(
@@ -36,7 +30,7 @@ class WelcomeScreen extends StatelessWidget {
                   errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.emoji_people_rounded,
                     size: 140,
-                    color: Color(0xFFFFD700),
+                    color: Colors.black,
                   ),
                 ),
               ),
@@ -47,10 +41,11 @@ class WelcomeScreen extends StatelessWidget {
                     fontSize: 42,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
+                    color: Colors.black,
                   ),
                   children: [
-                    TextSpan(text: "HIGH", style: TextStyle(color: Colors.white)),
-                    TextSpan(text: "5", style: TextStyle(color: Color(0xFFFFD700))),
+                    TextSpan(text: "HIGH"),
+                    TextSpan(text: "5", style: TextStyle(color: Colors.white)),
                   ],
                 ),
               ),
@@ -70,7 +65,7 @@ class WelcomeScreen extends StatelessWidget {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A3321),
+                          backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28),
@@ -95,8 +90,8 @@ class WelcomeScreen extends StatelessWidget {
                           );
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white, width: 2),
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Colors.black, width: 2),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(28),
                           ),
