@@ -140,7 +140,7 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> with RouteAwa
           .from('notifications')
           .update({'seen': true})
           .eq('user_id', user.id)
-          .eq('type', 'like')
+          .filter('type', 'in', ['like', 'answer_like'])
           .eq('seen', false);
     } catch (e) {
       debugPrint("Error marking as read: $e");
@@ -160,7 +160,7 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> with RouteAwa
           .from('notifications')
           .select()
           .eq('user_id', user.id)
-          .eq('type', 'like')
+          .filter('type', 'in', ['like', 'answer_like'])
           .order('created_at', ascending: false);
 
       if (notifications.isEmpty) {

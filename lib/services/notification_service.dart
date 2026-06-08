@@ -185,7 +185,7 @@ class NotificationService {
           MaterialPageRoute(builder: (_) => AnswerDetailScreen(answerId: answerId)),
         );
       }
-    } else if (type == 'like') {
+    } else if (type == 'like' || type == 'answer_like') {
       debugPrint("❤️ Like notification tapped");
       if (answerId != null) {
         debugPrint("➡️ Opening AnswerDetailScreen");

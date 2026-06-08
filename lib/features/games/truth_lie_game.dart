@@ -6,6 +6,7 @@ import '../../services/notification_service.dart';
 import '../../services/block_service.dart';
 import '../../utils/image_utils.dart';
 import 'friend_selection_screen.dart';
+import '../../services/game_notification_service.dart';
 
 // ==================================================
 // 1. TRUTH LIE LOBBY
@@ -255,6 +256,21 @@ class _TruthLieWizardState extends State<TruthLieWizard> {
         }
       });
 
+      // 4. Send Notifications
+      final creatorProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
+      final creatorUsername = creatorProfile['username'] ?? "Someone";
+
+      for (var friend in _selectedFriends) {
+        GameNotificationService.notify(
+          recipientId: friend.id,
+          gameId: gameId,
+          gameType: 'truth_lie',
+          action: 'invitation',
+          title: "Two Truths & One Lie 🎮",
+          body: "@$creatorUsername invited you to play!",
+        ).catchError((e) => debugPrint("Notification error: $e"));
+      }
+
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -464,6 +480,7 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
     await supabase.from('truth_lie_participants').update({'is_seen': true}).match({'game_id': widget.gameId, 'user_id': userId});
+    await GameNotificationService.markAsSeen(widget.gameId);
   }
 
   Future<void> _loadData() async {
@@ -540,6 +557,39 @@ class _TruthLiePlayState extends State<TruthLiePlay> {
         'data': {'index': index, 'statement': statement},
       });
       setState(() => _voted = statement);
+
+      // Notify game creator
+      final creatorId = _game?['creator_id'];
+      if (creatorId != null && creatorId != userId) {
+        final voterProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
+        final voterUsername = voterProfile['username'] ?? "Someone";
+
+        GameNotificationService.notify(
+          recipientId: creatorId,
+          gameId: widget.gameId,
+          gameType: 'truth_lie',
+          action: 'vote',
+          title: "Two Truths & One Lie 🎯",
+          body: "@$voterUsername cast a vote in your game!",
+        ).catchError((e) => debugPrint("Notification error: $e"));
+      }
+
+      // Check if everyone voted
+      final participantsRes = await supabase.from('truth_lie_participants').select('user_id').eq('game_id', widget.gameId);
+      final votesRes = await supabase.from('truth_lie_actions').select('user_id').eq('game_id', widget.gameId).eq('action_type', 'vote');
+
+      if ((votesRes as List).length == (participantsRes as List).length) {
+        for (var p in participantsRes) {
+          GameNotificationService.notify(
+            recipientId: p['user_id'],
+            gameId: widget.gameId,
+            gameType: 'truth_lie',
+            action: 'results',
+            title: "Results Available! 🏆",
+            body: "Everyone has voted in Two Truths & One Lie. See the results!",
+          ).catchError((e) => debugPrint("Notification error: $e"));
+        }
+      }
     } catch (e) {
       debugPrint("Error: $e");
     }

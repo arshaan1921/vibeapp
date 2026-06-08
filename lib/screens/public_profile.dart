@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/answer_card.dart';
 import '../models/answer.dart';
 import '../utils/image_utils.dart';
+import '../utils/link_utils.dart';
 import 'ask_any_user.dart';
 import 'report_problem_screen.dart';
 import 'blocked_users_screen.dart';
@@ -155,7 +157,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('answers')
-          .select('*, profiles!user_id(username, avatar_url, premium_plan, youtube_verified), questions!question_id(text, image_url, is_anonymous, from_user)')
+          .select('*, profiles!user_id(username, avatar_url, premium_plan, youtube_verified), questions!question_id(text, image_url, is_anonymous, from_user, asker:profiles!from_user(id, username))')
           .eq('user_id', widget.userId)
           .eq('is_hidden', false)
           .order('created_at', ascending: false);
@@ -552,12 +554,25 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 const SizedBox(height: 12),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Text(
-                    profileData!['bio'] ?? "Ready to V 1 B E",
+                  child: Linkify(
+                    onOpen: (link) async {
+                      await LinkUtils.handleLinkClick(context, link);
+                    },
+                    text: profileData!['bio'] ?? "Ready to HIGH5",
                     textAlign: TextAlign.center,
+                    linkifiers: const [
+                      UrlLinkifier(),
+                      EmailLinkifier(),
+                      UserLinkifier(),
+                    ],
                     style: const TextStyle(
                       fontSize: 14,
                       color: Colors.grey,
+                    ),
+                    linkStyle: const TextStyle(
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ),

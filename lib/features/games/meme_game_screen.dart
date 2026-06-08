@@ -4,6 +4,7 @@ import '../../models/meme_mania.dart';
 import '../../services/meme_mania_service.dart';
 import '../../providers/game_provider.dart';
 import '../../utils/image_utils.dart';
+import '../../services/game_notification_service.dart';
 
 class MemeGameScreen extends StatefulWidget {
   final String gameId;
@@ -30,6 +31,7 @@ class _MemeGameScreenState extends State<MemeGameScreen> {
 
   Future<void> _markSeen() async {
     await _service.markAsSeen(widget.gameId);
+    await GameNotificationService.markAsSeen(widget.gameId);
     if (mounted) Provider.of<GameProvider>(context, listen: false).decrementCount();
   }
 

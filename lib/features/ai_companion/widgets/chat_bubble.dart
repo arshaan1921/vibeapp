@@ -4,24 +4,13 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../screens/profile.dart';
+import '../../../utils/link_utils.dart';
 import '../models/ai_message.dart';
 
 class ChatBubble extends StatelessWidget {
   final AiMessage message;
 
   const ChatBubble({super.key, required this.message});
-
-  Future<void> _handleUsernameTap(BuildContext context, String username) async {
-    try {
-      final cleanUsername = username.startsWith('@') ? username.substring(1) : username;
-      final supabase = Supabase.instance.client;
-      final data = await supabase.from('profiles').select('id').eq('username', cleanUsername).maybeSingle();
-
-      if (data != null && context.mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen(userId: data['id'])));
-      }
-    } catch (_) {}
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +51,7 @@ class ChatBubble extends StatelessWidget {
                     UserLinkifier(),
                   ],
                   onOpen: (link) async {
-                    if (link.url.startsWith('@')) {
-                      _handleUsernameTap(context, link.url);
-                    } else {
-                      final uri = Uri.parse(link.url);
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      }
-                    }
+                    await LinkUtils.handleLinkClick(context, link);
                   },
                   style: TextStyle(
                     color: isUser ? Colors.white : theme.textTheme.bodyLarge?.color,
@@ -99,39 +81,5 @@ class ChatBubble extends StatelessWidget {
 
   String _formatTime(DateTime date) {
     return "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
-  }
-}
-
-class UserLinkifier extends Linkifier {
-  const UserLinkifier();
-
-  @override
-  List<LinkifyElement> parse(List<LinkifyElement> elements, LinkifyOptions options) {
-    final list = <LinkifyElement>[];
-    final regex = RegExp(r"@[a-zA-Z0-9_]+", multiLine: true);
-
-    for (var element in elements) {
-      if (element is TextElement) {
-        final matches = regex.allMatches(element.text);
-        if (matches.isEmpty) {
-          list.add(element);
-        } else {
-          int lastIndex = 0;
-          for (var match in matches) {
-            if (match.start > lastIndex) {
-              list.add(TextElement(element.text.substring(lastIndex, match.start)));
-            }
-            list.add(LinkableElement(match.group(0)!, match.group(0)!));
-            lastIndex = match.end;
-          }
-          if (lastIndex < element.text.length) {
-            list.add(TextElement(element.text.substring(lastIndex)));
-          }
-        }
-      } else {
-        list.add(element);
-      }
-    }
-    return list;
   }
 }

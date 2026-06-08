@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/meme_mania.dart';
 import '../models/user.dart';
 import 'notification_service.dart';
+import 'game_notification_service.dart';
 import 'block_service.dart';
 
 class MemeManiaService {
@@ -109,10 +110,14 @@ class MemeManiaService {
     // Send notifications
     for (final friendId in participantIds) {
       if (friendId != userId) {
-        NotificationService.sendGameNotification(
-          targetUserId: friendId,
-          creatorUsername: creatorUsername,
-        );
+        GameNotificationService.notify(
+          recipientId: friendId,
+          gameId: memeId,
+          gameType: 'meme',
+          action: 'invitation',
+          title: "Meme Battle 😂",
+          body: "@$creatorUsername invited you to a battle!",
+        ).catchError((e) => debugPrint("Notification error: $e"));
       }
     }
   }
@@ -159,6 +164,22 @@ class MemeManiaService {
       'user_id': userId,
       'comment': commentText,
     });
+
+    // Notify game creator
+    final gameData = await getGameDetails(memeId);
+    if (gameData.creatorId != userId) {
+      final commenterProfile = await _supabase.from('profiles').select('username').eq('id', userId).single();
+      final commenterUsername = commenterProfile['username'] ?? "Someone";
+
+      GameNotificationService.notify(
+        recipientId: gameData.creatorId,
+        gameId: memeId,
+        gameType: 'meme',
+        action: 'comment',
+        title: "Meme Battle 😂",
+        body: "@$commenterUsername roasted your meme!",
+      ).catchError((e) => debugPrint("Notification error: $e"));
+    }
   }
 
   Future<void> toggleLike(String commentId) async {
@@ -189,6 +210,29 @@ class MemeManiaService {
 
       await _supabase.rpc('increment_comment_upvotes',
           params: {'row_id': commentId});
+
+      // Notify commenter
+      try {
+        final commentRes = await _supabase.from('meme_comments').select('user_id, meme_id').eq('id', commentId).single();
+        final commenterId = commentRes['user_id'];
+        final memeId = commentRes['meme_id'];
+
+        if (commenterId != userId) {
+          final voterProfile = await _supabase.from('profiles').select('username').eq('id', userId).single();
+          final voterUsername = voterProfile['username'] ?? "Someone";
+
+          GameNotificationService.notify(
+            recipientId: commenterId,
+            gameId: memeId,
+            gameType: 'meme',
+            action: 'vote',
+            title: "Meme Battle 😂",
+            body: "@$voterUsername liked your roast!",
+          ).catchError((e) => debugPrint("Notification error: $e"));
+        }
+      } catch (e) {
+        debugPrint("Error notifying commenter: $e");
+      }
     }
   }
 

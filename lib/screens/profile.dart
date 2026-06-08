@@ -413,7 +413,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       // Reverted to more reliable table-only join syntax
       final response = await supabase
           .from('answers')
-          .select('*, profiles!user_id(username, avatar_url, premium_plan), questions!question_id(text, image_url, is_anonymous, from_user)')
+          .select('*, profiles!user_id(username, avatar_url, premium_plan), questions!question_id(text, image_url, is_anonymous, from_user, asker:profiles!from_user(id, username))')
           .eq('user_id', targetId)
           .order('created_at', ascending: false);
 
@@ -740,7 +740,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                               Icon(Icons.bolt_rounded, size: 20, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
                               const SizedBox(width: 10),
                               Text(
-                                plan == 'free' ? "$_remainingQuestions questions left today" : "Unlimited questions",
+                                PremiumUtils.getQuestionLimit(plan) >= 999999
+                                    ? "Unlimited questions"
+                                    : "${_remainingQuestions + (PremiumUtils.getQuestionLimit(plan) - 20)} questions left today",
                                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
                               ),
                             ],

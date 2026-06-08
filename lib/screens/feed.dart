@@ -195,6 +195,14 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
         return !isAnsweredField && !hasAnswers && !isBlocked;
       }).toList();
 
+      final answersCountRes = await supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', user.id)
+          .inFilter('type', ['answer', 'reply'])
+          .eq('seen', false)
+          .neq('source_user', user.id);
+
       if (mounted) {
         setState(() {
           likesCount = (likesRes as List).length;
@@ -436,7 +444,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                 ),
                 actions: [
                   _buildBadgeIcon(Icons.favorite_border_rounded, likesCount, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const LikesActivityScreen())).then((_) => fetchNotificationCounts());
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => LikesActivityScreen())).then((_) => fetchNotificationCounts());
                   }),
                   _buildBadgeIcon(Icons.help_outline_rounded, questionsCount, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionsScreen())).then((_) => fetchNotificationCounts());

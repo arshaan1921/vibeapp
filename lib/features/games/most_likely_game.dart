@@ -6,6 +6,7 @@ import '../../services/notification_service.dart';
 import '../../services/block_service.dart';
 import '../../utils/image_utils.dart';
 import 'friend_selection_screen.dart';
+import '../../services/game_notification_service.dart';
 
 // ==================================================
 // 1. MOST LIKELY LOBBY (REDESIGNED)
@@ -270,6 +271,21 @@ class _MostLikelyWizardState extends State<MostLikelyWizard> {
         }
       });
 
+      // 4. Send Notifications
+      final creatorProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
+      final creatorUsername = creatorProfile['username'] ?? "Someone";
+
+      for (var friend in _selectedFriends) {
+        GameNotificationService.notify(
+          recipientId: friend.id,
+          gameId: gameId,
+          gameType: 'most_likely',
+          action: 'invitation',
+          title: "Most Likely To 🎮",
+          body: "@$creatorUsername invited you to play!",
+        ).catchError((e) => debugPrint("Notification error: $e"));
+      }
+
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -504,6 +520,7 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
     await supabase.from('most_likely_participants').update({'is_seen': true}).match({'game_id': widget.gameId, 'user_id': userId});
+    await GameNotificationService.markAsSeen(widget.gameId);
   }
 
   Future<void> _loadData() async {
@@ -565,6 +582,39 @@ class _MostLikelyPlayState extends State<MostLikelyPlay> {
       });
       setState(() => _votedOption = option);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vote cast! 🎯")));
+
+      // Notify game creator
+      final creatorId = _game?['creator_id'];
+      if (creatorId != null && creatorId != userId) {
+        final voterProfile = await supabase.from('profiles').select('username').eq('id', userId).single();
+        final voterUsername = voterProfile['username'] ?? "Someone";
+
+        GameNotificationService.notify(
+          recipientId: creatorId,
+          gameId: widget.gameId,
+          gameType: 'most_likely',
+          action: 'vote',
+          title: "Most Likely To 🎯",
+          body: "@$voterUsername cast a vote in your game!",
+        ).catchError((e) => debugPrint("Notification error: $e"));
+      }
+
+      // Check if everyone voted
+      final participantsRes = await supabase.from('most_likely_participants').select('user_id').eq('game_id', widget.gameId);
+      final votesRes = await supabase.from('most_likely_actions').select('user_id').eq('game_id', widget.gameId).eq('action_type', 'vote');
+      
+      if ((votesRes as List).length == (participantsRes as List).length) {
+        for (var p in participantsRes) {
+          GameNotificationService.notify(
+            recipientId: p['user_id'],
+            gameId: widget.gameId,
+            gameType: 'most_likely',
+            action: 'results',
+            title: "Results Available! 🏆",
+            body: "Everyone has voted in Most Likely To. See the results!",
+          ).catchError((e) => debugPrint("Notification error: $e"));
+        }
+      }
     } catch (e) {
       debugPrint("Error: $e");
     }

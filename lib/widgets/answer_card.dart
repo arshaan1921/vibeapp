@@ -126,14 +126,13 @@ class _AnswerCardState extends State<AnswerCard> {
     widget.onLikeChanged?.call();
 
     try {
-      if (originalIsLiked) {
-        await LikeService.unlikeAnswer(widget.answer.id);
-      } else {
-        await LikeService.likeAnswer(widget.answer.id);
-      }
+      final isNowLiked = await LikeService.toggleLike(widget.answer.id);
       
       if (mounted) {
-        setState(() => _isProcessing = false);
+        setState(() {
+          _isLiked = isNowLiked;
+          _isProcessing = false;
+        });
       }
     } catch (e) {
       if (mounted) {

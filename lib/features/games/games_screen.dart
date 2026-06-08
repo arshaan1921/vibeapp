@@ -21,10 +21,6 @@ class GamesScreen extends StatefulWidget {
 class _GamesScreenState extends State<GamesScreen> {
   final supabase = Supabase.instance.client;
   bool _isLoading = true;
-  int _totalBadgeCount = 0;
-  int _mlWaiting = 0;
-  int _tlWaiting = 0;
-  int _memeWaiting = 0;
   List<Map<String, dynamic>> _activeGames = [];
 
   @override
@@ -35,20 +31,8 @@ class _GamesScreenState extends State<GamesScreen> {
 
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
-    await Future.wait([
-      _fetchBadgeCount(),
-      _fetchActiveGames(),
-    ]);
+    await _fetchActiveGames();
     if (mounted) setState(() => _isLoading = false);
-  }
-
-  Future<void> _fetchBadgeCount() async {
-    try {
-      final count = await GameService().getUnvotedGamesCount();
-      if (mounted) setState(() => _totalBadgeCount = count);
-    } catch (e) {
-      debugPrint("Error fetching badge count: $e");
-    }
   }
 
   Future<void> _fetchActiveGames() async {
@@ -121,9 +105,6 @@ class _GamesScreenState extends State<GamesScreen> {
       if (mounted) {
         setState(() {
           _activeGames = allActive;
-          _mlWaiting = mlCount;
-          _tlWaiting = tlCount;
-          _memeWaiting = memeCount;
         });
       }
     } catch (e) {
@@ -198,7 +179,7 @@ class _GamesScreenState extends State<GamesScreen> {
                           ),
                         ],
                       ),
-                      _buildNotificationIcon(isDark),
+                      // Removed Notification Icon
                     ],
                   ),
                   const SizedBox(height: 32),
@@ -233,13 +214,9 @@ class _GamesScreenState extends State<GamesScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildHeroStat("Active", "${_activeGames.length}"),
-                            _buildHeroStat("Votes", "$_totalBadgeCount"),
-                            _buildHeroStat("New", "${_mlWaiting + _tlWaiting + _memeWaiting}"),
-                          ],
+                        const Text(
+                          "Active games and battles will appear here.",
+                          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -333,73 +310,6 @@ class _GamesScreenState extends State<GamesScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),
-    );
-  }
-
-  Widget _buildNotificationIcon(bool isDark) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.notifications_none_rounded,
-            color: isDark ? Colors.white : Colors.black,
-            size: 26,
-          ),
-        ),
-        if (_totalBadgeCount > 0)
-          Positioned(
-            top: -2,
-            right: -2,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: Color(0xFFEF4444),
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-              child: Text(
-                '$_totalBadgeCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildHeroStat(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-          ),
-        ),
-      ],
     );
   }
 

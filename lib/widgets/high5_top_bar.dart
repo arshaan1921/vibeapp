@@ -118,7 +118,7 @@ class _High5TopBarState extends State<High5TopBar> with WidgetsBindingObserver {
           .from('notifications')
           .select('id')
           .eq('user_id', user.id)
-          .eq('type', 'answer')
+          .inFilter('type', ['answer', 'reply'])
           .eq('seen', false)
           .neq('source_user', user.id); // 🚨 FIX
 
@@ -227,7 +227,7 @@ class _High5TopBarState extends State<High5TopBar> with WidgetsBindingObserver {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const LikesActivityScreen(),
+                          builder: (context) => LikesActivityScreen(),
                         ),
                       ).then((_) {
                         fetchLikeNotificationsCount();

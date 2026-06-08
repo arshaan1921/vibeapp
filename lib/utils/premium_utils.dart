@@ -24,7 +24,7 @@ class PremiumUtils {
         return 999999; // Unlimited questions
 
       default:
-        return 10; // Free plan
+        return 20; // Free plan
     }
   }
 
