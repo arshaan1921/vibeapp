@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ImageUtils {
   static String? safeUrl(String? url) {
@@ -10,7 +11,7 @@ class ImageUtils {
   static ImageProvider? getImageProvider(String? url) {
     final validUrl = safeUrl(url);
     if (validUrl != null) {
-      return NetworkImage(validUrl);
+      return CachedNetworkImageProvider(validUrl);
     }
     return null;
   }
@@ -23,12 +24,19 @@ class ImageUtils {
   }) {
     final validUrl = safeUrl(url);
     if (validUrl != null) {
-      return Image.network(
-        validUrl,
+      return CachedNetworkImage(
+        imageUrl: validUrl,
         width: width,
         height: height,
         fit: fit,
-        errorBuilder: (context, error, stackTrace) => Container(
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        placeholder: (context, url) => Container(
+          width: width,
+          height: height,
+          color: Colors.grey[200],
+        ),
+        errorWidget: (context, url, error) => Container(
           width: width,
           height: height,
           color: Colors.grey[200],
@@ -69,14 +77,13 @@ class ImageUtils {
               child: InteractiveViewer(
                 minScale: 0.5,
                 maxScale: 4.0,
-                child: Image.network(
-                  url,
+                child: CachedNetworkImage(
+                  imageUrl: url,
                   fit: BoxFit.contain,
-                  gaplessPlayback: true,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(child: CircularProgressIndicator(color: Colors.white));
-                  },
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                  errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
                 ),
               ),
             ),

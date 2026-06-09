@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/question.dart';
 import '../utils/link_utils.dart';
 import '../services/notification_service.dart';
@@ -219,31 +220,26 @@ class _AnswerScreenState extends State<AnswerScreen> {
                         const SizedBox(height: 12),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            imageUrl,
+                          child: CachedNetworkImage(
+                            imageUrl: imageUrl,
                             width: double.infinity,
                             height: 200,
                             fit: BoxFit.cover,
-                            gaplessPlayback: true,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                height: 200,
-                                color: Colors.black12,
-                                child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 100,
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
-                              );
-                            },
+                            fadeInDuration: Duration.zero,
+                            fadeOutDuration: Duration.zero,
+                            placeholder: (context, url) => Container(
+                              height: 200,
+                              color: Colors.black12,
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              height: 100,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[200],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.broken_image_outlined, color: Colors.grey),
+                            ),
                           ),
                         ),
                       ],

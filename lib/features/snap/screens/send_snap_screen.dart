@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../main.dart';
 import '../../../utils/image_utils.dart';
 import '../../../services/notification_service.dart';
+import '../../../services/image_optimizer_service.dart';
 
 class SendSnapScreen extends StatefulWidget {
   final String imagePath;
@@ -187,8 +188,9 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      // 1. Upload Image to Storage
-      final bytes = await File(widget.imagePath).readAsBytes();
+      // 1. Upload Image to Storage (Task 4: Compress before upload)
+      final compressedFile = await ImageOptimizerService.compressSnapImage(File(widget.imagePath));
+      final bytes = await compressedFile.readAsBytes();
       final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
       await supabase.storage.from('snaps').uploadBinary(

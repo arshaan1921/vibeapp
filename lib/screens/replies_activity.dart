@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'answer_view_screen.dart';
 import 'profile.dart';
+import '../utils/image_utils.dart';
 import '../services/block_service.dart';
 import '../main.dart';
 
@@ -290,12 +291,8 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> with Rout
                     radius: 22,
                     backgroundColor:
                     Colors.grey.withOpacity(0.2),
-                    backgroundImage: (avatarUrl != null &&
-                        avatarUrl != '')
-                        ? NetworkImage(avatarUrl)
-                        : null,
-                    child: (avatarUrl == null ||
-                        avatarUrl == '')
+                    backgroundImage: ImageUtils.getImageProvider(avatarUrl),
+                    child: ImageUtils.safeUrl(avatarUrl) == null
                         ? Icon(Icons.person,
                         color: theme.iconTheme.color)
                         : null,

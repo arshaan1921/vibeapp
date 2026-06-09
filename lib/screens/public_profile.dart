@@ -502,7 +502,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     child: CircleAvatar(
                       radius: 52,
                       backgroundColor: Colors.grey,
-                      backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
+                      backgroundImage: ImageUtils.getImageProvider(avatarUrl),
                       child: (avatarUrl == null || avatarUrl == '') ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
                     ),
                   ),

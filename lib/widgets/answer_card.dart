@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/answer.dart';
 import '../screens/profile.dart';
 import '../screens/answer_view_screen.dart';
@@ -36,7 +37,7 @@ class AnswerCard extends StatefulWidget {
   State<AnswerCard> createState() => _AnswerCardState();
 }
 
-class _AnswerCardState extends State<AnswerCard> {
+class _AnswerCardState extends State<AnswerCard> with AutomaticKeepAliveClientMixin {
   late bool _isLiked;
   late int _likeCount;
   bool _isProcessing = false;
@@ -46,6 +47,9 @@ class _AnswerCardState extends State<AnswerCard> {
   bool _isLoadingReplies = false;
   
   final ScreenshotController _screenshotController = ScreenshotController();
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -565,6 +569,7 @@ class _AnswerCardState extends State<AnswerCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     
@@ -689,11 +694,19 @@ class _AnswerCardState extends State<AnswerCard> {
                         const SizedBox(height: 10),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.network(
-                            widget.answer.questionImageUrl!,
+                          child: CachedNetworkImage(
+                            imageUrl: widget.answer.questionImageUrl!,
                             width: double.infinity,
                             fit: BoxFit.cover,
-                            gaplessPlayback: true,
+                            fadeInDuration: Duration.zero,
+                            fadeOutDuration: Duration.zero,
+                            placeholder: (context, url) => Container(
+                              height: 200,
+                              color: theme.brightness == Brightness.dark 
+                                  ? Colors.white.withOpacity(0.05) 
+                                  : Colors.grey[200],
+                            ),
+                            errorWidget: (context, url, error) => const Icon(Icons.error),
                           ),
                         ),
                       ],

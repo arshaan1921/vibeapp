@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class SnapViewerScreen extends StatefulWidget {
   final String imageUrl;
@@ -25,16 +26,15 @@ class _SnapViewerScreenState extends State<SnapViewerScreen> {
       body: GestureDetector(
         onTap: () => Navigator.pop(context),
         child: Center(
-          child: Image.network(
-            widget.imageUrl,
+          child: CachedNetworkImage(
+            imageUrl: widget.imageUrl,
             fit: BoxFit.contain,
             width: double.infinity,
             height: double.infinity,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const Center(child: CircularProgressIndicator(color: Colors.white));
-            },
-            errorBuilder: (context, error, stackTrace) => const Center(
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
+            placeholder: (context, url) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+            errorWidget: (context, url, error) => const Center(
               child: Text("Failed to load snap", style: TextStyle(color: Colors.white)),
             ),
           ),

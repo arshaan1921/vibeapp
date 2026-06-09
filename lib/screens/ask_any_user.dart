@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/notification_service.dart';
+import '../services/image_optimizer_service.dart';
 import 'premium.dart';
 
 class AskAnyUserScreen extends StatefulWidget {
@@ -80,18 +81,18 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
 
       String? imageUrl;
       if (_selectedImage != null) {
-        final extension = _selectedImage!.path.split('.').last.toLowerCase();
+        // Task 2: Compress image before upload
+        final compressedFile = await ImageOptimizerService.compressQuestionImage(_selectedImage!);
+        
+        final extension = compressedFile.path.split('.').last.toLowerCase();
         final path = "questions/${DateTime.now().millisecondsSinceEpoch}.$extension";
         
-        // Define content type for proper serving
+        // Define content type (compressed file is jpeg)
         String contentType = 'image/jpeg';
-        if (extension == 'gif') contentType = 'image/gif';
-        else if (extension == 'png') contentType = 'image/png';
-        else if (extension == 'webp') contentType = 'image/webp';
 
         await supabase.storage.from('question-images').upload(
           path, 
-          _selectedImage!,
+          compressedFile,
           fileOptions: FileOptions(contentType: contentType),
         );
         imageUrl = supabase.storage.from('question-images').getPublicUrl(path);

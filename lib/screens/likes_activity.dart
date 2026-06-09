@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'answer_view_screen.dart';
 import 'profile.dart';
+import '../utils/image_utils.dart';
 import '../services/block_service.dart';
 import '../main.dart';
 
@@ -274,8 +275,8 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> with RouteAwa
                               child: CircleAvatar(
                                 radius: 22,
                                 backgroundColor: Colors.grey.withOpacity(0.2),
-                                backgroundImage: (avatarUrl != null && avatarUrl != '') ? NetworkImage(avatarUrl) : null,
-                                child: (avatarUrl == null || avatarUrl == '') ? Icon(Icons.person, color: theme.iconTheme.color) : null,
+                                backgroundImage: ImageUtils.getImageProvider(avatarUrl),
+                                child: ImageUtils.safeUrl(avatarUrl) == null ? Icon(Icons.person, color: theme.iconTheme.color) : null,
                               ),
                             ),
                             title: RichText(

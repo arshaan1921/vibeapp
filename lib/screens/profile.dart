@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../main.dart';
 import '../models/answer.dart';
 import 'settings_screen.dart';
@@ -631,12 +632,19 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(21.5),
-                                child: Image.network(
-                                  profileData!['avatar_url'] ?? '',
+                                child: CachedNetworkImage(
+                                  imageUrl: profileData!['avatar_url'] ?? '',
                                   width: 78,
                                   height: 78,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
+                                  fadeInDuration: Duration.zero,
+                                  fadeOutDuration: Duration.zero,
+                                  placeholder: (context, url) => Container(
+                                    width: 78,
+                                    height: 78,
+                                    color: isDarkMode ? Colors.white10 : Colors.grey[200],
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
                                     width: 78,
                                     height: 78,
                                     color: isDarkMode ? Colors.white10 : Colors.grey[200],
