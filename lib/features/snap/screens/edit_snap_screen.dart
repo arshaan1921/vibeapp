@@ -14,7 +14,8 @@ class _TextOverlay {
 
 class EditSnapScreen extends StatefulWidget {
   final String imagePath;
-  const EditSnapScreen({super.key, required this.imagePath});
+  final List<double>? filterMatrix;
+  const EditSnapScreen({super.key, required this.imagePath, this.filterMatrix});
 
   @override
   State<EditSnapScreen> createState() => _EditSnapScreenState();
@@ -149,10 +150,19 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.file(
-                    File(widget.imagePath),
-                    fit: BoxFit.cover,
-                  ),
+                  if (widget.filterMatrix != null)
+                    ColorFiltered(
+                      colorFilter: ColorFilter.matrix(widget.filterMatrix!),
+                      child: Image.file(
+                        File(widget.imagePath),
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  else
+                    Image.file(
+                      File(widget.imagePath),
+                      fit: BoxFit.cover,
+                    ),
                   for (final overlay in _overlays)
                     if (overlay != _editingOverlay)
                       _buildDraggableOverlay(overlay),
