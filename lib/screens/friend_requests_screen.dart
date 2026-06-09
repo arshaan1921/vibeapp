@@ -100,6 +100,16 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     }
   }
 
+  Future<void> _cancelRequest(String receiverId) async {
+    try {
+      await friendService.cancelFriendRequest(receiverId);
+      _loadRequests();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Request cancelled")));
+    } catch (e) {
+      debugPrint("Error cancelling request: $e");
+    }
+  }
+
   Future<void> _declineRequest(String requestId) async {
     try {
       await friendService.declineFriendRequest(requestId);
@@ -203,10 +213,39 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                 ),
               ],
             )
-          : const Padding(
-              padding: EdgeInsets.only(right: 8.0),
-              child: Text("Pending", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Pending", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                const SizedBox(width: 12),
+                _buildActionButton(
+                  icon: Icons.cancel,
+                  color: Colors.grey,
+                  onTap: () => _showCancelConfirmation(userId, profile['username'] ?? 'User'),
+                  tooltip: "Cancel Request",
+                ),
+              ],
             ),
+    );
+  }
+
+  void _showCancelConfirmation(String receiverId, String username) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Cancel Request?"),
+        content: Text("Are you sure you want to cancel your friend request to @$username?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("NO")),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelRequest(receiverId);
+            },
+            child: const Text("YES, CANCEL", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 

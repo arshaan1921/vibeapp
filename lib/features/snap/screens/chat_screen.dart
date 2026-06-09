@@ -398,25 +398,26 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final user = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: Colors.grey[100],
+              backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
               backgroundImage: ImageUtils.getImageProvider(_avatarUrl),
               child: _avatarUrl == null
-                  ? Icon(Icons.person, color: Colors.grey[400], size: 20)
+                  ? Icon(Icons.person, color: isDark ? Colors.white38 : Colors.grey[400], size: 20)
                   : null,
             ),
             const SizedBox(width: 12),
@@ -429,7 +430,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       Flexible(
                         child: Text(
                           widget.userName,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -444,7 +445,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   Text(
                     _isOnline ? "Online" : "Recently active",
-                    style: TextStyle(fontSize: 11, color: _isOnline ? Colors.green : Colors.grey),
+                    style: TextStyle(fontSize: 11, color: _isOnline ? Colors.green : (isDark ? Colors.white38 : Colors.grey)),
                   ),
                 ],
               ),
@@ -704,7 +705,9 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isMe ? const Color(0xFFF8F8F8) : const Color(0xFFEEEEEE),
+          color: isMe 
+            ? (theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : const Color(0xFFF8F8F8)) 
+            : (theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.08) : const Color(0xFFEEEEEE)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey.withOpacity(0.05)),
         ),
@@ -724,7 +727,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 8),
             Text(
               _formatTimestampShort(message.createdAt),
-              style: TextStyle(color: Colors.grey.withOpacity(0.6), fontSize: 11),
+              style: TextStyle(color: theme.brightness == Brightness.dark ? Colors.white24 : Colors.grey.withOpacity(0.6), fontSize: 11),
             ),
           ],
         ),
@@ -786,13 +789,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildTextItem(SnapMessage message, bool isMe) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.colorScheme.primary;
 
     return Container(
       constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: isMe ? primaryColor : const Color(0xFFF1F1F1),
+        color: isMe ? primaryColor : (isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF1F1F1)),
         borderRadius: BorderRadius.circular(20).copyWith(
           bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(20),
           bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(0),
@@ -801,7 +805,7 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Text(
         message.text ?? "",
         style: TextStyle(
-          color: isMe ? Colors.white : Colors.black87,
+          color: isMe ? Colors.white : theme.colorScheme.onSurface,
           fontSize: 15,
         ),
       ),

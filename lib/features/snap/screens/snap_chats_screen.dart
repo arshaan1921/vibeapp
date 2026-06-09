@@ -345,9 +345,9 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: true,
         leading: Padding(
@@ -359,19 +359,19 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
             child: Center(
               child: CircleAvatar(
                 radius: 18,
-                backgroundColor: Colors.grey[100],
+                backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
                 backgroundImage: ImageUtils.getImageProvider(_profileData?['avatar_url']),
                 child: _profileData?['avatar_url'] == null
-                    ? Icon(Icons.person, color: Colors.grey[400], size: 20)
+                    ? Icon(Icons.person, color: isDark ? Colors.white38 : Colors.grey[400], size: 20)
                     : null,
               ),
             ),
           ),
         ),
-        title: const Text(
+        title: Text(
           "Chats",
           style: TextStyle(
-            color: Colors.black,
+            color: theme.colorScheme.onSurface,
             fontWeight: FontWeight.w900,
             fontSize: 20,
             letterSpacing: -0.5,
@@ -383,7 +383,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
             child: Stack(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded, color: Colors.black, size: 28),
+                  icon: Icon(Icons.notifications_none_rounded, color: theme.colorScheme.onSurface, size: 28),
                   onPressed: () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendRequestsScreen())).then((_) => _loadData());
                   },
@@ -417,11 +417,11 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
                   : ListView.separated(
                       padding: EdgeInsets.zero,
                       itemCount: _chats.length,
-                      separatorBuilder: (context, index) => const Divider(
+                      separatorBuilder: (context, index) => Divider(
                         height: 1,
                         thickness: 0.5,
                         indent: 80,
-                        color: Color(0xFFF1F1F1),
+                        color: isDark ? Colors.white10 : const Color(0xFFF1F1F1),
                       ),
                       itemBuilder: (context, index) {
                         final chat = _chats[index];
@@ -444,6 +444,8 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   }
 
   Widget _buildChatTile(Map<String, dynamic> chat) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isUnread = chat['is_unread'] as bool? ?? false;
     final isSnap = chat['type'] == 'snap';
     final streak = _streakMap[chat['id']] ?? 0;
@@ -463,10 +465,10 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
       },
       leading: CircleAvatar(
         radius: 28,
-        backgroundColor: Colors.grey[100],
+        backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
         backgroundImage: ImageUtils.getImageProvider(chat['avatar_url']),
         child: chat['avatar_url'] == null
-            ? Icon(Icons.person, color: Colors.grey[300], size: 30)
+            ? Icon(Icons.person, color: isDark ? Colors.white38 : Colors.grey[300], size: 30)
             : null,
       ),
       title: Text(
@@ -474,7 +476,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
         style: TextStyle(
           fontWeight: isUnread ? FontWeight.w900 : FontWeight.bold,
           fontSize: 16,
-          color: Colors.black,
+          color: theme.colorScheme.onSurface,
         ),
       ),
       subtitle: Padding(
@@ -499,30 +501,36 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
                     TextSpan(
                       text: chat['last_activity'],
                       style: TextStyle(
-                        color: isUnread ? Colors.black : Colors.grey[600],
+                        color: isUnread 
+                          ? (isDark ? Colors.white : Colors.black) 
+                          : (isDark ? Colors.white38 : Colors.grey[600]),
                         fontWeight: isUnread ? FontWeight.w700 : FontWeight.normal,
                       ),
                     ),
                     TextSpan(
                       text: " • ",
-                      style: TextStyle(color: Colors.grey[400]),
+                      style: TextStyle(color: isDark ? Colors.white12 : Colors.grey[400]),
                     ),
                     TextSpan(
                       text: chat['timestamp'],
                       style: TextStyle(
-                        color: isUnread ? Colors.black : Colors.grey[600],
+                        color: isUnread 
+                          ? (isDark ? Colors.white : Colors.black) 
+                          : (isDark ? Colors.white38 : Colors.grey[600]),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     if (streak > 0) ...[
                       TextSpan(
                         text: " • ",
-                        style: TextStyle(color: Colors.grey[400]),
+                        style: TextStyle(color: isDark ? Colors.white12 : Colors.grey[400]),
                       ),
                       TextSpan(
                         text: "${streak}🔥",
                         style: TextStyle(
-                          color: isUnread ? Colors.black : Colors.grey[600],
+                          color: isUnread 
+                            ? (isDark ? Colors.white : Colors.black) 
+                            : (isDark ? Colors.white38 : Colors.grey[600]),
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -545,11 +553,14 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
                 shape: BoxShape.circle,
               ),
             )
-          : const Icon(Icons.chevron_right, color: Color(0xFFE0E0E0), size: 20),
+          : Icon(Icons.chevron_right, color: isDark ? Colors.white10 : const Color(0xFFE0E0E0), size: 20),
     );
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -557,15 +568,15 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           Icon(
             Icons.chat_bubble_outline_rounded,
             size: 100,
-            color: Colors.grey[100],
+            color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             "No conversations yet",
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: Colors.black,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),

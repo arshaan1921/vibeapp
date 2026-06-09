@@ -37,10 +37,10 @@ class _StreakRestoreStoreDialogState extends State<StreakRestoreStoreDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Row(
-        children: const [
-          Icon(Icons.local_fire_department, color: Colors.orange),
-          SizedBox(width: 8),
-          Text("Get Streak Restores"),
+        children: [
+          const Icon(Icons.local_fire_department, color: Colors.orange),
+          const SizedBox(width: 8),
+          Text("Get Streak Restores", style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
         ],
       ),
       content: _isLoading 
@@ -108,7 +108,7 @@ class _StreakRestoreStoreDialogState extends State<StreakRestoreStoreDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.onSurface)),
                   if (isRecommended)
                     const Text("BEST VALUE", style: TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
                 ],

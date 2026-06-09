@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/answer.dart';
 import '../widgets/answer_card.dart';
 import '../services/block_service.dart';
+import '../utils/premium_utils.dart';
 import '../main.dart';
 import 'profile.dart';
 import 'search_screen.dart';
@@ -136,8 +137,10 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
       }
       
       final response = await query.order('created_at', ascending: false).limit(15);
+      final people = List<Map<String, dynamic>>.from(response as List);
+      await _fetchLikesForProfiles(people);
       
-      _suggestedPeople = List<Map<String, dynamic>>.from(response as List);
+      _suggestedPeople = people;
     } catch (e, st) {
       debugPrint('Error fetching suggested people: $e');
       debugPrintStack(stackTrace: st);
@@ -157,8 +160,10 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
       }
       
       final response = await query.limit(10);
+      final people = List<Map<String, dynamic>>.from(response as List);
+      await _fetchLikesForProfiles(people);
       
-      _verifiedCreators = List<Map<String, dynamic>>.from(response as List);
+      _verifiedCreators = people;
     } catch (e, st) {
       debugPrint('Error fetching verified creators: $e');
       debugPrintStack(stackTrace: st);
@@ -208,10 +213,37 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
           .order('created_at', ascending: false)
           .limit(10);
       
-      _newRisingCreators = List<Map<String, dynamic>>.from(response as List);
+      final people = List<Map<String, dynamic>>.from(response as List);
+      await _fetchLikesForProfiles(people);
+      _newRisingCreators = people;
     } catch (e, st) {
       debugPrint('Error fetching new rising creators: $e');
       debugPrintStack(stackTrace: st);
+    }
+  }
+
+  Future<void> _fetchLikesForProfiles(List<Map<String, dynamic>> profiles) async {
+    if (profiles.isEmpty) return;
+    try {
+      final userIds = profiles.map((p) => p['id']).toList();
+      final response = await Supabase.instance.client
+          .from('answers')
+          .select('user_id, likes_count')
+          .inFilter('user_id', userIds);
+      
+      final data = response as List;
+      final Map<String, int> likesMap = {};
+      for (var row in data) {
+        final uid = row['user_id'].toString();
+        final likes = (row['likes_count'] as int? ?? 0);
+        likesMap[uid] = (likesMap[uid] ?? 0) + likes;
+      }
+      
+      for (var profile in profiles) {
+        profile['likes_count'] = likesMap[profile['id']] ?? 0;
+      }
+    } catch (e) {
+      debugPrint('Error fetching likes for profiles: $e');
     }
   }
 
@@ -572,7 +604,8 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (person['youtube_verified'] == true || (person['premium_plan'] != null && person['premium_plan'] != 'free'))
+              PremiumUtils.buildBadge(person['premium_plan'], size: 14),
+              if (person['youtube_verified'] == true)
                 const Icon(Icons.verified_rounded, color: Colors.blue, size: 14),
             ],
           ),
@@ -626,7 +659,8 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (person['youtube_verified'] == true || (person['premium_plan'] != null && person['premium_plan'] != 'free'))
+          PremiumUtils.buildBadge(person['premium_plan'], size: 16),
+          if (person['youtube_verified'] == true)
             const Padding(
               padding: EdgeInsets.only(left: 4),
               child: Icon(Icons.verified_rounded, color: Colors.blue, size: 16),
