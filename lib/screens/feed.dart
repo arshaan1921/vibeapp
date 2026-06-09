@@ -494,6 +494,11 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                         );
                       },
                       childCount: _feedItems.length,
+                      findChildIndexCallback: (key) {
+                        final valueKey = key as ValueKey<String>;
+                        final index = _feedItems.indexWhere((item) => item.id == valueKey.value);
+                        return index == -1 ? null : index;
+                      },
                     ),
                   ),
                 ),

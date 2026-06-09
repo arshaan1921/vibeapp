@@ -737,18 +737,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _handleSnapTap(SnapMessage message) async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null || message.imageUrl == null) return;
+    if (user == null || message.imageUrl == null) {
+      debugPrint('PROVE_DELETE: Aborting - User or Image URL is null');
+      return;
+    }
 
     final bool isMe = message.senderId == user.id;
 
     // If it's already opened, do nothing as per requirement
     if (message.status == SnapStatus.opened) {
-      debugPrint('SNAP_OPEN: Snap already opened, ignoring tap');
+      debugPrint('PROVE_DELETE: Snap already opened, ignoring tap');
       return;
     }
 
     // 1. Navigate to viewer
-    debugPrint('SNAP_OPEN: Opening snap ${message.snapId}');
+    debugPrint('PROVE_DELETE: Opening snap ${message.snapId} for viewing');
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => SnapViewerScreen(imageUrl: message.imageUrl!)),
@@ -758,32 +761,84 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!isMe) {
       try {
         final supabase = Supabase.instance.client;
+        final String? imageUrl = message.imageUrl;
+
+        debugPrint('PROVE_DELETE: --- START CLEANUP ---');
+        debugPrint('PROVE_DELETE: Recipient ID: ${user.id}');
+        debugPrint('PROVE_DELETE: Snap ID: ${message.snapId}');
+        debugPrint('PROVE_DELETE: Recipient Row ID: ${message.id}');
+        debugPrint('PROVE_DELETE: Original URL: $imageUrl');
 
         // 2. Extract file path correctly from image_url
-        // URL format: .../public/snaps/USER_ID/FILENAME.jpg
-        final String filePath = message.imageUrl!.split('/public/snaps/').last;
-        debugPrint('SNAP_DELETE: Removing storage file $filePath');
+        if (imageUrl != null && imageUrl.contains('/public/snaps/')) {
+          // Robust path extraction: split by the bucket part and take everything after it
+          // Then remove any query parameters if they exist
+          String filePath = imageUrl.split('/public/snaps/').last;
+          if (filePath.contains('?')) {
+            filePath = filePath.split('?').first;
+          }
+          
+          debugPrint('PROVE_DELETE: Extracted Path: "$filePath"');
+          debugPrint('PROVE_DELETE: Path Length: ${filePath.length}');
 
-        // 3. Delete from Supabase Storage
-        await supabase.storage.from('snaps').remove([filePath]);
+          // 3. Delete from Supabase Storage
+          try {
+            debugPrint('PROVE_DELETE: Calling storage.from("snaps").remove(["$filePath"])');
+            final List<FileObject> response = await supabase.storage.from('snaps').remove([filePath]);
+            
+            if (response.isNotEmpty) {
+              debugPrint('PROVE_DELETE: ✅ SUCCESS: Storage removal returned objects. Count: ${response.length}');
+              for (var f in response) {
+                debugPrint('PROVE_DELETE: Removed object: ${f.name}');
+              }
+            } else {
+              debugPrint('PROVE_DELETE: ⚠️ WARNING: Storage removal returned an EMPTY list. This usually means the file was NOT found or the DELETE policy blocked it.');
+            }
+          } catch (storageErr) {
+            debugPrint('PROVE_DELETE: ❌ ERROR during storage.remove: $storageErr');
+            if (storageErr.toString().contains('403') || storageErr.toString().contains('Permission denied')) {
+              debugPrint('PROVE_DELETE: 🚨 PERMISSION DENIED: The current user (${user.id}) cannot delete this file. Check RLS DELETE policy on "snaps" bucket.');
+            }
+          }
+        } else {
+          debugPrint('PROVE_DELETE: ⚠️ ABORT: URL does not contain "/public/snaps/" or is null');
+        }
 
-        // 4. Update status in DB (Do not delete rows)
-        debugPrint('SNAP_DELETE: Updating snap_recipients status to opened');
-        await supabase
+        // 4. Update status in DB
+        debugPrint('PROVE_DELETE: Updating DB records...');
+        final now = DateTime.now().toIso8601String();
+        
+        // Update recipient record
+        final recipientUpdate = await supabase
             .from('snap_recipients')
             .update({
               'status': 'opened', 
-              'opened_at': DateTime.now().toIso8601String()
+              'opened_at': now
             })
-            .eq('id', message.id);
-
-        debugPrint('SNAP_DELETE: Success');
+            .eq('id', message.id)
+            .select();
         
-        // Refresh local UI to show "Opened" instead of deleting
+        debugPrint('PROVE_DELETE: DB snap_recipients update: ${recipientUpdate.isNotEmpty ? 'SUCCESS' : 'FAILED'}');
+
+        // Update main snap record to remove image URL reference
+        if (message.snapId != null) {
+          final snapUpdate = await supabase
+              .from('snaps')
+              .update({'image_url': null})
+              .eq('id', message.snapId!)
+              .select();
+          debugPrint('PROVE_DELETE: DB snaps.image_url nullification: ${snapUpdate.isNotEmpty ? 'SUCCESS' : 'FAILED'}');
+        }
+
+        debugPrint('PROVE_DELETE: --- END CLEANUP ---');
+        
+        // Refresh local UI
         _loadMessages();
       } catch (e) {
-        debugPrint('SNAP_DELETE_ERROR: $e');
+        debugPrint('PROVE_DELETE: 🔥 CRITICAL EXCEPTION in _handleSnapTap: $e');
       }
+    } else {
+      debugPrint('PROVE_DELETE: Skipping deletion because viewer is the sender.');
     }
   }
 

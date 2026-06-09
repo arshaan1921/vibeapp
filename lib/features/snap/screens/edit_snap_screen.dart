@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import 'send_snap_screen.dart';
 
 class _TextOverlay {
@@ -14,8 +15,14 @@ class _TextOverlay {
 
 class EditSnapScreen extends StatefulWidget {
   final String imagePath;
+  final bool isVideo;
   final List<double>? filterMatrix;
-  const EditSnapScreen({super.key, required this.imagePath, this.filterMatrix});
+  const EditSnapScreen({
+    super.key, 
+    required this.imagePath, 
+    this.isVideo = false,
+    this.filterMatrix,
+  });
 
   @override
   State<EditSnapScreen> createState() => _EditSnapScreenState();
@@ -27,6 +34,7 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
   bool _isTextMode = false;
   bool _isCapturing = false;
   
+  VideoPlayerController? _videoController;
   final TextEditingController _textController = TextEditingController();
   final FocusNode _textFocusNode = FocusNode();
   final ScreenshotController _screenshotController = ScreenshotController();
@@ -38,6 +46,14 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
   @override
   void initState() {
     super.initState();
+    if (widget.isVideo) {
+      _videoController = VideoPlayerController.file(File(widget.imagePath))
+        ..initialize().then((_) {
+          _videoController!.setLooping(true);
+          _videoController!.play();
+          setState(() {});
+        });
+    }
     _uiController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -56,10 +72,23 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
     _textController.dispose();
     _textFocusNode.dispose();
     _uiController.dispose();
+    _videoController?.dispose();
     super.dispose();
   }
 
   Future<void> _sendSnap() async {
+    if (widget.isVideo) {
+      // For video, we just send the original file for now
+      // (Baking overlays into video is more complex)
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SendSnapScreen(imagePath: widget.imagePath, isVideo: true),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isCapturing = true);
     _textFocusNode.unfocus();
     await Future.delayed(const Duration(milliseconds: 200));
@@ -77,7 +106,7 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => SendSnapScreen(imagePath: imagePath),
+            builder: (_) => SendSnapScreen(imagePath: imagePath, isVideo: false),
           ),
         );
       }
@@ -153,16 +182,30 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
                   if (widget.filterMatrix != null)
                     ColorFiltered(
                       colorFilter: ColorFilter.matrix(widget.filterMatrix!),
-                      child: Image.file(
-                        File(widget.imagePath),
-                        fit: BoxFit.cover,
-                      ),
+                      child: widget.isVideo 
+                        ? (_videoController != null && _videoController!.value.isInitialized
+                            ? AspectRatio(
+                                aspectRatio: _videoController!.value.aspectRatio,
+                                child: VideoPlayer(_videoController!),
+                              )
+                            : Container(color: Colors.black))
+                        : Image.file(
+                            File(widget.imagePath),
+                            fit: BoxFit.cover,
+                          ),
                     )
                   else
-                    Image.file(
-                      File(widget.imagePath),
-                      fit: BoxFit.cover,
-                    ),
+                    widget.isVideo
+                      ? (_videoController != null && _videoController!.value.isInitialized
+                          ? AspectRatio(
+                              aspectRatio: _videoController!.value.aspectRatio,
+                              child: VideoPlayer(_videoController!),
+                            )
+                          : Container(color: Colors.black))
+                      : Image.file(
+                          File(widget.imagePath),
+                          fit: BoxFit.cover,
+                        ),
                   for (final overlay in _overlays)
                     if (overlay != _editingOverlay)
                       _buildDraggableOverlay(overlay),

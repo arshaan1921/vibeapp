@@ -24,6 +24,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   int _pendingRequestsCount = 0;
   RealtimeChannel? _realtimeChannel;
   Timer? _refreshTimer;
+  static bool _hasCleanedUpThisSession = false;
 
   @override
   void initState() {
@@ -38,6 +39,62 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
         _loadData();
       }
     });
+  }
+
+  Future<void> _cleanupAbandonedSnaps() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      debugPrint('CLEANUP: Checking for abandoned snaps...');
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30)).toIso8601String();
+
+      // Find old snaps SENT BY ME that still have image files
+      // These are "abandoned" if they were never opened or just old system junk
+      final oldSentSnapsRes = await supabase
+          .from('snaps')
+          .select('id, image_url')
+          .eq('sender_id', user.id)
+          .not('image_url', 'is', null)
+          .lt('created_at', thirtyDaysAgo);
+
+      final List<dynamic> oldSnaps = oldSentSnapsRes as List;
+      if (oldSnaps.isEmpty) {
+        debugPrint('CLEANUP: No abandoned snaps found');
+        return;
+      }
+
+      for (var snap in oldSnaps) {
+        final snapId = snap['id'];
+        final imageUrl = snap['image_url'] as String?;
+        
+        if (imageUrl != null && imageUrl.contains('/public/snaps/')) {
+          final String filePath = imageUrl.split('/public/snaps/').last;
+          
+          // 1. Delete from storage
+          try {
+            await supabase.storage.from('snaps').remove([filePath]);
+          } catch (e) {
+            debugPrint('CLEANUP: Storage removal failed for $filePath: $e');
+          }
+          
+          // 2. Nullify image_url in DB
+          await supabase.from('snaps').update({'image_url': null}).eq('id', snapId);
+          
+          // 3. Mark all recipients as 'opened' if they weren't, to clear their UI
+          await supabase
+              .from('snap_recipients')
+              .update({'status': 'opened', 'opened_at': thirtyDaysAgo})
+              .eq('snap_id', snapId)
+              .isFilter('opened_at', null);
+              
+          debugPrint('CLEANUP: Processed snap $snapId');
+        }
+      }
+    } catch (e) {
+      debugPrint('CLEANUP_ERROR: $e');
+    }
   }
 
   @override
@@ -99,6 +156,12 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   }
 
   Future<void> _loadData() async {
+    // Abandoned Snap Cleanup (Once per app session)
+    if (!_hasCleanedUpThisSession) {
+      _hasCleanedUpThisSession = true;
+      _cleanupAbandonedSnaps();
+    }
+
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;

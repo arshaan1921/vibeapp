@@ -40,6 +40,11 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
   bool _showUI = false;
 
+  // Video recording state
+  bool _isRecording = false;
+  String? _videoPath;
+  static const int _maxRecordingDurationMs = 15000; // 15 seconds like classic snap
+
   // Filter state
   int _activeFilterIndex = 0;
   final PageController _filterPageController = PageController(viewportFraction: 0.25);
@@ -49,6 +54,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   late Animation<double> _shutterScale;
   late Animation<double> _ringScale;
   late Animation<double> _glowOpacity;
+  late AnimationController _progressController;
 
   @override
   void initState() {
@@ -72,6 +78,15 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     _glowOpacity = Tween<double>(begin: 0.0, end: 0.4).animate(
       CurvedAnimation(parent: _shutterController, curve: Curves.easeInOut),
     );
+
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _maxRecordingDurationMs),
+    )..addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _stopVideoRecording();
+      }
+    });
     
     // Entrance animation trigger
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -85,7 +100,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       _controller = CameraController(
         _cameras![_selectedCameraIndex],
         ResolutionPreset.high,
-        enableAudio: false,
+        enableAudio: true,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
@@ -115,6 +130,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     _zoomIndicatorTimer?.cancel();
     _focusTimer?.cancel();
     _shutterController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
@@ -234,7 +250,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   }
 
   Future<void> _takePicture() async {
-    if (_controller == null || !_controller!.value.isInitialized) return;
+    if (_controller == null || !_controller!.value.isInitialized || _isRecording) return;
 
     HapticFeedback.mediumImpact();
 
@@ -256,6 +272,51 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       }
     } catch (e) {
       debugPrint('Error taking picture: $e');
+    }
+  }
+
+  Future<void> _startVideoRecording() async {
+    if (_controller == null || !_controller!.value.isInitialized || _isRecording) return;
+
+    try {
+      await _controller!.startVideoRecording();
+      setState(() {
+        _isRecording = true;
+      });
+      _progressController.forward(from: 0.0);
+      HapticFeedback.heavyImpact();
+    } catch (e) {
+      debugPrint('Error starting video recording: $e');
+    }
+  }
+
+  Future<void> _stopVideoRecording() async {
+    if (_controller == null || !_controller!.value.isInitialized || !_isRecording) return;
+
+    try {
+      final XFile video = await _controller!.stopVideoRecording();
+      _progressController.stop();
+      _progressController.reset();
+      
+      setState(() {
+        _isRecording = false;
+        _videoPath = video.path;
+      });
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EditSnapScreen(
+              imagePath: _videoPath!,
+              isVideo: true,
+              filterMatrix: CameraFilter.filters[_activeFilterIndex].matrix,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error stopping video recording: $e');
     }
   }
 
@@ -635,11 +696,12 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   Widget _buildShutterButton() {
     return GestureDetector(
       onLongPressStart: (_) {
-        HapticFeedback.heavyImpact();
         _shutterController.forward();
+        _startVideoRecording();
       },
       onLongPressEnd: (_) {
         _shutterController.reverse();
+        _stopVideoRecording();
       },
       onTapDown: (_) {
         HapticFeedback.selectionClick();
@@ -647,15 +709,15 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       },
       onTap: _takePicture,
       child: AnimatedBuilder(
-        animation: _shutterController,
+        animation: Listenable.merge([_shutterController, _progressController]),
         builder: (context, child) {
           return Stack(
             alignment: Alignment.center,
             children: [
               // Outer Glow
               Container(
-                width: 95,
-                height: 95,
+                width: 105,
+                height: 105,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
@@ -667,6 +729,18 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                   ],
                 ),
               ),
+              // Video Progress Ring
+              if (_isRecording)
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: CircularProgressIndicator(
+                    value: _progressController.value,
+                    strokeWidth: 6,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                  ),
+                ),
               // Expanding Ring
               Transform.scale(
                 scale: _ringScale.value,
@@ -676,7 +750,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withOpacity(1.0 - _shutterController.value),
+                      color: Colors.white.withOpacity(_isRecording ? 0.0 : (1.0 - _shutterController.value)),
                       width: 2,
                     ),
                   ),
@@ -685,13 +759,14 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               // Main Shutter
               Transform.scale(
                 scale: _shutterScale.value,
-                child: Container(
-                  width: 80,
-                  height: 80,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: _isRecording ? 90 : 80,
+                  height: _isRecording ? 90 : 80,
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 4),
+                    border: Border.all(color: Colors.white, width: _isRecording ? 6 : 4),
                   ),
                   child: Container(
                     decoration: const BoxDecoration(

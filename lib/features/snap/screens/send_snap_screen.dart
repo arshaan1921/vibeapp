@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../main.dart';
@@ -8,7 +9,8 @@ import '../../../services/image_optimizer_service.dart';
 
 class SendSnapScreen extends StatefulWidget {
   final String imagePath;
-  const SendSnapScreen({super.key, required this.imagePath});
+  final bool isVideo;
+  const SendSnapScreen({super.key, required this.imagePath, this.isVideo = false});
 
   @override
   State<SendSnapScreen> createState() => _SendSnapScreenState();
@@ -188,15 +190,28 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      // 1. Upload Image to Storage (Task 4: Compress before upload)
-      final compressedFile = await ImageOptimizerService.compressSnapImage(File(widget.imagePath));
-      final bytes = await compressedFile.readAsBytes();
-      final fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      // 1. Upload File to Storage
+      final bool isVideo = widget.isVideo || widget.imagePath.endsWith('.mp4') || widget.imagePath.endsWith('.mov');
+      
+      String fileName;
+      String contentType;
+      Uint8List bytes;
+
+      if (isVideo) {
+        fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.mp4';
+        contentType = 'video/mp4';
+        bytes = await File(widget.imagePath).readAsBytes();
+      } else {
+        final compressedFile = await ImageOptimizerService.compressSnapImage(File(widget.imagePath));
+        bytes = await compressedFile.readAsBytes();
+        fileName = '${user.id}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        contentType = 'image/jpeg';
+      }
 
       await supabase.storage.from('snaps').uploadBinary(
         fileName,
         bytes,
-        fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
+        fileOptions: FileOptions(upsert: true, contentType: contentType),
       );
 
       final imageUrl = supabase.storage.from('snaps').getPublicUrl(fileName);
