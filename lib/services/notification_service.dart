@@ -10,10 +10,6 @@ import '../screens/inbox.dart';
 import '../screens/questions_screen.dart';
 import '../screens/answer_detail_screen.dart';
 import '../screens/my_tickets_screen.dart';
-import '../features/games/games_screen.dart';
-import '../features/games/most_likely_game.dart';
-import '../features/games/truth_lie_game.dart';
-import '../features/games/meme_game_screen.dart';
 import '../screens/friend_requests_screen.dart';
 import 'update_service.dart';
 
@@ -196,33 +192,6 @@ class NotificationService {
       } else {
         tabIndexNotifier.value = 4;
       }
-    } else if (type == 'game') {
-      debugPrint("🎮 Game notification tapped");
-      final gameType = data['game_type'];
-      final gameId = data['game_id']?.toString();
-      
-      if (gameId != null && gameType != null) {
-        debugPrint("➡️ Opening game: $gameType, ID: $gameId");
-        Widget target;
-        if (gameType == 'most_likely') {
-          target = MostLikelyPlay(gameId: gameId);
-        } else if (gameType == 'truth_lie') {
-          target = TruthLiePlay(gameId: gameId);
-        } else if (gameType == 'meme') {
-          target = MemeGameScreen(gameId: gameId);
-        } else {
-          target = const GamesScreen();
-        }
-        
-        navigatorKey.currentState?.push(
-          MaterialPageRoute(builder: (_) => target),
-        );
-      } else {
-        debugPrint("➡️ No game details, opening GamesScreen");
-        navigatorKey.currentState?.push(
-          MaterialPageRoute(builder: (_) => const GamesScreen()),
-        );
-      }
     } else if (type == 'friend_request') {
       debugPrint("👥 Friend request notification tapped");
       navigatorKey.currentState?.push(
@@ -233,18 +202,6 @@ class NotificationService {
       tabIndexNotifier.value = 3; // Navigate to SnapChats tab
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
     }
-  }
-
-  static Future<void> sendGameNotification({
-    required String targetUserId,
-    required String creatorUsername,
-  }) async {
-    await sendNotification(
-      userId: targetUserId,
-      title: "New Game! 🎮",
-      body: "@$creatorUsername started a new game with you",
-      data: {"type": "game"},
-    );
   }
 
   // ==============================

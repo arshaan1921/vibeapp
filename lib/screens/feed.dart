@@ -11,8 +11,6 @@ import '../screens/ask_any_user.dart';
 import '../screens/likes_activity.dart';
 import '../screens/replies_activity.dart';
 import '../screens/questions_screen.dart';
-import '../features/games/games_screen.dart';
-import '../services/game_service.dart';
 import '../features/snap/screens/camera_screen.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -452,10 +450,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                   _buildBadgeIcon(Icons.reply_rounded, answersCount, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AnswersActivityScreen())).then((_) => fetchNotificationCounts());
                   }),
-                  IconButton(
-                    icon: Icon(Icons.sports_esports_rounded, size: 26, color: theme.colorScheme.onSurface),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GamesScreen())),
-                  ),
                   IconButton(
                     icon: Icon(Icons.add_circle_outline_rounded, size: 26, color: theme.colorScheme.onSurface),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AskAnyUserScreen())),

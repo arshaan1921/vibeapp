@@ -226,7 +226,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text(
-                "Ask anonymous questions, answer honestly, and play fun social games with friends.",
+                "Ask anonymous questions and answer honestly with friends.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: theme.colorScheme.onSurface.withOpacity(0.7),
@@ -278,7 +278,7 @@ class AboutUsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              "At High5, we believe in the power of honest connections. Our mission is to create a safe and fun space where friends can interact authentically through anonymous questions and social games.",
+              "At High5, we believe in the power of honest connections. Our mission is to create a safe and fun space where friends can interact authentically through anonymous questions.",
               style: TextStyle(
                 fontSize: 16,
                 height: 1.6,
@@ -295,7 +295,7 @@ class AboutUsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              "High5 was born out of a simple idea: social media should be more about the people you actually know. We wanted to build something that brings out the personality in every conversation, whether it's through a heartfelt answer or a competitive meme battle.",
+              "High5 was born out of a simple idea: social media should be more about the people you actually know. We wanted to build something that brings out the personality in every conversation, whether it's through a heartfelt answer or a shared moment.",
               style: TextStyle(
                 fontSize: 16,
                 height: 1.6,
