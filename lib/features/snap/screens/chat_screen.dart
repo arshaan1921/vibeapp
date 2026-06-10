@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../utils/image_utils.dart';
@@ -920,17 +921,22 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildTextItem(SnapMessage message, bool isMe, bool isLastSent) {
+    return _SwipeToReplyWrapper(
+      onReply: () {
+        debugPrint('REPLY_SET id=${message.id}');
+        setState(() => _replyingTo = message);
+      },
+      child: _buildTextItemContent(message, isMe, isLastSent),
+    );
+  }
+
+  Widget _buildTextItemContent(SnapMessage message, bool isMe, bool isLastSent) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.colorScheme.primary;
 
     return GestureDetector(
       onLongPress: () => _showReactionPickerOverlay(message, _bubbleKeys[message.id]!),
-      onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity != null && details.primaryVelocity! > 500) {
-          setState(() => _replyingTo = message);
-        }
-      },
       child: Column(
         crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
@@ -1383,6 +1389,129 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SwipeToReplyWrapper extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onReply;
+
+  const _SwipeToReplyWrapper({required this.child, required this.onReply});
+
+  @override
+  State<_SwipeToReplyWrapper> createState() => _SwipeToReplyWrapperState();
+}
+
+class _SwipeToReplyWrapperState extends State<_SwipeToReplyWrapper> with TickerProviderStateMixin {
+  late AnimationController _dragController;
+  late Animation<Offset> _dragAnimation;
+  double _dragX = 0;
+  bool _isTriggered = false;
+  static const double _threshold = 40.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _dragController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _dragAnimation = Tween<Offset>(begin: Offset.zero, end: Offset.zero).animate(_dragController);
+  }
+
+  @override
+  void dispose() {
+    _dragController.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragStart(DragStartDetails details) {
+    debugPrint('SWIPE_START');
+    _isTriggered = false;
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dx < 0 && _dragX <= 0) return; // Only right swipe
+
+    setState(() {
+      _dragX += details.delta.dx;
+      if (_dragX < 0) _dragX = 0;
+      if (_dragX > 70) _dragX = 70; // Cap visual drag
+      
+      debugPrint('SWIPE_PROGRESS x=$_dragX');
+
+      if (_dragX >= _threshold && !_isTriggered) {
+        _isTriggered = true;
+        HapticFeedback.lightImpact();
+        debugPrint('SWIPE_TRIGGERED');
+      }
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (_isTriggered) {
+      widget.onReply();
+    }
+    
+    // Animate back
+    _dragAnimation = Tween<Offset>(
+      begin: Offset(_dragX, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _dragController, curve: Curves.easeOut));
+    
+    _dragX = 0;
+    _dragController.forward(from: 0);
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragStart: _onHorizontalDragStart,
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      onHorizontalDragEnd: _onHorizontalDragEnd,
+      behavior: HitTestBehavior.translucent,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Reply Icon background
+          Positioned(
+            left: -30,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Opacity(
+                opacity: (_dragX / _threshold).clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: (_dragX / _threshold).clamp(0.8, 1.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.reply, color: Colors.green, size: 20),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // The message bubble
+          AnimatedBuilder(
+            animation: _dragAnimation,
+            builder: (context, child) {
+              final offset = _dragController.isAnimating ? _dragAnimation.value : Offset(_dragX, 0);
+              return Transform.translate(
+                offset: offset,
+                child: child,
+              );
+            },
+            child: widget.child,
+          ),
+        ],
       ),
     );
   }

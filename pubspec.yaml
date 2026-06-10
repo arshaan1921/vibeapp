@@ -1,7 +1,7 @@
 name: high5
 description: "Ask anonymous questions and answer honestly with friends."
 publish_to: 'none'
-version: 1.0.40+41
+version: 1.0.41+42
 
 environment:
   sdk: ^3.11.0

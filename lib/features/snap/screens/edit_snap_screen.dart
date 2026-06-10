@@ -160,6 +160,30 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
     _textFocusNode.unfocus();
   }
 
+  Widget _buildImageContent() {
+    final Widget content = widget.isVideo
+        ? (_videoController != null && _videoController!.value.isInitialized
+            ? Center(
+                child: AspectRatio(
+                  aspectRatio: _videoController!.value.aspectRatio,
+                  child: VideoPlayer(_videoController!),
+                ),
+              )
+            : Container(color: Colors.black))
+        : Image.file(
+            File(widget.imagePath),
+            fit: BoxFit.cover,
+          );
+
+    if (widget.filterMatrix != null) {
+      return ColorFiltered(
+        colorFilter: ColorFilter.matrix(widget.filterMatrix!),
+        child: content,
+      );
+    }
+    return content;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -176,40 +200,24 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
                 if (_isTextMode) _finishEditing();
               },
               onDoubleTapDown: _onImageDoubleTap,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (widget.filterMatrix != null)
-                    ColorFiltered(
-                      colorFilter: ColorFilter.matrix(widget.filterMatrix!),
-                      child: widget.isVideo 
-                        ? (_videoController != null && _videoController!.value.isInitialized
-                            ? AspectRatio(
-                                aspectRatio: _videoController!.value.aspectRatio,
-                                child: VideoPlayer(_videoController!),
-                              )
-                            : Container(color: Colors.black))
-                        : Image.file(
-                            File(widget.imagePath),
-                            fit: BoxFit.cover,
-                          ),
-                    )
-                  else
-                    widget.isVideo
-                      ? (_videoController != null && _videoController!.value.isInitialized
-                          ? AspectRatio(
-                              aspectRatio: _videoController!.value.aspectRatio,
-                              child: VideoPlayer(_videoController!),
-                            )
-                          : Container(color: Colors.black))
-                      : Image.file(
-                          File(widget.imagePath),
-                          fit: BoxFit.cover,
-                        ),
-                  for (final overlay in _overlays)
-                    if (overlay != _editingOverlay)
-                      _buildDraggableOverlay(overlay),
-                ],
+              child: Container(
+                color: Colors.black,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    InteractiveViewer(
+                      minScale: 0.5,
+                      maxScale: 5.0,
+                      boundaryMargin: const EdgeInsets.all(double.infinity),
+                      child: SizedBox.expand(
+                        child: _buildImageContent(),
+                      ),
+                    ),
+                    for (final overlay in _overlays)
+                      if (overlay != _editingOverlay)
+                        _buildDraggableOverlay(overlay),
+                  ],
+                ),
               ),
             ),
           ),
@@ -250,14 +258,14 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
         },
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
           color: Colors.black.withOpacity(0.55),
           child: Text(
             overlay.text,
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 16,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.2,
             ),
@@ -283,7 +291,7 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
             top: _editingOverlay!.position.dy,
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 20),
+              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 20),
               color: Colors.black.withOpacity(0.55),
               child: TextField(
                 controller: _textController,
@@ -295,14 +303,14 @@ class _EditSnapScreenState extends State<EditSnapScreen> with TickerProviderStat
                 cursorWidth: 2,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 20,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 6),
+                  contentPadding: EdgeInsets.symmetric(vertical: 4),
                   filled: false,
                 ),
                 onChanged: (val) => setState(() => _editingOverlay!.text = val),
