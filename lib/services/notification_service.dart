@@ -197,8 +197,8 @@ class NotificationService {
       navigatorKey.currentState?.push(
         MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
       );
-    } else if (type == 'friend_accepted' || type == 'snap') {
-      debugPrint("👻 Friend accepted/Snap notification tapped");
+    } else if (type == 'friend_accepted' || type == 'snap' || type == 'chat') {
+      debugPrint("👻 Friend accepted/Snap/Chat notification tapped");
       tabIndexNotifier.value = 3; // Navigate to SnapChats tab
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
     }

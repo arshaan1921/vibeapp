@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../../utils/image_utils.dart';
+import '../../../services/notification_service.dart';
 import '../models/snap_message.dart';
 import '../models/streak.dart';
 import 'camera_screen.dart';
@@ -388,6 +389,25 @@ class _ChatScreenState extends State<ChatScreen> {
         'receiver_id': widget.userId,
         'message': text,
       });
+
+      // Fetch sender username for notification
+      final profileRes = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+      final senderUsername = profileRes?['username'] ?? 'Someone';
+
+      // Send push notification
+      await NotificationService.sendNotification(
+        userId: widget.userId,
+        title: senderUsername,
+        body: text,
+        data: {
+          'type': 'chat',
+          'sender_id': user.id,
+        },
+      );
 
       // Realtime will pick it up
     } catch (e) {
