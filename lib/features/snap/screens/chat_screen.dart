@@ -36,6 +36,9 @@ class _ChatScreenState extends State<ChatScreen> {
   int _purchasedRestores = 0;
   Timer? _countdownTimer;
   bool _isRestoring = false;
+  SnapMessage? _replyingTo;
+  final Map<String, GlobalKey> _bubbleKeys = {};
+  OverlayEntry? _reactionOverlay;
 
   @override
   void initState() {
@@ -48,6 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _realtimeChannel?.unsubscribe();
     _countdownTimer?.cancel();
+    _reactionOverlay?.remove();
     super.dispose();
   }
 
@@ -69,6 +73,13 @@ class _ChatScreenState extends State<ChatScreen> {
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'messages',
+      callback: (payload) {
+        _loadMessages();
+      },
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'message_reactions',
       callback: (payload) {
         _loadMessages();
       },
@@ -256,10 +267,10 @@ class _ChatScreenState extends State<ChatScreen> {
           .eq('snaps.sender_id', user.id)
           .order('delivered_at', ascending: false);
 
-      // Fetch regular messages
+      // Fetch regular messages with reactions
       final messagesResponse = await supabase
           .from('messages')
-          .select()
+          .select('*, message_reactions(*)')
           .or('and(sender_id.eq.${user.id},receiver_id.eq.${widget.userId}),and(sender_id.eq.${widget.userId},receiver_id.eq.${user.id})')
           .order('created_at', ascending: false);
 
@@ -267,15 +278,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final List<Map<String, dynamic>> sentSnaps = List<Map<String, dynamic>>.from(sentSnapsRes as List);
       final List<Map<String, dynamic>> msgsData = List<Map<String, dynamic>>.from(messagesResponse as List);
 
-      if (msgsData.isNotEmpty) {
-        debugPrint('DEBUG_MSG_KEYS: ${msgsData.first.keys.toList()}');
-        debugPrint('DEBUG_MSG_FULL: ${msgsData.first}');
-      }
-
-      debugPrint('CHAT_SCREEN receivedSnaps=${receivedSnaps.length}');
-      debugPrint('CHAT_SCREEN sentSnaps=${sentSnaps.length}');
       debugPrint('CHAT_LOAD messages count=${msgsData.length}');
-      debugPrint('CHAT_SCREEN messages returned=${msgsData.length}');
 
       final List<SnapMessage> allMessages = [];
 
@@ -284,10 +287,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       for (var s in allSnaps) {
         final snap = s['snaps'];
-        debugPrint('SNAP_ITEM: $s');
-        debugPrint('SNAP_IMAGE_URL: ${snap['image_url']}');
-        
-        final msg = SnapMessage(
+        allMessages.add(SnapMessage(
           id: s['id'],
           snapId: s['snap_id'],
           senderId: snap['sender_id'],
@@ -296,20 +296,37 @@ class _ChatScreenState extends State<ChatScreen> {
           caption: snap['caption'],
           createdAt: DateTime.parse(s['delivered_at'] ?? s['created_at'] ?? snap['created_at']),
           status: _parseSnapStatus(s['status']),
-        );
-        
-        debugPrint('CHAT_ITEM_TYPE: ${msg.isSnap ? 'snap' : 'text'}');
-        allMessages.add(msg);
+        ));
       }
 
       for (var m in msgsData) {
+        final reactionsData = m['message_reactions'] as List? ?? [];
+        final reactions = reactionsData.map((r) => MessageReaction.fromMap(r)).toList();
+
         allMessages.add(SnapMessage(
           id: m['id'],
           senderId: m['sender_id'],
           receiverId: m['receiver_id'],
           text: m['message'],
           createdAt: DateTime.parse(m['created_at']),
+          deliveredAt: m['delivered_at'] != null ? DateTime.parse(m['delivered_at']) : null,
+          readAt: m['read_at'] != null ? DateTime.parse(m['read_at']) : null,
+          repliedToId: m['replied_to_id'],
+          reactions: reactions,
         ));
+      }
+
+      // Resolve repliedToMessage references
+      for (int i = 0; i < allMessages.length; i++) {
+        final msg = allMessages[i];
+        if (msg.repliedToId != null) {
+          try {
+            final repliedMsg = allMessages.firstWhere((m) => m.id == msg.repliedToId);
+            allMessages[i] = msg.copyWith(repliedToMessage: repliedMsg);
+          } catch (_) {
+            // Replied message not found in current list (maybe older)
+          }
+        }
       }
 
       allMessages.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -321,13 +338,35 @@ class _ChatScreenState extends State<ChatScreen> {
         });
       }
 
-      // Mark text messages as read if we have any incoming ones
+      // Mark text messages as delivered/read if we have any incoming ones
+      final hasUndeliveredMessages = msgsData.any((m) => m['receiver_id'] == user.id && m['delivered_at'] == null);
+      if (hasUndeliveredMessages) {
+        _markMessagesAsDelivered();
+      }
+
       final hasUnreadMessages = msgsData.any((m) => m['receiver_id'] == user.id && m['read_at'] == null);
       if (hasUnreadMessages) {
         _markMessagesAsRead();
       }
     } catch (e) {
       debugPrint("Error loading messages: $e");
+    }
+  }
+
+  Future<void> _markMessagesAsDelivered() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      await supabase
+          .from('messages')
+          .update({'delivered_at': DateTime.now().toIso8601String()})
+          .eq('receiver_id', user.id)
+          .eq('sender_id', widget.userId)
+          .isFilter('delivered_at', null);
+    } catch (e) {
+      debugPrint("Error marking messages as delivered: $e");
     }
   }
 
@@ -376,7 +415,10 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     
+    final repliedToId = _replyingTo?.id;
+    
     _textController.clear();
+    setState(() => _replyingTo = null);
 
     try {
       final supabase = Supabase.instance.client;
@@ -388,6 +430,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'sender_id': user.id,
         'receiver_id': widget.userId,
         'message': text,
+        'replied_to_id': repliedToId,
       });
 
       // Fetch sender username for notification
@@ -487,7 +530,21 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     final message = _messages[index];
                     final isMe = message.senderId == user?.id;
-                    return _buildMessageBubble(message, isMe);
+                    
+                    // Find the last outgoing message index
+                    bool isLastSent = false;
+                    if (isMe && !message.isSnap) {
+                      final lastSentIndex = _messages.indexWhere((m) => m.senderId == user?.id && !m.isSnap);
+                      isLastSent = index == lastSentIndex;
+                    }
+
+                    final key = _bubbleKeys.putIfAbsent(message.id, () => GlobalKey());
+
+                    return Padding(
+                      key: key,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: _buildMessageBubble(message, isMe, isLastSent),
+                    );
                   },
                 ),
           ),
@@ -667,7 +724,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageBubble(SnapMessage message, bool isMe) {
+  Widget _buildMessageBubble(SnapMessage message, bool isMe, bool isLastSent) {
     debugPrint('RENDER_ITEM_TYPE=${message.isSnap ? 'snap' : 'text'}');
     debugPrint('RENDER_ITEM_STATUS=${message.status}');
     debugPrint('RENDER_IMAGE_URL=${message.imageUrl}');
@@ -680,7 +737,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (message.isSnap)
             _buildSnapItem(message, isMe)
           else
-            _buildTextItem(message, isMe),
+            _buildTextItem(message, isMe, isLastSent),
         ],
       ),
     );
@@ -862,33 +919,328 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Widget _buildTextItem(SnapMessage message, bool isMe) {
+  Widget _buildTextItem(SnapMessage message, bool isMe, bool isLastSent) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.colorScheme.primary;
 
-    return Container(
-      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: isMe ? primaryColor : (isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF1F1F1)),
-        borderRadius: BorderRadius.circular(20).copyWith(
-          bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(20),
-          bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(0),
-        ),
+    return GestureDetector(
+      onLongPress: () => _showReactionPickerOverlay(message, _bubbleKeys[message.id]!),
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! > 500) {
+          setState(() => _replyingTo = message);
+        }
+      },
+      child: Column(
+        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Container(
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+            decoration: BoxDecoration(
+              color: isMe ? primaryColor : (isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF1F1F1)),
+              borderRadius: BorderRadius.circular(20).copyWith(
+                bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(20),
+                bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message.repliedToMessage != null)
+                  _buildReplyBubble(message.repliedToMessage!, isMe),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        message.text ?? "",
+                        style: TextStyle(
+                          color: isMe ? Colors.white : theme.colorScheme.onSurface,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTimestampShort(message.createdAt),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: (isMe ? Colors.white : theme.colorScheme.onSurface).withOpacity(0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (message.reactions.isNotEmpty)
+            _buildReactionsDisplay(message, isMe),
+          if (isMe && isLastSent)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 4),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                child: Text(
+                  _getMessageStatusText(message),
+                  key: ValueKey(_getMessageStatusText(message)),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? Colors.white38 : Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
-      child: Text(
-        message.text ?? "",
-        style: TextStyle(
-          color: isMe ? Colors.white : theme.colorScheme.onSurface,
-          fontSize: 15,
+    );
+  }
+
+  Widget _buildReplyBubble(SnapMessage repliedMsg, bool isMe) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isMe ? Colors.black12 : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05)),
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: isMe ? Colors.white38 : Colors.green, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            repliedMsg.senderId == Supabase.instance.client.auth.currentUser?.id ? "You" : widget.userName,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: isMe ? Colors.white70 : Colors.green,
+            ),
+          ),
+          Text(
+            repliedMsg.text ?? (repliedMsg.isSnap ? "Snap" : ""),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              color: isMe ? Colors.white60 : Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReactionsDisplay(SnapMessage message, bool isMe) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final user = Supabase.instance.client.auth.currentUser;
+    final reactions = message.reactions;
+    
+    // Group reactions by type
+    final Map<String, int> reactionCounts = {};
+    for (var r in reactions) {
+      reactionCounts[r.reaction] = (reactionCounts[r.reaction] ?? 0) + 1;
+    }
+
+    return GestureDetector(
+      onTap: () {
+        // Remove my reaction if I have one
+        final hasMyReaction = reactions.any((r) => r.userId == user?.id);
+        if (hasMyReaction) {
+          _removeReaction(message);
+        }
+      },
+      child: Transform.translate(
+        offset: const Offset(0, -6),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (Widget child, Animation<double> animation) {
+            // Distinguish between entry and exit animations
+            final bool isEntrance = animation.status == AnimationStatus.forward || 
+                                   animation.status == AnimationStatus.completed;
+
+            if (isEntrance) {
+              final scaleAnimation = TweenSequence<double>([
+                TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.15).chain(CurveTween(curve: Curves.easeOutBack)), weight: 50),
+                TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 50),
+              ]).animate(animation);
+              
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: scaleAnimation,
+                  child: child,
+                ),
+              );
+            } else {
+              // Smooth exit: simple shrink and fade
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: animation,
+                  child: child,
+                ),
+              );
+            }
+          },
+          child: reactionCounts.isEmpty 
+            ? const SizedBox.shrink(key: ValueKey('no_reactions'))
+            : Container(
+                key: ValueKey(message.id + reactionCounts.keys.join(',') + reactions.length.toString()),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: reactionCounts.entries.map((e) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        "${e.key}${e.value > 1 ? " ${e.value}" : ""}",
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
         ),
       ),
     );
   }
 
+  String _getMessageStatusText(SnapMessage message) {
+    if (message.readAt != null) return "Seen";
+    if (message.deliveredAt != null) return "Delivered";
+    return "Sent";
+  }
+
   String _formatTimestampShort(DateTime dt) {
     return DateFormat('h:mm a').format(dt);
+  }
+
+  void _showReactionPickerOverlay(SnapMessage message, GlobalKey bubbleKey) {
+    _reactionOverlay?.remove();
+    _reactionOverlay = null;
+
+    final RenderBox? renderBox = bubbleKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final offset = renderBox.localToGlobal(Offset.zero);
+    
+    _reactionOverlay = OverlayEntry(
+      builder: (context) => _ReactionPickerOverlay(
+        offset: offset,
+        onReactionSelected: (r) {
+          _toggleReaction(message, r);
+          _reactionOverlay?.remove();
+          _reactionOverlay = null;
+        },
+        onDismiss: () {
+          _reactionOverlay?.remove();
+          _reactionOverlay = null;
+        },
+      ),
+    );
+
+    Overlay.of(context).insert(_reactionOverlay!);
+  }
+
+  Future<void> _toggleReaction(SnapMessage message, String reaction) async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    // --- OPTIMISTIC UI START ---
+    final originalMessages = List<SnapMessage>.from(_messages);
+    final msgIndex = _messages.indexWhere((m) => m.id == message.id);
+    if (msgIndex == -1) return;
+
+    final currentReactions = List<MessageReaction>.from(_messages[msgIndex].reactions);
+    final existingReactionIndex = currentReactions.indexWhere((r) => r.userId == user.id);
+
+    if (existingReactionIndex != -1) {
+      currentReactions[existingReactionIndex] = MessageReaction(userId: user.id, reaction: reaction);
+    } else {
+      currentReactions.add(MessageReaction(userId: user.id, reaction: reaction));
+    }
+
+    setState(() {
+      _messages[msgIndex] = _messages[msgIndex].copyWith(reactions: currentReactions);
+    });
+    // --- OPTIMISTIC UI END ---
+
+    try {
+      // Logic for picker: Always Add or Update (Upsert)
+      await supabase.from('message_reactions').upsert({
+        'message_id': message.id,
+        'user_id': user.id,
+        'reaction_type': reaction,
+      }, onConflict: 'message_id,user_id');
+      
+      // We don't call _loadMessages() here to avoid flicker. 
+      // Realtime will handle syncing other clients.
+    } catch (e) {
+      debugPrint("Error toggling reaction: $e");
+      // Rollback on failure
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+          _messages.addAll(originalMessages);
+        });
+      }
+    }
+  }
+
+  Future<void> _removeReaction(SnapMessage message) async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    // --- OPTIMISTIC UI START ---
+    final originalMessages = List<SnapMessage>.from(_messages);
+    final msgIndex = _messages.indexWhere((m) => m.id == message.id);
+    if (msgIndex == -1) return;
+
+    final currentReactions = List<MessageReaction>.from(_messages[msgIndex].reactions);
+    currentReactions.removeWhere((r) => r.userId == user.id);
+
+    setState(() {
+      _messages[msgIndex] = _messages[msgIndex].copyWith(reactions: currentReactions);
+    });
+    // --- OPTIMISTIC UI END ---
+
+    try {
+      await supabase
+          .from('message_reactions')
+          .delete()
+          .match({'message_id': message.id, 'user_id': user.id});
+      
+      // No _loadMessages() here either.
+    } catch (e) {
+      debugPrint("Error removing reaction: $e");
+      // Rollback on failure
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+          _messages.addAll(originalMessages);
+        });
+      }
+    }
   }
 
   Widget _buildInputArea() {
@@ -908,90 +1260,227 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       child: SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Camera Icon
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Container(
-                height: 44,
-                width: 44,
+            if (_replyingTo != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF5F5F5),
-                  shape: BoxShape.circle,
+                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: const Border(left: BorderSide(color: Colors.green, width: 4)),
                 ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.camera_alt_rounded, 
-                    color: isDark ? Colors.white70 : Colors.grey[600],
-                    size: 22,
-                  ), 
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraScreen()));
-                  }
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            
-            // Text Input Pill
-            Expanded(
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 44),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: TextField(
-                  controller: _textController,
-                  maxLines: 5,
-                  minLines: 1,
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                    fontSize: 15,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: "Send a Chat",
-                    hintStyle: TextStyle(
-                      color: isDark ? Colors.white24 : Colors.grey[500], 
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _replyingTo!.senderId == Supabase.instance.client.auth.currentUser?.id ? "You" : widget.userName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green),
+                          ),
+                          Text(
+                            _replyingTo!.text ?? (_replyingTo!.isSnap ? "Snap" : ""),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black54),
+                          ),
+                        ],
+                      ),
                     ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    filled: false,
-                  ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => setState(() => _replyingTo = null),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            
-            // Send Button
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _textController,
-              builder: (context, value, _) {
-                final hasText = value.text.trim().isNotEmpty;
-                return Padding(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Camera Icon
+                Padding(
                   padding: const EdgeInsets.only(bottom: 2),
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.send_rounded, 
-                      color: primaryColor,
-                      size: 28,
+                  child: Container(
+                    height: 44,
+                    width: 44,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF5F5F5),
+                      shape: BoxShape.circle,
                     ),
-                    onPressed: hasText ? _sendMessage : null,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.camera_alt_rounded, 
+                        color: isDark ? Colors.white70 : Colors.grey[600],
+                        size: 22,
+                      ), 
+                      onPressed: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraScreen()));
+                      }
+                    ),
                   ),
-                );
-              },
+                ),
+                const SizedBox(width: 12),
+                
+                // Text Input Pill
+                Expanded(
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: TextField(
+                      controller: _textController,
+                      maxLines: 5,
+                      minLines: 1,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontSize: 15,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: "Send a Chat",
+                        hintStyle: TextStyle(
+                          color: isDark ? Colors.white24 : Colors.grey[500], 
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        filled: false,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                
+                // Send Button
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _textController,
+                  builder: (context, value, _) {
+                    final hasText = value.text.trim().isNotEmpty;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.send_rounded, 
+                          color: primaryColor,
+                          size: 28,
+                        ),
+                        onPressed: hasText ? _sendMessage : null,
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReactionPickerOverlay extends StatefulWidget {
+  final Offset offset;
+  final Function(String) onReactionSelected;
+  final VoidCallback onDismiss;
+
+  const _ReactionPickerOverlay({
+    required this.offset,
+    required this.onReactionSelected,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_ReactionPickerOverlay> createState() => _ReactionPickerOverlayState();
+}
+
+class _ReactionPickerOverlayState extends State<_ReactionPickerOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: widget.onDismiss,
+          child: Container(color: Colors.transparent),
+        ),
+        Positioned(
+          left: widget.offset.dx.clamp(20, MediaQuery.of(context).size.width - 250),
+          top: widget.offset.dy - 60,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: ["❤️", "😂", "🔥", "😮", "👍", "👎"].map((r) => GestureDetector(
+                      onTap: () => widget.onReactionSelected(r),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(r, style: const TextStyle(fontSize: 24)),
+                      ),
+                    )).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
