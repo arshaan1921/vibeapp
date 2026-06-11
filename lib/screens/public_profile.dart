@@ -9,6 +9,7 @@ import '../models/answer.dart';
 import '../utils/image_utils.dart';
 import '../utils/link_utils.dart';
 import 'ask_any_user.dart';
+import 'streak_achievement_screen.dart';
 import 'report_problem_screen.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
@@ -29,6 +30,8 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   String? _friendshipStatus;
   int _mutualFriendsCount = 0;
   int _streak = 0;
+  String? _streakId;
+  bool _isCenturyClubMember = false;
   String? errorMessage;
 
   @override
@@ -199,14 +202,27 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
+      // 1. Check if this user is a Century Club Member
+      final clubRes = await supabase
+          .from('snap_streaks')
+          .select('id')
+          .or('user1_id.eq.${widget.userId},user2_id.eq.${widget.userId}')
+          .gte('streak_count', 100)
+          .limit(1);
+      
+      if (mounted) {
+        setState(() {
+          _isCenturyClubMember = (clubRes as List).isNotEmpty;
+        });
+      }
+
+      // 2. Fetch specific streak with current user
       final streaksRes = await supabase
           .from('snap_streaks')
           .select('user1_id, user2_id, streak_count')
           .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
       
       final streaks = List<dynamic>.from(streaksRes as List);
-      debugPrint('Loaded streaks: ${streaks.length}');
-
       final streakRow = streaks.firstWhere(
         (s) =>
             (s['user1_id'] == user.id && s['user2_id'] == widget.userId) ||
@@ -216,14 +232,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
       if (streakRow != null) {
         final count = streakRow['streak_count'] as int;
-        debugPrint('Friend ${widget.userId} streak: $count');
         if (mounted) {
           setState(() {
             _streak = count;
+            _streakId = streakRow['id'];
           });
         }
-      } else {
-        debugPrint('Friend ${widget.userId} streak: 0');
       }
     } catch (e) {
       debugPrint("Error fetching streak: $e");
@@ -533,14 +547,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                         child: Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
                       ),
                     if (_streak > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Text(
-                          "🔥 $_streak",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                      GestureDetector(
+                        onTap: () {
+                          if (_streakId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => StreakAchievementScreen(
+                                  streakId: _streakId!,
+                                  friendName: profileData!['name'] ?? profileData!['username'],
+                                  currentStreak: _streak,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Text(
+                            "🔥 $_streak",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
                           ),
                         ),
                       ),
@@ -552,6 +582,49 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     child: Text(
                       "$_mutualFriendsCount mutual ${_mutualFriendsCount == 1 ? 'friend' : 'friends'}",
                       style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                if (_isCenturyClubMember)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: GestureDetector(
+                      onTap: () {
+                        if (_streakId != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => StreakAchievementScreen(
+                                streakId: _streakId!,
+                                friendName: profileData!['name'] ?? profileData!['username'],
+                                currentStreak: _streak,
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text("🏆", style: TextStyle(fontSize: 16)),
+                            SizedBox(width: 8),
+                            Text(
+                              "Century Club Member",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 const SizedBox(height: 12),

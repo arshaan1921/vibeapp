@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../main.dart';
 import '../models/answer.dart';
 import 'settings_screen.dart';
+import 'streak_achievement_screen.dart';
 import 'edit_profile.dart';
 import 'search_screen.dart';
 import '../utils/premium_utils.dart';
@@ -44,6 +45,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
   String? _friendshipStatus;
   int _mutualFriendsCount = 0;
   int _streak = 0;
+  String? _streakId;
+  bool _isCenturyClubMember = false;
   RealtimeChannel? _realtimeChannel;
 
   @override
@@ -213,35 +216,56 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     final currentUser = Supabase.instance.client.auth.currentUser;
     if (currentUser == null) return;
     final targetId = widget.userId;
-    if (targetId == null || targetId == currentUser.id) return;
 
     try {
       final supabase = Supabase.instance.client;
-      final streaksRes = await supabase
-          .from('snap_streaks')
-          .select('user1_id, user2_id, streak_count')
-          .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
       
-      final streaks = List<dynamic>.from(streaksRes as List);
-      debugPrint('Loaded streaks: ${streaks.length}');
+      // 1. Check if user is a Century Club Member (streak >= 100 with anyone)
+      final profileTargetId = targetId ?? currentUser.id;
+      final clubRes = await supabase
+          .from('snap_streaks')
+          .select('id, streak_count')
+          .or('user1_id.eq.$profileTargetId,user2_id.eq.$profileTargetId')
+          .gte('streak_count', 100)
+          .order('streak_count', ascending: false)
+          .limit(1);
+      
+      final List<dynamic> clubData = clubRes as List;
+      if (mounted) {
+        setState(() {
+          _isCenturyClubMember = clubData.isNotEmpty;
+          if (_isCenturyClubMember && targetId == null) {
+            // On my own profile, use my best club streak for the card
+            _streakId = clubData[0]['id'];
+            _streak = clubData[0]['streak_count'];
+          }
+        });
+      }
 
-      final streakRow = streaks.firstWhere(
-        (s) =>
-            (s['user1_id'] == currentUser.id && s['user2_id'] == targetId) ||
-            (s['user2_id'] == currentUser.id && s['user1_id'] == targetId),
-        orElse: () => null,
-      );
+      // 2. Fetch specific streak if viewing a friend's profile
+      if (targetId != null && targetId != currentUser.id) {
+        final streaksRes = await supabase
+            .from('snap_streaks')
+            .select('id, user1_id, user2_id, streak_count')
+            .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
+        
+        final streaks = List<dynamic>.from(streaksRes as List);
+        final streakRow = streaks.firstWhere(
+          (s) =>
+              (s['user1_id'] == currentUser.id && s['user2_id'] == targetId) ||
+              (s['user2_id'] == currentUser.id && s['user1_id'] == targetId),
+          orElse: () => null,
+        );
 
-      if (streakRow != null) {
-        final count = streakRow['streak_count'] as int;
-        debugPrint('Friend $targetId streak: $count');
-        if (mounted) {
-          setState(() {
-            _streak = count;
-          });
+        if (streakRow != null) {
+          final count = streakRow['streak_count'] as int;
+          if (mounted) {
+            setState(() {
+              _streak = count;
+              _streakId = streakRow['id'];
+            });
+          }
         }
-      } else {
-        debugPrint('Friend $targetId streak: 0');
       }
     } catch (e) {
       debugPrint("Error fetching streak: $e");
@@ -684,14 +708,30 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                         child: Icon(Icons.star_rounded, color: Colors.orange, size: 18),
                                       ),
                                     if (_streak > 0)
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 8),
-                                        child: Text(
-                                          "🔥 $_streak",
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w900,
-                                            color: Colors.orange,
+                                      GestureDetector(
+                                        onTap: () {
+                                          if (_streakId != null) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => StreakAchievementScreen(
+                                                  streakId: _streakId!,
+                                                  friendName: profileData!['name'] ?? profileData!['username'],
+                                                  currentStreak: _streak,
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(left: 8),
+                                          child: Text(
+                                            "🔥 $_streak",
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.orange,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -736,6 +776,48 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       const SizedBox(height: 16),
                       if (profileData!['show_social_links'] != false)
                         _buildSocialLinksRow(),
+                      if (_isCenturyClubMember) ...[
+                        const SizedBox(height: 16),
+                        GestureDetector(
+                          onTap: () {
+                            if (_streakId != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => StreakAchievementScreen(
+                                    streakId: _streakId!,
+                                    friendName: profileData!['name'] ?? profileData!['username'],
+                                    currentStreak: _streak,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(isDarkMode ? 0.2 : 0.1),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Text("🏆", style: TextStyle(fontSize: 20)),
+                                const SizedBox(width: 12),
+                                Text(
+                                  "Century Club Member",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDarkMode ? Colors.orangeAccent : Colors.orange[800],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       if (isMe)
                         Container(

@@ -7,6 +7,7 @@ import '../../../utils/image_utils.dart';
 import '../../../screens/profile.dart';
 import 'camera_screen.dart';
 import 'chat_screen.dart';
+import '../../../screens/streak_achievement_screen.dart';
 import '../../../screens/friend_requests_screen.dart';
 
 class SnapChatsScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   Map<String, dynamic>? _profileData;
   List<Map<String, dynamic>> _chats = [];
   Map<String, int> _streakMap = {};
+  Map<String, String> _streakIdMap = {};
   int _pendingRequestsCount = 0;
   RealtimeChannel? _realtimeChannel;
   Timer? _refreshTimer;
@@ -187,10 +189,11 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
 
       // 1.7. Fetch streaks
       Map<String, int> streakMap = {};
+      Map<String, String> streakIdMap = {};
       try {
         final streaksRes = await supabase
             .from('snap_streaks')
-            .select('user1_id, user2_id, streak_count')
+            .select('id, user1_id, user2_id, streak_count')
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
         final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
@@ -202,6 +205,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           final friendId = (u1 == user.id) ? u2 : u1;
           final count = row['streak_count'] as int;
           streakMap[friendId] = count;
+          streakIdMap[friendId] = row['id'] as String;
           debugPrint('Friend $friendId streak: $count');
         }
       } catch (e) {
@@ -383,6 +387,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
         setState(() {
           _chats = chatList;
           _streakMap = streakMap;
+          _streakIdMap = streakIdMap;
           _isLoading = false;
         });
       }
@@ -535,7 +540,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
             : null,
       ),
       title: Text(
-        chat['name'],
+        (streak >= 100 ? "🏆 " : "") + chat['name'],
         style: TextStyle(
           fontWeight: isUnread ? FontWeight.w900 : FontWeight.bold,
           fontSize: 16,
@@ -588,13 +593,33 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
                         text: " • ",
                         style: TextStyle(color: isDark ? Colors.white12 : Colors.grey[400]),
                       ),
-                      TextSpan(
-                        text: "${streak}🔥",
-                        style: TextStyle(
-                          color: isUnread 
-                            ? (isDark ? Colors.white : Colors.black) 
-                            : (isDark ? Colors.white38 : Colors.grey[600]),
-                          fontWeight: FontWeight.w900,
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: GestureDetector(
+                          onTap: () {
+                            final streakId = _streakIdMap[chat['id']];
+                            if (streakId != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => StreakAchievementScreen(
+                                    streakId: streakId,
+                                    friendName: chat['name'],
+                                    currentStreak: streak,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: Text(
+                            "${streak}🔥",
+                            style: TextStyle(
+                              color: isUnread 
+                                ? (isDark ? Colors.white : Colors.black) 
+                                : (isDark ? Colors.white38 : Colors.grey[600]),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                         ),
                       ),
                     ],

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,6 +12,7 @@ import 'camera_screen.dart';
 import 'snap_viewer_screen.dart';
 import '../../../screens/premium.dart';
 import '../../../widgets/streak_restore_store_dialog.dart';
+import '../../../screens/streak_achievement_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -108,6 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       await _fetchStreakData();
       await _fetchUserRestoreLimits();
+      await _checkMilestones();
       await _loadMessages();
     } catch (e) {
       debugPrint("Error loading chat data: $e");
@@ -179,6 +182,50 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       debugPrint("Error fetching restore limits: $e");
+    }
+  }
+
+  Future<void> _checkMilestones() async {
+    try {
+      if (_currentStreakData == null) return;
+      
+      final supabase = Supabase.instance.client;
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+
+      // Check for unseen milestone notifications for this streak
+      final response = await supabase
+          .from('notifications')
+          .select()
+          .eq('user_id', user.id)
+          .eq('type', 'streak_milestone')
+          .eq('source_id', _currentStreakData!.id)
+          .eq('seen', false)
+          .maybeSingle();
+
+      if (response != null && mounted) {
+        final data = response['data'];
+        Map<String, dynamic>? payload;
+        
+        if (data is String) {
+          payload = jsonDecode(data);
+        } else if (data is Map) {
+          payload = Map<String, dynamic>.from(data);
+        }
+
+        if (payload != null) {
+          final milestone = int.tryParse(payload['milestone']?.toString() ?? '0') ?? 0;
+          if (milestone == 100) {
+             NotificationService.showMilestoneCelebration(
+               milestone, 
+               _currentStreakData!.id, 
+               response['id'].toString()
+             );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking milestones in chat: $e");
     }
   }
 
@@ -493,16 +540,32 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          widget.userName,
+                          (_streak >= 100 ? "🏆 " : "") + widget.userName,
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (_streak > 0) ...[
                         const SizedBox(width: 4),
-                        Text(
-                          "$_streak🔥",
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange),
+                        GestureDetector(
+                          onTap: () {
+                            if (_currentStreakData != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => StreakAchievementScreen(
+                                    streakId: _currentStreakData!.id,
+                                    friendName: widget.userName,
+                                    currentStreak: _streak,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          child: Text(
+                            "$_streak🔥${_streak >= 100 ? " Century Club" : ""}",
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange),
+                          ),
                         ),
                       ],
                     ],

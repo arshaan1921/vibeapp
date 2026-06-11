@@ -11,6 +11,7 @@ import '../screens/questions_screen.dart';
 import '../screens/answer_detail_screen.dart';
 import '../screens/my_tickets_screen.dart';
 import '../screens/friend_requests_screen.dart';
+import '../widgets/streak_milestone_celebration.dart';
 import 'update_service.dart';
 
 class NotificationService {
@@ -93,6 +94,13 @@ class NotificationService {
     // Foreground listener
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint("📩 Foreground message received: ${message.messageId}");
+      
+      final type = message.data['type'];
+      if (type == 'streak_milestone') {
+        _handleNavigation(message.data);
+        return;
+      }
+
       final title = message.notification?.title ?? message.data['title'] ?? 'High5';
       final body = message.notification?.body ?? message.data['body'] ?? '';
       showNotification(title, body, payload: message.data);
@@ -201,7 +209,79 @@ class NotificationService {
       debugPrint("👻 Friend accepted/Snap/Chat notification tapped");
       tabIndexNotifier.value = 3; // Navigate to SnapChats tab
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    } else if (type == 'streak_milestone') {
+      final milestone = int.tryParse(data['milestone']?.toString() ?? '0') ?? 0;
+      final streakId = data['streak_id']?.toString();
+      final notificationId = data['notification_id']?.toString();
+      
+      if (milestone == 100) {
+        showMilestoneCelebration(milestone, streakId, notificationId);
+      }
     }
+  }
+
+  static void showMilestoneCelebration(int milestone, String? streakId, [String? notificationId]) async {
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    final supabase = Supabase.instance.client;
+    
+    // Mark notification as seen if ID provided
+    if (notificationId != null) {
+      try {
+        await supabase.from('notifications').update({'seen': true}).eq('id', notificationId);
+      } catch (e) {
+        debugPrint("Error marking milestone notification as seen: $e");
+      }
+    }
+
+    String friendName = "your friend";
+    if (streakId != null) {
+      try {
+        final user = supabase.auth.currentUser;
+        if (user != null) {
+          final streakRes = await supabase
+              .from('snap_streaks')
+              .select('user1_id, user2_id')
+              .eq('id', streakId)
+              .maybeSingle();
+          
+          if (streakRes != null) {
+            final otherUserId = streakRes['user1_id'] == user.id 
+                ? streakRes['user2_id'] 
+                : streakRes['user1_id'];
+            
+            final profileRes = await supabase
+                .from('profiles')
+                .select('username')
+                .eq('id', otherUserId)
+                .maybeSingle();
+            
+            if (profileRes != null) {
+              friendName = profileRes['username'] ?? friendName;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("Error fetching friend name for celebration: $e");
+      }
+    }
+
+    if (!context.mounted) return;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black,
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (context, anim1, anim2) {
+        return StreakMilestoneCelebration(
+          milestone: milestone,
+          friendName: friendName,
+          onDismiss: () => Navigator.pop(context),
+        );
+      },
+    );
   }
 
   // ==============================

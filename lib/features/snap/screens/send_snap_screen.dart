@@ -104,6 +104,42 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
         }
       }
 
+      // 3. Fetch recent snap recipients for "Quick Send"
+      List<Map<String, dynamic>> quickSendData = [];
+      try {
+        final recentSnapsRes = await supabase
+            .from('snap_recipients')
+            .select('recipient_id, snaps!inner(sender_id, created_at)')
+            .eq('snaps.sender_id', user.id)
+            .order('snaps(created_at)', ascending: false)
+            .limit(20);
+
+        final List<dynamic> recentSnaps = recentSnapsRes as List;
+        final Set<String> recentIds = {};
+        for (var s in recentSnaps) {
+          final rid = s['recipient_id']?.toString();
+          if (rid != null) recentIds.add(rid);
+        }
+
+        if (recentIds.isNotEmpty) {
+          final recentProfilesRes = await supabase
+              .from('profiles')
+              .select('id, username, name, avatar_url, premium_plan')
+              .inFilter('id', recentIds.toList());
+          
+          final List<Map<String, dynamic>> fetchedRecent = List<Map<String, dynamic>>.from(recentProfilesRes as List);
+          
+          // Sort by the order in recentIds to maintain recency
+          for (var id in recentIds) {
+            final profile = fetchedRecent.firstWhere((p) => p['id'] == id, orElse: () => {});
+            if (profile.isNotEmpty) quickSendData.add(profile);
+            if (quickSendData.length >= 10) break;
+          }
+        }
+      } catch (e) {
+        debugPrint("SEND_SNAP: Quick send fetch error: $e");
+      }
+
       // 4. Fallback: If still no connections, fetch suggested users
       if (friendsData.isEmpty) {
         debugPrint("SEND_SNAP: No connections found, fetching suggested users...");
@@ -120,6 +156,11 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
         }
       }
 
+      // If quick send is empty (no snaps sent yet), use top friends
+      if (quickSendData.isEmpty) {
+        quickSendData = friendsData.take(10).toList();
+      }
+
       // 5. Fetch Streaks
       Map<String, int> streaksMap = {};
       try {
@@ -129,7 +170,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
         final List<dynamic> streaksData = List<dynamic>.from(streaksResponse as List);
-        debugPrint('Loaded streaks: ${streaksData.length}');
+        debugPrint('Loaded streaks: ${ streaksData.length}');
 
         for (var row in streaksData) {
           final u1 = row['user1_id'] as String;
@@ -147,7 +188,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
         setState(() {
           _friends = friendsData;
           _filteredFriends = _friends;
-          _quickSend = _friends.take(10).toList();
+          _quickSend = quickSendData;
           _userStreaks = streaksMap;
           _isLoading = false;
         });
