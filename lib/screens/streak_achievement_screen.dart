@@ -124,7 +124,7 @@ class _StreakAchievementScreenState extends State<StreakAchievementScreen> with 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Achievement saved to gallery! 🏆"),
+            content: Text("Achievement saved to gallery!"),
             backgroundColor: Colors.green,
           ),
         );
@@ -147,7 +147,7 @@ class _StreakAchievementScreenState extends State<StreakAchievementScreen> with 
     final imagePath = await File('${directory.path}/high5_century_club.png').create();
     await imagePath.writeAsBytes(image);
 
-    await Share.shareXFiles([XFile(imagePath.path)], text: "We reached the Century Club on HIGH5! 🏆🔥");
+    await Share.shareXFiles([XFile(imagePath.path)], text: "We reached the Century Club on HIGH5!");
   }
 
   @override

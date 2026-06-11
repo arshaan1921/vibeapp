@@ -531,6 +531,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           ),
         ).then((_) => _loadData());
       },
+      onLongPress: () => _showChatOptions(chat),
       leading: CircleAvatar(
         radius: 28,
         backgroundColor: isDark ? Colors.white10 : Colors.grey[100],
@@ -540,7 +541,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
             : null,
       ),
       title: Text(
-        (streak >= 100 ? "🏆 " : "") + chat['name'],
+        chat['name'],
         style: TextStyle(
           fontWeight: isUnread ? FontWeight.w900 : FontWeight.bold,
           fontSize: 16,
@@ -678,5 +679,101 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
         ],
       ),
     );
+  }
+
+  void _showChatOptions(Map<String, dynamic> chat) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                title: const Text("Delete Conversation", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                subtitle: const Text("This will clear all messages and snaps."),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDeleteChat(chat);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteChat(Map<String, dynamic> chat) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Chat?"),
+        content: Text("Are you sure you want to delete your conversation with ${chat['name']}? This action cannot be undone."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteConversation(chat['id']);
+            },
+            child: const Text("DELETE", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteConversation(String otherUserId) async {
+    setState(() => _isLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final myId = supabase.auth.currentUser!.id;
+
+      // 1. Delete Messages
+      await supabase
+          .from('messages')
+          .delete()
+          .or('and(sender_id.eq.$myId,receiver_id.eq.$otherUserId),and(sender_id.eq.$otherUserId,receiver_id.eq.$myId)');
+
+      // 2. Delete Snap Recipients (Received)
+      final receivedSnaps = await supabase
+          .from('snap_recipients')
+          .select('id, snaps!inner(sender_id)')
+          .eq('recipient_id', myId)
+          .eq('snaps.sender_id', otherUserId);
+      
+      final List<String> receivedIds = (receivedSnaps as List).map((s) => s['id'].toString()).toList();
+      if (receivedIds.isNotEmpty) {
+        await supabase.from('snap_recipients').delete().inFilter('id', receivedIds);
+      }
+
+      // 3. Delete Snap Recipients (Sent)
+      final sentSnaps = await supabase
+          .from('snap_recipients')
+          .select('id, snaps!inner(sender_id)')
+          .eq('recipient_id', otherUserId)
+          .eq('snaps.sender_id', myId);
+      
+      final List<String> sentIds = (sentSnaps as List).map((s) => s['id'].toString()).toList();
+      if (sentIds.isNotEmpty) {
+        await supabase.from('snap_recipients').delete().inFilter('id', sentIds);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Conversation deleted")));
+      }
+      _loadData();
+    } catch (e) {
+      debugPrint("Error deleting conversation: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete conversation: $e")));
+      }
+      setState(() => _isLoading = false);
+    }
   }
 }

@@ -546,34 +546,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                         padding: EdgeInsets.only(left: 4),
                         child: Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
                       ),
-                    if (_streak > 0)
-                      GestureDetector(
-                        onTap: () {
-                          if (_streakId != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => StreakAchievementScreen(
-                                  streakId: _streakId!,
-                                  friendName: profileData!['name'] ?? profileData!['username'],
-                                  currentStreak: _streak,
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Text(
-                            "🔥 $_streak",
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
                 if (_mutualFriendsCount > 0)
@@ -582,49 +554,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     child: Text(
                       "$_mutualFriendsCount mutual ${_mutualFriendsCount == 1 ? 'friend' : 'friends'}",
                       style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                if (_isCenturyClubMember)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (_streakId != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => StreakAchievementScreen(
-                                streakId: _streakId!,
-                                friendName: profileData!['name'] ?? profileData!['username'],
-                                currentStreak: _streak,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text("🏆", style: TextStyle(fontSize: 16)),
-                            SizedBox(width: 8),
-                            Text(
-                              "Century Club Member",
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 const SizedBox(height: 12),

@@ -707,34 +707,6 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                         padding: EdgeInsets.only(left: 4),
                                         child: Icon(Icons.star_rounded, color: Colors.orange, size: 18),
                                       ),
-                                    if (_streak > 0)
-                                      GestureDetector(
-                                        onTap: () {
-                                          if (_streakId != null) {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => StreakAchievementScreen(
-                                                  streakId: _streakId!,
-                                                  friendName: profileData!['name'] ?? profileData!['username'],
-                                                  currentStreak: _streak,
-                                                ),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(left: 8),
-                                          child: Text(
-                                            "🔥 $_streak",
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w900,
-                                              color: Colors.orange,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
                                   ],
                                 ),
                                 if (!isMe && _mutualFriendsCount > 0)
@@ -776,48 +748,6 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       const SizedBox(height: 16),
                       if (profileData!['show_social_links'] != false)
                         _buildSocialLinksRow(),
-                      if (_isCenturyClubMember) ...[
-                        const SizedBox(height: 16),
-                        GestureDetector(
-                          onTap: () {
-                            if (_streakId != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => StreakAchievementScreen(
-                                    streakId: _streakId!,
-                                    friendName: profileData!['name'] ?? profileData!['username'],
-                                    currentStreak: _streak,
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(isDarkMode ? 0.2 : 0.1),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Text("🏆", style: TextStyle(fontSize: 20)),
-                                const SizedBox(width: 12),
-                                Text(
-                                  "Century Club Member",
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: isDarkMode ? Colors.orangeAccent : Colors.orange[800],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 16),
                       if (isMe)
                         Container(

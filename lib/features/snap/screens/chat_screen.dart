@@ -540,7 +540,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          (_streak >= 100 ? "🏆 " : "") + widget.userName,
+                          widget.userName,
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -563,7 +563,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             }
                           },
                           child: Text(
-                            "$_streak🔥${_streak >= 100 ? " Century Club" : ""}",
+                            "$_streak🔥",
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange),
                           ),
                         ),
