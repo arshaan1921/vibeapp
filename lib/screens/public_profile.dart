@@ -14,6 +14,8 @@ import 'report_problem_screen.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
 import '../services/friend_service.dart';
+import '../features/snap/models/streak.dart';
+import '../features/snap/screens/chat_screen.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String userId;
@@ -31,6 +33,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   int _mutualFriendsCount = 0;
   int _streak = 0;
   String? _streakId;
+  SnapStreak? _currentStreakData;
   bool _isCenturyClubMember = false;
   String? errorMessage;
 
@@ -219,7 +222,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       // 2. Fetch specific streak with current user
       final streaksRes = await supabase
           .from('snap_streaks')
-          .select('user1_id, user2_id, streak_count')
+          .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
           .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
       
       final streaks = List<dynamic>.from(streaksRes as List);
@@ -231,11 +234,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       );
 
       if (streakRow != null) {
-        final count = streakRow['streak_count'] as int;
+        final streak = SnapStreak.fromMap(streakRow);
         if (mounted) {
           setState(() {
-            _streak = count;
-            _streakId = streakRow['id'];
+            _currentStreakData = streak;
+            _streak = streak.streakCount;
+            _streakId = streak.id;
           });
         }
       }
@@ -589,6 +593,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 const SizedBox(height: 16),
                 if (profileData!['show_social_links'] != false)
                   _buildSocialLinksRow(),
+                if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 24, left: 24, right: 24),
+                    child: _buildRestoreStreakCard(),
+                  ),
               ],
             ),
           ),
@@ -735,6 +744,76 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRestoreStreakCard() {
+    final deadline = _currentStreakData?.timeUntilDeadline;
+    final countdownText = deadline != null 
+        ? "${deadline.inHours}h ${deadline.inMinutes % 60}m remaining"
+        : "";
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF9D42), Color(0xFFFF6B00)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 32),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Restore ${_currentStreakData?.brokenStreakCount} Day Streak!",
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                if (countdownText.isNotEmpty)
+                  Text(
+                    countdownText,
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChatScreen(
+                    userId: widget.userId,
+                    userName: profileData?['name'] ?? "Friend",
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.orange,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            child: const Text("RESTORE", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 

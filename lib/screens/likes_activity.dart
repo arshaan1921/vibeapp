@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'answer_view_screen.dart';
@@ -279,14 +280,16 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> with RouteAwa
                                 child: ImageUtils.safeUrl(avatarUrl) == null ? Icon(Icons.person, color: theme.iconTheme.color) : null,
                               ),
                             ),
-                            title: RichText(
-                              text: TextSpan(
+                            title: Text.rich(
+                              TextSpan(
                                 style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 14),
                                 children: [
-                                  WidgetSpan(
-                                    alignment: PlaceholderAlignment.middle,
-                                    child: GestureDetector(
-                                      onTap: () {
+                                  TextSpan(
+                                    text: "@$username",
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                    onEnter: (_) {}, // Optional: helps with hover states if any
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
                                         final userId = item['source_user'];
                                         if (userId != null) {
                                           Navigator.push(
@@ -295,11 +298,6 @@ class _LikesActivityScreenState extends State<LikesActivityScreen> with RouteAwa
                                           );
                                         }
                                       },
-                                      child: Text(
-                                        "@$username",
-                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
-                                      ),
-                                    ),
                                   ),
                                   const TextSpan(text: " liked your answer"),
                                 ],

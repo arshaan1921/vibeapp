@@ -142,6 +142,10 @@ class _UpdatePopupState extends State<UpdatePopup> with TickerProviderStateMixin
                             width: 120,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
+                              image: const DecorationImage(
+                                image: AssetImage('assets/app_icon.png'),
+                                fit: BoxFit.cover,
+                              ),
                               boxShadow: [
                                 BoxShadow(
                                   color: const Color(0xFFFFD700).withOpacity(0.3),
@@ -150,36 +154,18 @@ class _UpdatePopupState extends State<UpdatePopup> with TickerProviderStateMixin
                                 ),
                               ],
                             ),
-                            child: Container(
-                              color: const Color(0xFF0A3321),
-                              child: const Icon(
-                                Icons.auto_awesome,
-                                size: 60,
-                                color: Color(0xFFFFD700),
-                              ),
-                            ),
                           ),
                         ),
                         const SizedBox(height: 32),
                         
                         Text(
-                          "🎉 Welcome to HIGH5",
+                          "Welcome to HIGH5",
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                             letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Formerly V1BE",
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFFFFD700),
-                            letterSpacing: 2,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -194,7 +180,7 @@ class _UpdatePopupState extends State<UpdatePopup> with TickerProviderStateMixin
                           child: Column(
                             children: [
                               Text(
-                                "We’ve changed our name, but our mission stays the same.",
+                                "HIGH5 is your space to ask, answer, and connect with your vibe.",
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.poppins(
                                   fontSize: 16,
@@ -204,7 +190,7 @@ class _UpdatePopupState extends State<UpdatePopup> with TickerProviderStateMixin
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                "HIGH5 is the actual social network where people ask, answer, connect and play — not just endless scrolling.",
+                                "Join the social network where every interaction matters — not just endless scrolling.",
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.poppins(
                                   fontSize: 15,

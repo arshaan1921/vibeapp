@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'public_profile.dart';
+import '../features/snap/models/streak.dart';
 
 class SavedProfilesScreen extends StatefulWidget {
   const SavedProfilesScreen({super.key});
@@ -12,11 +13,15 @@ class SavedProfilesScreen extends StatefulWidget {
 class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _friends = [];
-  Map<String, int> _streaksMap = {};
+  Map<String, SnapStreak> _streaksMap = {};
 
   @override
   void initState() {
     super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
     await Future.wait([
       _fetchFriends(),
       _fetchStreaks(),
@@ -31,20 +36,20 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
 
       final streaksRes = await supabase
           .from('snap_streaks')
-          .select('user1_id, user2_id, streak_count')
+          .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
           .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
       
       final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
       debugPrint('Loaded streaks: ${streaksData.length}');
       
-      Map<String, int> streaksMap = {};
+      Map<String, SnapStreak> streaksMap = {};
       for (var row in streaksData) {
         final u1 = row['user1_id'] as String;
         final u2 = row['user2_id'] as String;
         final friendId = (u1 == user.id) ? u2 : u1;
-        final count = row['streak_count'] as int;
-        streaksMap[friendId] = count;
-        debugPrint('Friend $friendId streak: $count');
+        final streak = SnapStreak.fromMap(row);
+        streaksMap[friendId] = streak;
+        debugPrint('Friend $friendId streak: ${streak.streakCount}');
       }
 
       if (mounted) {
@@ -116,7 +121,10 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                       itemBuilder: (context, index) {
                         final user = _friends[index];
                         final avatarUrl = user['avatar_url'];
-                        final streak = _streaksMap[user['id']] ?? 0;
+                        final streakData = _streaksMap[user['id']];
+                        final streak = streakData?.streakCount ?? 0;
+                        final brokenStreak = streakData?.brokenStreakCount ?? 0;
+                        final isRestoreable = streakData?.canBeRestored ?? false;
 
                         return ListTile(
                           leading: CircleAvatar(
@@ -138,13 +146,13 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold, fontSize: 14)),
                               ),
-                              if (streak > 0) ...[
+                              if (streak > 0 || (brokenStreak > 0 && isRestoreable)) ...[
                                 const SizedBox(width: 4),
-                                Text("${streak}🔥",
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.normal, 
+                                Text(streak > 0 ? "${streak}🔥" : "${brokenStreak}💔",
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold, 
                                         fontSize: 12,
-                                        color: Colors.grey)),
+                                        color: streak > 0 ? Colors.orange : Colors.redAccent)),
                               ],
                             ],
                           ),

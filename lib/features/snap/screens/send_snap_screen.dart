@@ -6,6 +6,7 @@ import '../../../main.dart';
 import '../../../utils/image_utils.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/image_optimizer_service.dart';
+import '../models/streak.dart';
 
 class SendSnapScreen extends StatefulWidget {
   final String imagePath;
@@ -21,7 +22,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
   List<Map<String, dynamic>> _friends = [];
   List<Map<String, dynamic>> _filteredFriends = [];
   List<Map<String, dynamic>> _quickSend = [];
-  Map<String, int> _userStreaks = {};
+  Map<String, SnapStreak> _userStreaks = {};
   final Set<String> _selectedUserIds = {};
   final TextEditingController _searchController = TextEditingController();
 
@@ -162,11 +163,11 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       }
 
       // 5. Fetch Streaks
-      Map<String, int> streaksMap = {};
+      Map<String, SnapStreak> streaksMap = {};
       try {
         final streaksResponse = await supabase
             .from('snap_streaks')
-            .select('user1_id, user2_id, streak_count')
+            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
         final List<dynamic> streaksData = List<dynamic>.from(streaksResponse as List);
@@ -176,9 +177,9 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
           final u1 = row['user1_id'] as String;
           final u2 = row['user2_id'] as String;
           final friendId = (u1 == user.id) ? u2 : u1;
-          final count = row['streak_count'] as int;
-          streaksMap[friendId] = count;
-          debugPrint('Friend $friendId streak: $count');
+          final streak = SnapStreak.fromMap(row);
+          streaksMap[friendId] = streak;
+          debugPrint('Friend $friendId streak: ${streak.streakCount}');
         }
       } catch (e) {
         debugPrint("SEND_SNAP: Streaks fetch error: $e");
@@ -597,7 +598,10 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
   Widget _buildUserTile(Map<String, dynamic> user) {
     final userId = user['id'];
     final isSelected = _selectedUserIds.contains(userId);
-    final streak = _userStreaks[userId] ?? 0;
+    final streakData = _userStreaks[userId];
+    final streak = streakData?.streakCount ?? 0;
+    final brokenStreak = streakData?.brokenStreakCount ?? 0;
+    final isRestoreable = streakData?.canBeRestored ?? false;
     
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -612,8 +616,15 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       ),
       subtitle: Row(
         children: [
-          if (streak > 0) ...[
-            Text("${streak}🔥", style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13)),
+          if (streak > 0 || (brokenStreak > 0 && isRestoreable)) ...[
+            Text(
+              streak > 0 ? "${streak}🔥" : "${brokenStreak}💔", 
+              style: TextStyle(
+                color: streak > 0 ? Colors.orange : Colors.redAccent, 
+                fontWeight: FontWeight.bold, 
+                fontSize: 13
+              )
+            ),
             const SizedBox(width: 8),
           ],
           Text("@${user['username'] ?? ''}", style: const TextStyle(color: Colors.grey, fontSize: 13)),

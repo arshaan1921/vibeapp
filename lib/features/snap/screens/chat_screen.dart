@@ -13,6 +13,7 @@ import 'snap_viewer_screen.dart';
 import '../../../screens/premium.dart';
 import '../../../widgets/streak_restore_store_dialog.dart';
 import '../../../screens/streak_achievement_screen.dart';
+import '../../../utils/premium_utils.dart';
 
 class ChatScreen extends StatefulWidget {
   final String userId;
@@ -31,6 +32,9 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _avatarUrl;
   bool _isLoading = true;
   RealtimeChannel? _realtimeChannel;
+  Timer? _loadMessagesDebounce;
+  bool _isMarkingDelivered = false;
+  bool _isMarkingRead = false;
 
   // Streak Restore state
   SnapStreak? _currentStreakData;
@@ -54,6 +58,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _realtimeChannel?.unsubscribe();
     _countdownTimer?.cancel();
+    _loadMessagesDebounce?.cancel();
     _reactionOverlay?.remove();
     super.dispose();
   }
@@ -70,23 +75,30 @@ class _ChatScreenState extends State<ChatScreen> {
       schema: 'public',
       table: 'snap_recipients',
       callback: (payload) {
-        _loadMessages();
+        _debouncedLoadMessages();
       },
     ).onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'messages',
       callback: (payload) {
-        _loadMessages();
+        _debouncedLoadMessages();
       },
     ).onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'message_reactions',
       callback: (payload) {
-        _loadMessages();
+        _debouncedLoadMessages();
       },
     ).subscribe();
+  }
+
+  void _debouncedLoadMessages() {
+    _loadMessagesDebounce?.cancel();
+    _loadMessagesDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) _loadMessages();
+    });
   }
 
   Future<void> _loadChatData() async {
@@ -169,13 +181,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final profileRes = await supabase
           .from('profiles')
-          .select('free_streak_restores, streak_restores_used_this_month, purchased_streak_restores')
+          .select('premium_plan, streak_restores_used_this_month, purchased_streak_restores, free_streak_restores')
           .eq('id', user.id)
           .maybeSingle();
 
       if (profileRes != null && mounted) {
+        final plan = profileRes['premium_plan'] as String?;
+        final limit = PremiumUtils.getStreakRestoreLimit(plan);
+        
+        // Sync DB limit if it doesn't match current plan (Fixes issues for older upgrades)
+        final int currentDbLimit = profileRes['free_streak_restores'] ?? 0;
+        if (currentDbLimit != limit) {
+          debugPrint('RESTORE_SYNC: Updating DB free_streak_restores from $currentDbLimit to $limit');
+          await supabase.from('profiles').update({'free_streak_restores': limit}).eq('id', user.id);
+        }
+
         setState(() {
-          _freeRestores = profileRes['free_streak_restores'] ?? 0;
+          _freeRestores = limit;
           _restoresUsed = profileRes['streak_restores_used_this_month'] ?? 0;
           _purchasedRestores = profileRes['purchased_streak_restores'] ?? 0;
         });
@@ -255,6 +277,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
+      debugPrint('RESTORE_STREAK: Calling RPC for streak ${_currentStreakData!.id}');
       final result = await supabase.rpc(
         'restore_streak',
         params: {
@@ -263,7 +286,21 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
 
+      debugPrint('RESTORE_STREAK: Result = $result');
+
       if (result == true) {
+        // 2. Log the restoration in the streak_restores table
+        try {
+          await supabase.from('streak_restores').insert({
+            'streak_id': _currentStreakData!.id,
+            'restored_by': user.id,
+            'previous_streak': _currentStreakData!.brokenStreakCount,
+          });
+        } catch (logError) {
+          debugPrint('RESTORE_STREAK: Failed to log history: $logError');
+          // Don't fail the whole operation if just the log insert fails
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("🔥 Streak restored successfully!")),
@@ -273,17 +310,18 @@ class _ChatScreenState extends State<ChatScreen> {
           await _loadMessages();
         }
       } else {
+        debugPrint('RESTORE_STREAK: RPC returned false');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Unable to restore streak")),
+            const SnackBar(content: Text("Unable to restore streak (Policy/Limit)")),
           );
         }
       }
     } catch (e) {
-      debugPrint("Error restoring streak: $e");
+      debugPrint("RESTORE_STREAK: Exception: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Unable to restore streak")),
+          SnackBar(content: Text("Error: $e")),
         );
       }
     } finally {
@@ -388,12 +426,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // Mark text messages as delivered/read if we have any incoming ones
       final hasUndeliveredMessages = msgsData.any((m) => m['receiver_id'] == user.id && m['delivered_at'] == null);
-      if (hasUndeliveredMessages) {
+      if (hasUndeliveredMessages && !_isMarkingDelivered) {
         _markMessagesAsDelivered();
       }
 
       final hasUnreadMessages = msgsData.any((m) => m['receiver_id'] == user.id && m['read_at'] == null);
-      if (hasUnreadMessages) {
+      if (hasUnreadMessages && !_isMarkingRead) {
         _markMessagesAsRead();
       }
     } catch (e) {
@@ -402,6 +440,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _markMessagesAsDelivered() async {
+    if (_isMarkingDelivered) return;
+    _isMarkingDelivered = true;
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
@@ -415,10 +455,14 @@ class _ChatScreenState extends State<ChatScreen> {
           .isFilter('delivered_at', null);
     } catch (e) {
       debugPrint("Error marking messages as delivered: $e");
+    } finally {
+      _isMarkingDelivered = false;
     }
   }
 
   Future<void> _markMessagesAsRead() async {
+    if (_isMarkingRead) return;
+    _isMarkingRead = true;
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
@@ -432,6 +476,8 @@ class _ChatScreenState extends State<ChatScreen> {
           .isFilter('read_at', null);
     } catch (e) {
       debugPrint("Error marking messages as read: $e");
+    } finally {
+      _isMarkingRead = false;
     }
   }
 
@@ -567,13 +613,25 @@ class _ChatScreenState extends State<ChatScreen> {
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange),
                           ),
                         ),
+                      ] else if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          "${_currentStreakData!.brokenStreakCount}💔",
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                        ),
                       ],
                     ],
                   ),
-                  Text(
-                    _isOnline ? "Online" : "Recently active",
-                    style: TextStyle(fontSize: 11, color: _isOnline ? Colors.green : (isDark ? Colors.white38 : Colors.grey)),
-                  ),
+                  if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0)
+                    Text(
+                      "Lost ${_currentStreakData!.brokenStreakCount} Streak • Restore Available",
+                      style: const TextStyle(fontSize: 11, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                    )
+                  else
+                    Text(
+                      _isOnline ? "Online" : "Recently active",
+                      style: TextStyle(fontSize: 11, color: _isOnline ? Colors.green : (isDark ? Colors.white38 : Colors.grey)),
+                    ),
                 ],
               ),
             ),
@@ -619,7 +677,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildRestoreBanner() {
-    final remainingRestores = (_freeRestores - _restoresUsed).clamp(0, 999) + _purchasedRestores;
+    final remainingRestores = _freeRestores >= 999999 
+        ? 999999 
+        : (_freeRestores - _restoresUsed).clamp(0, 999) + _purchasedRestores;
     final deadline = _currentStreakData!.timeUntilDeadline;
     final countdownText = deadline != null 
         ? "${deadline.inHours}h ${deadline.inMinutes % 60}m remaining"
@@ -644,6 +704,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -670,7 +731,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -685,101 +746,95 @@ class _ChatScreenState extends State<ChatScreen> {
                     countdownText,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
               if (remainingRestores > 0)
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.orange,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  ),
-                  onPressed: _isRestoring ? null : _restoreStreak,
-                  child: _isRestoring
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.orange,
-                          ),
-                        )
-                      : const Text(
-                          "Restore Streak",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                Text(
+                  remainingRestores >= 999999 ? "Unlimited restores" : "Restores left: $remainingRestores",
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
             ],
           ),
-          if (remainingRestores > 0) ...[
-            const SizedBox(height: 12),
-            Text(
-              "Restores remaining: $remainingRestores",
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ] else ...[
-            const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          if (remainingRestores > 0)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.orange,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: _isRestoring ? null : _restoreStreak,
+              child: _isRestoring
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.orange,
+                      ),
+                    )
+                  : const Text(
+                      "RESTORE STREAK",
+                      style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                    ),
+            )
+          else ...[
             const Text(
               "No free restores remaining",
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 4),
             const Text(
               "Upgrade to Premium for additional streak restores",
               style: TextStyle(color: Colors.white70, fontSize: 12),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white24,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white24,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => const StreakRestoreStoreDialog(),
-                  ).then((value) {
-                    if (value == true) {
-                      _fetchUserRestoreLimits();
-                    }
-                  });
-                },
-                child: const Text("Buy Streak Restores"),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PremiumScreen()),
+                );
+              },
+              child: const Text(
+                "Upgrade to Premium",
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white24,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () {
-                  // Navigate to Premium Screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const PremiumScreen()),
-                  );
-                },
-                child: const Text("View Premium Plans"),
+            TextButton(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => const StreakRestoreStoreDialog(),
+                ).then((value) {
+                  if (value == true) {
+                    _fetchUserRestoreLimits();
+                  }
+                });
+              },
+              child: const Text(
+                "Buy Restores Only",
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
               ),
             ),
           ],

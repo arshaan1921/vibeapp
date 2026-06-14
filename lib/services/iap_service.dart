@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/safety_service.dart';
 
+import '../utils/premium_utils.dart';
+
 class IAPService {
   static final IAPService _instance = IAPService._internal();
   factory IAPService() => _instance;
@@ -116,10 +118,14 @@ class IAPService {
         String plan = purchase.productID.split('_')[0];
         int months = plan == 'gold' ? 12 : (plan == 'blue' ? 3 : 1);
         final expiresAt = DateTime.now().add(Duration(days: months * 30));
+        
+        final restoreLimit = PremiumUtils.getStreakRestoreLimit(plan);
+
         await supabase.from('profiles').update({
           'premium_plan': plan,
           'premium_expires_at': expiresAt.toIso8601String(),
           'is_premium': plan != 'free',
+          'free_streak_restores': restoreLimit,
         }).eq('id', user.id);
 
         // Sync SafetyService

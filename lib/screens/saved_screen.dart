@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile.dart';
-import '../main.dart';
 import '../services/block_service.dart';
 import '../utils/image_utils.dart';
+import '../features/snap/models/streak.dart';
 import '../utils/premium_utils.dart';
 
 class FriendsListScreen extends StatefulWidget {
@@ -16,7 +16,7 @@ class FriendsListScreen extends StatefulWidget {
 
 class _FriendsListScreenState extends State<FriendsListScreen> {
   List<Map<String, dynamic>> _friends = [];
-  Map<String, int> _userStreaks = {};
+  Map<String, SnapStreak> _userStreaks = {};
   bool _isLoading = true;
 
   @override
@@ -88,12 +88,12 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
       final List<Map<String, dynamic>> profiles = List<Map<String, dynamic>>.from(profilesResponse as List);
 
       // 3. Fetch streaks for current user
-      final Map<String, int> streaksMap = {};
+      final Map<String, SnapStreak> streaksMap = {};
       if (currentUser != null) {
         try {
           final streaksResponse = await supabase
               .from('snap_streaks')
-              .select('user1_id, user2_id, streak_count')
+              .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
               .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
           
           final List<dynamic> streaksData = List<dynamic>.from(streaksResponse as List);
@@ -103,9 +103,9 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             final u1 = row['user1_id'] as String;
             final u2 = row['user2_id'] as String;
             final friendId = (u1 == currentUser.id) ? u2 : u1;
-            final count = row['streak_count'] as int;
-            streaksMap[friendId] = count;
-            debugPrint('Friend $friendId streak: $count');
+            final streak = SnapStreak.fromMap(row);
+            streaksMap[friendId] = streak;
+            debugPrint('Friend $friendId streak: ${streak.streakCount}');
           }
         } catch (e) {
           debugPrint("Streaks fetch error: $e");
@@ -151,8 +151,8 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                         itemBuilder: (context, index) {
                           final profile = _friends[index];
                           final avatarUrl = profile['avatar_url'];
-                          final streak = _userStreaks[profile['id']] ?? 0;
-                          final plan = profile['premium_plan'];
+                          final plan = profile['premium_plan'] ?? 'free';
+                          final streakData = _userStreaks[profile['id']];
 
                           return Column(
                             children: [
@@ -183,9 +183,18 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                                     ),
                                     const SizedBox(width: 4),
                                     PremiumUtils.buildBadge(plan),
-                                    if (streak > 0) ...[
+                                    if (streakData != null && (streakData.streakCount > 0 || (streakData.brokenStreakCount > 0 && streakData.canBeRestored))) ...[
                                       const SizedBox(width: 4),
-                                      Text("${streak}🔥", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal, color: Colors.grey)),
+                                      Text(
+                                        streakData.streakCount > 0 
+                                            ? "${streakData.streakCount}🔥" 
+                                            : "${streakData.brokenStreakCount}💔", 
+                                        style: TextStyle(
+                                          fontSize: 14, 
+                                          fontWeight: FontWeight.bold, 
+                                          color: streakData.streakCount > 0 ? Colors.orange : Colors.redAccent
+                                        )
+                                      ),
                                     ],
                                   ],
                                 ),

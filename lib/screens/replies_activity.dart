@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'answer_view_screen.dart';
@@ -298,17 +299,19 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> with Rout
                         : null,
                   ),
                 ),
-                title: RichText(
-                  text: TextSpan(
+                title: Text.rich(
+                  TextSpan(
                     style: TextStyle(
                         color:
                         theme.textTheme.bodyLarge?.color,
                         fontSize: 14),
                     children: [
-                      WidgetSpan(
-                        alignment: PlaceholderAlignment.middle,
-                        child: GestureDetector(
-                          onTap: () {
+                      TextSpan(
+                        text: "@$username",
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.green),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () {
                             final userId = item['source_user'];
                             if (userId != null) {
                               Navigator.push(
@@ -317,12 +320,6 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> with Rout
                               );
                             }
                           },
-                          child: Text(
-                            "@$username",
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, color: Colors.green), // Made it look like a link
-                          ),
-                        ),
                       ),
                       TextSpan(
                           text: actionText),

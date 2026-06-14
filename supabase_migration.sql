@@ -27,3 +27,15 @@ CREATE TABLE IF NOT EXISTS public.saved_profiles (
   CONSTRAINT saved_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users (id) ON DELETE CASCADE
 );
 
+-- Create streak_restores table to track restoration history
+CREATE TABLE IF NOT EXISTS public.streak_restores (
+  id uuid NOT NULL DEFAULT gen_random_uuid (),
+  streak_id uuid NOT NULL,
+  restored_by uuid NOT NULL,
+  previous_streak integer NOT NULL,
+  restored_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT streak_restores_pkey PRIMARY KEY (id),
+  CONSTRAINT streak_restores_restored_by_fkey FOREIGN KEY (restored_by) REFERENCES profiles (id) ON DELETE CASCADE,
+  CONSTRAINT streak_restores_streak_id_fkey FOREIGN KEY (streak_id) REFERENCES snap_streaks (id) ON DELETE CASCADE
+);
+

@@ -40,7 +40,15 @@ class _StreakRestoreStoreDialogState extends State<StreakRestoreStoreDialog> {
         children: [
           const Icon(Icons.local_fire_department, color: Colors.orange),
           const SizedBox(width: 8),
-          Text("Get Streak Restores", style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
+          Expanded(
+            child: Text(
+              "Get Streak Restores",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
+              ),
+            ),
+          ),
         ],
       ),
       content: _isLoading 

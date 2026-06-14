@@ -50,6 +50,24 @@ class PremiumUtils {
   }
 
   // =========================
+  // STREAK RESTORE LIMITS
+  // =========================
+
+  static int getStreakRestoreLimit(String? plan) {
+    switch (plan) {
+      case 'green':
+        return 3;
+      case 'blue':
+        return 10;
+      case 'gold':
+      case 'yellow':
+        return 999999; // Unlimited
+      default:
+        return 1; // Free
+    }
+  }
+
+  // =========================
   // CHECK QUESTION LIMIT
   // =========================
 

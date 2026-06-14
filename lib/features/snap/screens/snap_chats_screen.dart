@@ -9,6 +9,7 @@ import 'camera_screen.dart';
 import 'chat_screen.dart';
 import '../../../screens/streak_achievement_screen.dart';
 import '../../../screens/friend_requests_screen.dart';
+import '../models/streak.dart';
 
 class SnapChatsScreen extends StatefulWidget {
   const SnapChatsScreen({super.key});
@@ -21,7 +22,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
   List<Map<String, dynamic>> _chats = [];
-  Map<String, int> _streakMap = {};
+  Map<String, SnapStreak> _streakMap = {};
   Map<String, String> _streakIdMap = {};
   int _pendingRequestsCount = 0;
   RealtimeChannel? _realtimeChannel;
@@ -188,12 +189,12 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
       if (mounted) setState(() => _pendingRequestsCount = (requestsRes as List).length);
 
       // 1.7. Fetch streaks
-      Map<String, int> streakMap = {};
+      Map<String, SnapStreak> streakMap = {};
       Map<String, String> streakIdMap = {};
       try {
         final streaksRes = await supabase
             .from('snap_streaks')
-            .select('id, user1_id, user2_id, streak_count')
+            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
         final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
@@ -203,10 +204,10 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           final u1 = row['user1_id'] as String;
           final u2 = row['user2_id'] as String;
           final friendId = (u1 == user.id) ? u2 : u1;
-          final count = row['streak_count'] as int;
-          streakMap[friendId] = count;
-          streakIdMap[friendId] = row['id'] as String;
-          debugPrint('Friend $friendId streak: $count');
+          final streak = SnapStreak.fromMap(row);
+          streakMap[friendId] = streak;
+          streakIdMap[friendId] = streak.id;
+          debugPrint('Friend $friendId streak: ${streak.streakCount}, broken: ${streak.brokenStreakCount}');
         }
       } catch (e) {
         debugPrint("CHAT_SCREEN: Streaks fetch error: $e");
@@ -516,7 +517,14 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
     final isDark = theme.brightness == Brightness.dark;
     final isUnread = chat['is_unread'] as bool? ?? false;
     final isSnap = chat['type'] == 'snap';
-    final streak = _streakMap[chat['id']] ?? 0;
+    final streakData = _streakMap[chat['id']];
+    final streak = streakData?.streakCount ?? 0;
+    final brokenStreak = streakData?.brokenStreakCount ?? 0;
+    final isRestoreable = streakData?.canBeRestored ?? false;
+
+    // Show streak if active (>0) OR if broken but restoreable
+    final showStreak = streak > 0;
+    final showBrokenStreak = streak == 0 && brokenStreak > 0 && isRestoreable;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -563,71 +571,70 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
               const SizedBox(width: 4),
             ],
             Expanded(
-              child: Text.rich(
-                TextSpan(
-                  style: const TextStyle(fontSize: 13),
-                  children: [
-                    TextSpan(
-                      text: chat['last_activity'],
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      chat['last_activity'],
                       style: TextStyle(
+                        fontSize: 13,
                         color: isUnread 
                           ? (isDark ? Colors.white : Colors.black) 
                           : (isDark ? Colors.white38 : Colors.grey[600]),
                         fontWeight: isUnread ? FontWeight.w700 : FontWeight.normal,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
-                    TextSpan(
-                      text: " • ",
-                      style: TextStyle(color: isDark ? Colors.white12 : Colors.grey[400]),
+                  ),
+                  Text(
+                    " • ",
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.white12 : Colors.grey[400]),
+                  ),
+                  Text(
+                    chat['timestamp'],
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isUnread 
+                        ? (isDark ? Colors.white : Colors.black) 
+                        : (isDark ? Colors.white38 : Colors.grey[600]),
+                      fontWeight: FontWeight.w600,
                     ),
-                    TextSpan(
-                      text: chat['timestamp'],
-                      style: TextStyle(
-                        color: isUnread 
-                          ? (isDark ? Colors.white : Colors.black) 
-                          : (isDark ? Colors.white38 : Colors.grey[600]),
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  if (showStreak || showBrokenStreak) ...[
+                    Text(
+                      " • ",
+                      style: TextStyle(fontSize: 13, color: isDark ? Colors.white12 : Colors.grey[400]),
                     ),
-                    if (streak > 0) ...[
-                      TextSpan(
-                        text: " • ",
-                        style: TextStyle(color: isDark ? Colors.white12 : Colors.grey[400]),
-                      ),
-                      WidgetSpan(
-                        alignment: PlaceholderAlignment.middle,
-                        child: GestureDetector(
-                          onTap: () {
-                            final streakId = _streakIdMap[chat['id']];
-                            if (streakId != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => StreakAchievementScreen(
-                                    streakId: streakId,
-                                    friendName: chat['name'],
-                                    currentStreak: streak,
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: Text(
-                            "${streak}🔥",
-                            style: TextStyle(
-                              color: isUnread 
-                                ? (isDark ? Colors.white : Colors.black) 
-                                : (isDark ? Colors.white38 : Colors.grey[600]),
-                              fontWeight: FontWeight.w900,
+                    GestureDetector(
+                      onTap: () {
+                        final streakId = _streakIdMap[chat['id']];
+                        if (streakId != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => StreakAchievementScreen(
+                                streakId: streakId,
+                                friendName: chat['name'],
+                                currentStreak: showStreak ? streak : brokenStreak,
+                              ),
                             ),
-                          ),
+                          );
+                        }
+                      },
+                      child: Text(
+                        showStreak ? "${streak}🔥" : "${brokenStreak}💔",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: showStreak 
+                            ? (isUnread ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white38 : Colors.grey[600]))
+                            : Colors.redAccent,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                ],
               ),
             ),
           ],
