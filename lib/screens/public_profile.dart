@@ -235,6 +235,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
       if (streakRow != null) {
         final streak = SnapStreak.fromMap(streakRow);
+        debugPrint('STREAK_DEBUG: friendId=${widget.userId}, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
         if (mounted) {
           setState(() {
             _currentStreakData = streak;
@@ -801,7 +802,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     userName: profileData?['name'] ?? "Friend",
                   ),
                 ),
-              );
+              ).then((_) {
+                _loadData();
+              });
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,

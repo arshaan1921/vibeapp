@@ -49,7 +49,7 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
         final friendId = (u1 == user.id) ? u2 : u1;
         final streak = SnapStreak.fromMap(row);
         streaksMap[friendId] = streak;
-        debugPrint('Friend $friendId streak: ${streak.streakCount}');
+        debugPrint('STREAK_DEBUG: friendId=$friendId, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
       }
 
       if (mounted) {
@@ -124,7 +124,7 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                         final streakData = _streaksMap[user['id']];
                         final streak = streakData?.streakCount ?? 0;
                         final brokenStreak = streakData?.brokenStreakCount ?? 0;
-                        final isRestoreable = streakData?.canBeRestored ?? false;
+                        final canBeRestored = streakData?.canBeRestored ?? false;
 
                         return ListTile(
                           leading: CircleAvatar(
@@ -146,7 +146,7 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold, fontSize: 14)),
                               ),
-                              if (streak > 0 || (brokenStreak > 0 && isRestoreable)) ...[
+                              if (streak > 0 || (brokenStreak > 0 && canBeRestored)) ...[
                                 const SizedBox(width: 4),
                                 Text(streak > 0 ? "${streak}🔥" : "${brokenStreak}💔",
                                     style: TextStyle(

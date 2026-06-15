@@ -179,7 +179,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
           final friendId = (u1 == user.id) ? u2 : u1;
           final streak = SnapStreak.fromMap(row);
           streaksMap[friendId] = streak;
-          debugPrint('Friend $friendId streak: ${streak.streakCount}');
+          debugPrint('STREAK_DEBUG: friendId=$friendId, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
         }
       } catch (e) {
         debugPrint("SEND_SNAP: Streaks fetch error: $e");
@@ -601,7 +601,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
     final streakData = _userStreaks[userId];
     final streak = streakData?.streakCount ?? 0;
     final brokenStreak = streakData?.brokenStreakCount ?? 0;
-    final isRestoreable = streakData?.canBeRestored ?? false;
+    final canBeRestored = streakData?.canBeRestored ?? false;
     
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -616,7 +616,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       ),
       subtitle: Row(
         children: [
-          if (streak > 0 || (brokenStreak > 0 && isRestoreable)) ...[
+          if (streak > 0 || (brokenStreak > 0 && canBeRestored)) ...[
             Text(
               streak > 0 ? "${streak}🔥" : "${brokenStreak}💔", 
               style: TextStyle(

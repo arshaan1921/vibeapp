@@ -262,6 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
         if (streakRow != null) {
           final streak = SnapStreak.fromMap(streakRow);
+          debugPrint('STREAK_DEBUG: friendId=$targetId, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
           if (mounted) {
             setState(() {
               _currentStreakData = streak;
@@ -972,7 +973,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       userName: profileData?['name'] ?? "Friend",
                     ),
                   ),
-                );
+                ).then((_) {
+                  _loadData();
+                });
               }
             },
             style: ElevatedButton.styleFrom(

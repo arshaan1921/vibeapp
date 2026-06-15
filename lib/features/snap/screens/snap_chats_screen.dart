@@ -207,7 +207,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           final streak = SnapStreak.fromMap(row);
           streakMap[friendId] = streak;
           streakIdMap[friendId] = streak.id;
-          debugPrint('Friend $friendId streak: ${streak.streakCount}, broken: ${streak.brokenStreakCount}');
+          debugPrint('STREAK_DEBUG: friendId=$friendId, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
         }
       } catch (e) {
         debugPrint("CHAT_SCREEN: Streaks fetch error: $e");
@@ -520,11 +520,11 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
     final streakData = _streakMap[chat['id']];
     final streak = streakData?.streakCount ?? 0;
     final brokenStreak = streakData?.brokenStreakCount ?? 0;
-    final isRestoreable = streakData?.canBeRestored ?? false;
+    final canBeRestored = streakData?.canBeRestored ?? false;
 
     // Show streak if active (>0) OR if broken but restoreable
     final showStreak = streak > 0;
-    final showBrokenStreak = streak == 0 && brokenStreak > 0 && isRestoreable;
+    final showBrokenStreak = streak == 0 && brokenStreak > 0 && canBeRestored;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

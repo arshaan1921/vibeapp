@@ -155,7 +155,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (streakMap != null && mounted) {
         final streak = SnapStreak.fromMap(streakMap);
         final count = streak.streakCount;
-        debugPrint('Friend ${widget.userId} streak: $count');
+        debugPrint('STREAK_DEBUG: friendId=${widget.userId}, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
 
         setState(() {
           _currentStreakData = streak;

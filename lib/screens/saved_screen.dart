@@ -105,7 +105,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
             final friendId = (u1 == currentUser.id) ? u2 : u1;
             final streak = SnapStreak.fromMap(row);
             streaksMap[friendId] = streak;
-            debugPrint('Friend $friendId streak: ${streak.streakCount}');
+            debugPrint('STREAK_DEBUG: friendId=$friendId, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
           }
         } catch (e) {
           debugPrint("Streaks fetch error: $e");
