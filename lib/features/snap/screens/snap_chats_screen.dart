@@ -9,6 +9,7 @@ import 'camera_screen.dart';
 import 'chat_screen.dart';
 import '../../../screens/streak_achievement_screen.dart';
 import '../../../screens/friend_requests_screen.dart';
+import '../../../widgets/streak_badge.dart';
 import '../models/streak.dart';
 
 class SnapChatsScreen extends StatefulWidget {
@@ -155,6 +156,12 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           table: 'friend_requests',
           callback: (payload) => _loadData(),
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'snap_streaks',
+          callback: (payload) => _loadData(),
+        )
         .subscribe();
   }
 
@@ -194,7 +201,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
       try {
         final streaksRes = await supabase
             .from('snap_streaks')
-            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
+            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
         final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
@@ -622,15 +629,12 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
                           );
                         }
                       },
-                      child: Text(
-                        showStreak ? "${streak}🔥" : "${brokenStreak}💔",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: showStreak 
-                            ? (isUnread ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white38 : Colors.grey[600]))
-                            : Colors.redAccent,
-                          fontWeight: FontWeight.w900,
-                        ),
+                      child: StreakBadge(
+                        streakData: streakData,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        activeColor: isUnread ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white38 : Colors.grey[600]),
+                        brokenColor: Colors.redAccent,
                       ),
                     ),
                   ],

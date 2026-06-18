@@ -12,6 +12,8 @@ import 'ask_any_user.dart';
 import 'streak_achievement_screen.dart';
 import 'report_problem_screen.dart';
 import 'blocked_users_screen.dart';
+import '../widgets/streak_badge.dart';
+import '../features/snap/models/streak.dart';
 import '../services/block_service.dart';
 import '../services/friend_service.dart';
 import '../features/snap/models/streak.dart';
@@ -222,7 +224,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       // 2. Fetch specific streak with current user
       final streaksRes = await supabase
           .from('snap_streaks')
-          .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
+          .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
           .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
       
       final streaks = List<dynamic>.from(streaksRes as List);
@@ -546,6 +548,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                         color: Colors.grey,
                       ),
                     ),
+                    if (_currentStreakData != null) ...[
+                      const SizedBox(width: 4),
+                      StreakBadge(streakData: _currentStreakData, fontSize: 16),
+                    ],
                     if (profileData!['youtube_verified'] == true || (profileData!['premium_plan'] != null && profileData!['premium_plan'] != 'free'))
                       const Padding(
                         padding: EdgeInsets.only(left: 4),

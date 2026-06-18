@@ -6,6 +6,7 @@ import '../../../main.dart';
 import '../../../utils/image_utils.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/image_optimizer_service.dart';
+import '../../../widgets/streak_badge.dart';
 import '../models/streak.dart';
 
 class SendSnapScreen extends StatefulWidget {
@@ -167,7 +168,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       try {
         final streaksResponse = await supabase
             .from('snap_streaks')
-            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
+            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
             .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
         
         final List<dynamic> streaksData = List<dynamic>.from(streaksResponse as List);
@@ -616,15 +617,8 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       ),
       subtitle: Row(
         children: [
-          if (streak > 0 || (brokenStreak > 0 && canBeRestored)) ...[
-            Text(
-              streak > 0 ? "${streak}🔥" : "${brokenStreak}💔", 
-              style: TextStyle(
-                color: streak > 0 ? Colors.orange : Colors.redAccent, 
-                fontWeight: FontWeight.bold, 
-                fontSize: 13
-              )
-            ),
+          if (streakData != null) ...[
+            StreakBadge(streakData: streakData, fontSize: 13),
             const SizedBox(width: 8),
           ],
           Text("@${user['username'] ?? ''}", style: const TextStyle(color: Colors.grey, fontSize: 13)),

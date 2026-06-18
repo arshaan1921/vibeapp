@@ -12,6 +12,7 @@ import 'camera_screen.dart';
 import 'snap_viewer_screen.dart';
 import '../../../screens/premium.dart';
 import '../../../widgets/streak_restore_store_dialog.dart';
+import '../../../widgets/streak_badge.dart';
 import '../../../screens/streak_achievement_screen.dart';
 import '../../../utils/premium_utils.dart';
 
@@ -90,6 +91,13 @@ class _ChatScreenState extends State<ChatScreen> {
       table: 'message_reactions',
       callback: (payload) {
         _debouncedLoadMessages();
+      },
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'snap_streaks',
+      callback: (payload) {
+        _fetchStreakData();
       },
     ).subscribe();
   }
@@ -608,16 +616,10 @@ class _ChatScreenState extends State<ChatScreen> {
                               );
                             }
                           },
-                          child: Text(
-                            "$_streak🔥",
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange),
+                          child: StreakBadge(
+                            streakData: _currentStreakData,
+                            fontSize: 14,
                           ),
-                        ),
-                      ] else if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0) ...[
-                        const SizedBox(width: 4),
-                        Text(
-                          "${_currentStreakData!.brokenStreakCount}💔",
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.redAccent),
                         ),
                       ],
                     ],

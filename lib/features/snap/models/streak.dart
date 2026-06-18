@@ -9,6 +9,7 @@ class SnapStreak {
   final bool isRestoreable;
   final DateTime? restoreDeadline;
   final int restoreCount;
+  final DateTime? lastExchangeAt;
 
   SnapStreak({
     required this.id,
@@ -19,6 +20,7 @@ class SnapStreak {
     required this.isRestoreable,
     this.restoreDeadline,
     required this.restoreCount,
+    this.lastExchangeAt,
   });
 
   factory SnapStreak.fromMap(Map<String, dynamic> map) {
@@ -33,7 +35,20 @@ class SnapStreak {
           ? DateTime.parse(map['restore_deadline'])
           : null,
       restoreCount: map['restore_count'] ?? 0,
+      lastExchangeAt: map['last_exchange_at'] != null
+          ? DateTime.parse(map['last_exchange_at'])
+          : null,
     );
+  }
+
+  bool get shouldShowHourglass {
+    if (streakCount == 0 || lastExchangeAt == null) return false;
+    
+    final expiryTime = lastExchangeAt!.add(const Duration(hours: 24));
+    final remaining = expiryTime.difference(DateTime.now());
+
+    // Show hourglass if less than 4 hours remaining
+    return remaining.inSeconds > 0 && remaining.inSeconds <= 4 * 3600;
   }
 
   bool get canBeRestored {

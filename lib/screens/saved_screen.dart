@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile.dart';
 import '../services/block_service.dart';
 import '../utils/image_utils.dart';
+import '../widgets/streak_badge.dart';
 import '../features/snap/models/streak.dart';
 import '../utils/premium_utils.dart';
 
@@ -18,18 +19,37 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
   List<Map<String, dynamic>> _friends = [];
   Map<String, SnapStreak> _userStreaks = {};
   bool _isLoading = true;
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _subscribeToRealtime();
     blockService.blockedIdsNotifier.addListener(_onBlocksChanged);
   }
 
   @override
   void dispose() {
-    blockService.blockedIdsNotifier.addListener(_onBlocksChanged);
+    _realtimeChannel?.unsubscribe();
+    blockService.blockedIdsNotifier.removeListener(_onBlocksChanged);
     super.dispose();
+  }
+
+  void _subscribeToRealtime() {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _realtimeChannel = supabase.channel('public:friends_list_streaks_updates');
+    _realtimeChannel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'snap_streaks',
+      callback: (payload) {
+        _fetchFriends();
+      },
+    ).subscribe();
   }
 
   void _onBlocksChanged() {
@@ -93,7 +113,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
         try {
           final streaksResponse = await supabase
               .from('snap_streaks')
-              .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
+              .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
               .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
           
           final List<dynamic> streaksData = List<dynamic>.from(streaksResponse as List);
@@ -183,18 +203,9 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                                     ),
                                     const SizedBox(width: 4),
                                     PremiumUtils.buildBadge(plan),
-                                    if (streakData != null && (streakData.streakCount > 0 || (streakData.brokenStreakCount > 0 && streakData.canBeRestored))) ...[
+                                    if (streakData != null) ...[
                                       const SizedBox(width: 4),
-                                      Text(
-                                        streakData.streakCount > 0 
-                                            ? "${streakData.streakCount}🔥" 
-                                            : "${streakData.brokenStreakCount}💔", 
-                                        style: TextStyle(
-                                          fontSize: 14, 
-                                          fontWeight: FontWeight.bold, 
-                                          color: streakData.streakCount > 0 ? Colors.orange : Colors.redAccent
-                                        )
-                                      ),
+                                      StreakBadge(streakData: streakData, fontSize: 14),
                                     ],
                                   ],
                                 ),

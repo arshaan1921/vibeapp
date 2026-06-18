@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'public_profile.dart';
+import '../widgets/streak_badge.dart';
 import '../features/snap/models/streak.dart';
 
 class SavedProfilesScreen extends StatefulWidget {
@@ -14,11 +15,35 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _friends = [];
   Map<String, SnapStreak> _streaksMap = {};
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _subscribeToRealtime();
+  }
+
+  @override
+  void dispose() {
+    _realtimeChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToRealtime() {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    _realtimeChannel = supabase.channel('public:saved_profiles_streaks_updates');
+    _realtimeChannel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'snap_streaks',
+      callback: (payload) {
+        _fetchStreaks();
+      },
+    ).subscribe();
   }
 
   Future<void> _loadData() async {
@@ -36,7 +61,7 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
 
       final streaksRes = await supabase
           .from('snap_streaks')
-          .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
+          .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
           .or('user1_id.eq.${user.id},user2_id.eq.${user.id}');
       
       final List<dynamic> streaksData = List<dynamic>.from(streaksRes as List);
@@ -146,13 +171,9 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold, fontSize: 14)),
                               ),
-                              if (streak > 0 || (brokenStreak > 0 && canBeRestored)) ...[
+                              if (streakData != null) ...[
                                 const SizedBox(width: 4),
-                                Text(streak > 0 ? "${streak}🔥" : "${brokenStreak}💔",
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold, 
-                                        fontSize: 12,
-                                        color: streak > 0 ? Colors.orange : Colors.redAccent)),
+                                StreakBadge(streakData: streakData, fontSize: 12),
                               ],
                             ],
                           ),

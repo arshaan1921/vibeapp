@@ -17,6 +17,8 @@ import '../utils/image_utils.dart';
 import 'ask_any_user.dart';
 import 'premium.dart';
 import '../widgets/answer_card.dart';
+import '../widgets/streak_badge.dart';
+import '../features/snap/models/streak.dart';
 import 'blocked_users_screen.dart';
 import '../services/block_service.dart';
 import '../services/safety_service.dart';
@@ -249,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       if (targetId != null && targetId != currentUser.id) {
         final streaksRes = await supabase
             .from('snap_streaks')
-            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline')
+            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
             .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
         
         final streaks = List<dynamic>.from(streaksRes as List);
@@ -704,6 +706,10 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
+                                    if (!isMe && _currentStreakData != null) ...[
+                                      const SizedBox(width: 4),
+                                      StreakBadge(streakData: _currentStreakData, fontSize: 16),
+                                    ],
                                     PremiumUtils.buildBadge(plan),
                                     if (profileData!['is_verified'] == true) 
                                       const Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
