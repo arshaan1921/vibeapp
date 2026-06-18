@@ -21,12 +21,14 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
   String? _errorMessage;
   List<AnswerModel> _trendingAnswers = [];
   List<Map<String, dynamic>> _suggestedPeople = [];
+  List<Map<String, dynamic>> _topLikedUsers = [];
   List<Map<String, dynamic>> _verifiedCreators = [];
   List<AnswerModel> _mostLikedWeekly = [];
   List<Map<String, dynamic>> _newRisingCreators = [];
 
   final List<String> _categories = [
     'Trending',
+    'Top Liked',
     'People',
     'Answers',
     'Verified',
@@ -82,6 +84,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
       await Future.wait([
         _fetchTrendingAnswers().catchError((e) => debugPrint('Error trending: $e')),
         _fetchSuggestedPeople().catchError((e) => debugPrint('Error suggested: $e')),
+        _fetchTopLikedUsers().catchError((e) => debugPrint('Error top liked: $e')),
         _fetchVerifiedCreators().catchError((e) => debugPrint('Error verified: $e')),
         _fetchMostLikedWeekly().catchError((e) => debugPrint('Error weekly: $e')),
         _fetchNewRisingCreators().catchError((e) => debugPrint('Error rising: $e')),
@@ -143,6 +146,52 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
       _suggestedPeople = people;
     } catch (e, st) {
       debugPrint('Error fetching suggested people: $e');
+      debugPrintStack(stackTrace: st);
+    }
+  }
+
+  Future<void> _fetchTopLikedUsers() async {
+    try {
+      // 1. Fetch top answers to identify active creators with many likes
+      final response = await Supabase.instance.client
+          .from('answers')
+          .select('user_id, likes_count')
+          .order('likes_count', ascending: false)
+          .limit(500);
+      
+      final data = response as List;
+      final Map<String, int> userLikes = {};
+      for (var row in data) {
+        final uid = row['user_id'].toString();
+        final likes = (row['likes_count'] as int? ?? 0);
+        userLikes[uid] = (userLikes[uid] ?? 0) + likes;
+      }
+
+      // 2. Get top user IDs by accumulated likes
+      final sortedUserIds = userLikes.keys.toList()
+        ..sort((a, b) => userLikes[b]!.compareTo(userLikes[a]!));
+      
+      final topUserIds = sortedUserIds.take(15).toList();
+      
+      if (topUserIds.isEmpty) return;
+
+      // 3. Fetch full profiles for these users
+      final profilesRes = await Supabase.instance.client
+          .from('profiles')
+          .select('id, username, avatar_url, premium_plan, youtube_verified')
+          .inFilter('id', topUserIds);
+      
+      final profiles = List<Map<String, dynamic>>.from(profilesRes as List);
+      
+      for (var profile in profiles) {
+        profile['likes_count'] = userLikes[profile['id']] ?? 0;
+      }
+      
+      profiles.sort((a, b) => (b['likes_count'] as int).compareTo(a['likes_count'] as int));
+
+      _topLikedUsers = profiles;
+    } catch (e, st) {
+      debugPrint('Error fetching top liked users: $e');
       debugPrintStack(stackTrace: st);
     }
   }
@@ -393,14 +442,20 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
 
   Widget _buildContentForTab() {
     switch (_selectedTabIndex) {
-      case 0: // Trending (All Sections)
+      case 0: // Trending (Main Mix)
         return SliverList(
           delegate: SliverChildListDelegate([
+            _buildSectionHeader("Top Liked Creators"),
+            if (_topLikedUsers.isEmpty)
+              _buildEmptyState("No data available.")
+            else
+              _buildHorizontalPeopleList(_topLikedUsers, showRank: true),
+
             _buildSectionHeader("Trending Answers"),
             if (_trendingAnswers.isEmpty)
               _buildEmptyState("No trending answers yet.")
             else
-              ..._trendingAnswers.asMap().entries.map((entry) {
+              ..._trendingAnswers.take(10).toList().asMap().entries.map((entry) {
                 return Stack(
                   children: [
                     AnswerCard(answer: entry.value),
@@ -440,7 +495,24 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
             const SizedBox(height: 100),
           ]),
         );
-      case 1: // People
+      case 1: // Top Liked (New Tab)
+        if (_topLikedUsers.isEmpty) return SliverToBoxAdapter(child: _buildEmptyState("No top creators found."));
+        return SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 0.7,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _buildPersonGridItem(_topLikedUsers[index], rank: index + 1),
+              childCount: _topLikedUsers.length,
+            ),
+          ),
+        );
+      case 2: // People
         if (_suggestedPeople.isEmpty) return SliverToBoxAdapter(child: _buildEmptyState("No users found."));
         return SliverPadding(
           padding: const EdgeInsets.all(16),
@@ -457,7 +529,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
             ),
           ),
         );
-      case 2: // Answers
+      case 3: // Answers
         if (_trendingAnswers.isEmpty) return SliverToBoxAdapter(child: _buildEmptyState("No trending answers yet."));
         return SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -465,7 +537,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
             childCount: _trendingAnswers.length,
           ),
         );
-      case 3: // Verified
+      case 4: // Verified
         if (_verifiedCreators.isEmpty) return SliverToBoxAdapter(child: _buildEmptyState("No verified creators yet."));
         return SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -473,7 +545,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
             childCount: _verifiedCreators.length,
           ),
         );
-      case 4: // New
+      case 5: // New
         if (_newRisingCreators.isEmpty) return SliverToBoxAdapter(child: _buildEmptyState("No new rising creators."));
         return SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -555,7 +627,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
     );
   }
 
-  Widget _buildHorizontalPeopleList(List<Map<String, dynamic>> people) {
+  Widget _buildHorizontalPeopleList(List<Map<String, dynamic>> people, {bool showRank = false}) {
     return SizedBox(
       height: 220,
       child: ListView.builder(
@@ -564,80 +636,90 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
         itemCount: people.length,
         itemBuilder: (context, index) {
           final person = people[index];
-          return _buildPersonCard(person);
+          return _buildPersonCard(person, rank: showRank ? index + 1 : null);
         },
       ),
     );
   }
 
-  Widget _buildPersonCard(Map<String, dynamic> person) {
+  Widget _buildPersonCard(Map<String, dynamic> person, {int? rank}) {
     final theme = Theme.of(context);
     final avatarUrl = person['avatar_url'] as String?;
     
-    return Container(
-      width: 140,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(128)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) 
-              ? NetworkImage(avatarUrl) 
-              : null,
-            child: (avatarUrl == null || avatarUrl.isEmpty) ? const Icon(Icons.person) : null,
+    return Stack(
+      children: [
+        Container(
+          width: 140,
+          margin: const EdgeInsets.only(right: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(128)),
           ),
-          const SizedBox(height: 12),
-          Row(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Flexible(
-                child: Text(
-                  person['username'] ?? 'User',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  overflow: TextOverflow.ellipsis,
+              CircleAvatar(
+                radius: 30,
+                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty) 
+                  ? NetworkImage(avatarUrl) 
+                  : null,
+                child: (avatarUrl == null || avatarUrl.isEmpty) ? const Icon(Icons.person) : null,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      person['username'] ?? 'User',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  PremiumUtils.buildBadge(person['premium_plan'], size: 14),
+                  if (person['youtube_verified'] == true)
+                    const Icon(Icons.verified_rounded, color: Colors.blue, size: 14),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "${person['likes_count'] ?? 0} Likes",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              PremiumUtils.buildBadge(person['premium_plan'], size: 14),
-              if (person['youtube_verified'] == true)
-                const Icon(Icons.verified_rounded, color: Colors.blue, size: 14),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ProfileScreen(userId: person['id'])),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(0, 32),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Visit", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            "${person['likes_count'] ?? 0} Likes",
-            style: TextStyle(
-              fontSize: 12,
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
+        ),
+        if (rank != null && rank <= 3)
+          Positioned(
+            top: 8,
+            right: 20,
+            child: _buildRankBadge(rank),
           ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => ProfileScreen(userId: person['id'])),
-            ),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              minimumSize: const Size(0, 32),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Visit", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+      ],
     );
   }
 
-  Widget _buildPersonGridItem(Map<String, dynamic> person) {
-    return _buildPersonCard(person);
+  Widget _buildPersonGridItem(Map<String, dynamic> person, {int? rank}) {
+    return _buildPersonCard(person, rank: rank);
   }
 
   Widget _buildPersonListTile(Map<String, dynamic> person, {bool showDate = false}) {

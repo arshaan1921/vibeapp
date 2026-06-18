@@ -381,6 +381,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
       for (var s in allSnaps) {
         final snap = s['snaps'];
+        final rawCreatedAt = s['delivered_at'] ?? s['created_at'] ?? snap['created_at'];
+        final createdAt = DateTime.parse(rawCreatedAt).toLocal();
+        
+        debugPrint('Raw UTC: $rawCreatedAt');
+        debugPrint('Local: $createdAt');
+
         allMessages.add(SnapMessage(
           id: s['id'],
           snapId: s['snap_id'],
@@ -388,7 +394,7 @@ class _ChatScreenState extends State<ChatScreen> {
           receiverId: s['recipient_id'],
           imageUrl: snap['image_url'],
           caption: snap['caption'],
-          createdAt: DateTime.parse(s['delivered_at'] ?? s['created_at'] ?? snap['created_at']),
+          createdAt: createdAt,
           status: _parseSnapStatus(s['status']),
         ));
       }
@@ -397,17 +403,32 @@ class _ChatScreenState extends State<ChatScreen> {
         final reactionsData = m['message_reactions'] as List? ?? [];
         final reactions = reactionsData.map((r) => MessageReaction.fromMap(r)).toList();
 
+        final rawCreatedAt = m['created_at'];
+        final createdAt = DateTime.parse(rawCreatedAt).toLocal();
+        
+        debugPrint('Raw UTC (Message): $rawCreatedAt');
+        debugPrint('Local: $createdAt');
+
         allMessages.add(SnapMessage(
           id: m['id'],
           senderId: m['sender_id'],
           receiverId: m['receiver_id'],
           text: m['message'],
-          createdAt: DateTime.parse(m['created_at']),
-          deliveredAt: m['delivered_at'] != null ? DateTime.parse(m['delivered_at']) : null,
-          readAt: m['read_at'] != null ? DateTime.parse(m['read_at']) : null,
+          createdAt: createdAt,
+          deliveredAt: m['delivered_at'] != null ? DateTime.parse(m['delivered_at']).toLocal() : null,
+          readAt: m['read_at'] != null ? DateTime.parse(m['read_at']).toLocal() : null,
           repliedToId: m['replied_to_id'],
           reactions: reactions,
         ));
+        
+        if (m['delivered_at'] != null) {
+          debugPrint('Raw UTC (Delivered): ${m['delivered_at']}');
+          debugPrint('Local: ${DateTime.parse(m['delivered_at']).toLocal()}');
+        }
+        if (m['read_at'] != null) {
+          debugPrint('Raw UTC (Read): ${m['read_at']}');
+          debugPrint('Local: ${DateTime.parse(m['read_at']).toLocal()}');
+        }
       }
 
       // Resolve repliedToMessage references
@@ -1250,13 +1271,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _getMessageStatusText(SnapMessage message) {
-    if (message.readAt != null) return "Seen";
-    if (message.deliveredAt != null) return "Delivered";
+    if (message.readAt != null) {
+      return "Seen ${_formatTimestampShort(message.readAt!)}";
+    }
+    if (message.deliveredAt != null) {
+      return "Delivered ${_formatTimestampShort(message.deliveredAt!)}";
+    }
     return "Sent";
   }
 
   String _formatTimestampShort(DateTime dt) {
-    return DateFormat('h:mm a').format(dt);
+    final localTime = dt.isUtc ? dt.toLocal() : dt;
+    return DateFormat('h:mm a').format(localTime);
   }
 
   void _showReactionPickerOverlay(SnapMessage message, GlobalKey bubbleKey) {

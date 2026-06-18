@@ -301,7 +301,10 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
         final rawTime = m['created_at']?.toString();
         if (rawTime == null) continue;
         
-        final timestamp = DateTime.parse(rawTime);
+        final timestamp = DateTime.parse(rawTime).toLocal();
+        debugPrint('Raw UTC (Interaction Message): $rawTime');
+        debugPrint('Local: $timestamp');
+
         if (!interactions.containsKey(otherId) || 
             timestamp.isAfter(DateTime.parse(interactions[otherId]!['raw_time']))) {
           
@@ -334,7 +337,10 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
         final rawTime = (s['delivered_at'] ?? s['created_at'] ?? snapObj['created_at'])?.toString();
         if (rawTime == null) continue;
 
-        final timestamp = DateTime.parse(rawTime);
+        final timestamp = DateTime.parse(rawTime).toLocal();
+        debugPrint('Raw UTC (Interaction Received Snap): $rawTime');
+        debugPrint('Local: $timestamp');
+
         if (!interactions.containsKey(otherId) || 
             timestamp.isAfter(DateTime.parse(interactions[otherId]!['raw_time']))) {
           
@@ -368,7 +374,10 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
           final rawTime = s['created_at']?.toString();
           if (rawTime == null) continue;
 
-          final timestamp = DateTime.parse(rawTime);
+          final timestamp = DateTime.parse(rawTime).toLocal();
+          debugPrint('Raw UTC (Interaction Sent Snap): $rawTime');
+          debugPrint('Local: $timestamp');
+
           if (!interactions.containsKey(otherId) || 
               timestamp.isAfter(DateTime.parse(interactions[otherId]!['raw_time']))) {
             
@@ -407,12 +416,13 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
   }
 
   String _formatTimestamp(DateTime dt) {
+    final localTime = dt.isUtc ? dt.toLocal() : dt;
     final now = DateTime.now();
-    final diff = now.difference(dt);
+    final diff = now.difference(localTime);
     if (diff.inMinutes < 1) return 'now';
     if (diff.inMinutes < 60) return '${diff.inMinutes}m';
     if (diff.inHours < 24) return '${diff.inHours}h';
-    return DateFormat('MMM d').format(dt);
+    return DateFormat('MMM d').format(localTime);
   }
 
   @override
