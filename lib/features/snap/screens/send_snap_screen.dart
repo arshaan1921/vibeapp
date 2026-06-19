@@ -618,7 +618,7 @@ class _SendSnapScreenState extends State<SendSnapScreen> {
       subtitle: Row(
         children: [
           if (streakData != null) ...[
-            StreakBadge(streakData: streakData, fontSize: 13),
+            StreakBadge(streakData: streakData, fontSize: 11),
             const SizedBox(width: 8),
           ],
           Text("@${user['username'] ?? ''}", style: const TextStyle(color: Colors.grey, fontSize: 13)),

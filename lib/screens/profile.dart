@@ -708,7 +708,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                     ),
                                     if (!isMe && _currentStreakData != null) ...[
                                       const SizedBox(width: 4),
-                                      StreakBadge(streakData: _currentStreakData, fontSize: 16),
+                                      StreakBadge(streakData: _currentStreakData, fontSize: 14),
                                     ],
                                     PremiumUtils.buildBadge(plan),
                                     if (profileData!['is_verified'] == true) 

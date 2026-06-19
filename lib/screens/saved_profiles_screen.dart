@@ -173,7 +173,7 @@ class _SavedProfilesScreenState extends State<SavedProfilesScreen> {
                               ),
                               if (streakData != null) ...[
                                 const SizedBox(width: 4),
-                                StreakBadge(streakData: streakData, fontSize: 12),
+                                StreakBadge(streakData: streakData, fontSize: 10),
                               ],
                             ],
                           ),

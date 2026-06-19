@@ -550,7 +550,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     ),
                     if (_currentStreakData != null) ...[
                       const SizedBox(width: 4),
-                      StreakBadge(streakData: _currentStreakData, fontSize: 16),
+                      StreakBadge(streakData: _currentStreakData, fontSize: 14),
                     ],
                     if (profileData!['youtube_verified'] == true || (profileData!['premium_plan'] != null && profileData!['premium_plan'] != 'free'))
                       const Padding(

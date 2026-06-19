@@ -13,7 +13,7 @@ class StreakBadge extends StatefulWidget {
   const StreakBadge({
     super.key,
     this.streakData,
-    this.fontSize = 14,
+    this.fontSize = 12,
     this.color,
     this.activeColor,
     this.brokenColor,

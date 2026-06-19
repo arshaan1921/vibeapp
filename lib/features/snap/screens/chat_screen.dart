@@ -28,6 +28,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final List<SnapMessage> _messages = [];
   final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   int _streak = 0;
   bool _isOnline = false;
   String? _avatarUrl;
@@ -61,6 +62,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _countdownTimer?.cancel();
     _loadMessagesDebounce?.cancel();
     _reactionOverlay?.remove();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -76,6 +78,7 @@ class _ChatScreenState extends State<ChatScreen> {
       schema: 'public',
       table: 'snap_recipients',
       callback: (payload) {
+        debugPrint('REALTIME_MESSAGE_RECEIVED: table=snap_recipients, event=${payload.eventType}');
         _debouncedLoadMessages();
       },
     ).onPostgresChanges(
@@ -83,6 +86,7 @@ class _ChatScreenState extends State<ChatScreen> {
       schema: 'public',
       table: 'messages',
       callback: (payload) {
+        debugPrint('REALTIME_MESSAGE_RECEIVED: table=messages, event=${payload.eventType}');
         _debouncedLoadMessages();
       },
     ).onPostgresChanges(
@@ -90,6 +94,7 @@ class _ChatScreenState extends State<ChatScreen> {
       schema: 'public',
       table: 'message_reactions',
       callback: (payload) {
+        debugPrint('REALTIME_MESSAGE_RECEIVED: table=message_reactions, event=${payload.eventType}');
         _debouncedLoadMessages();
       },
     ).onPostgresChanges(
@@ -97,6 +102,7 @@ class _ChatScreenState extends State<ChatScreen> {
       schema: 'public',
       table: 'snap_streaks',
       callback: (payload) {
+        debugPrint('REALTIME_MESSAGE_RECEIVED: table=snap_streaks, event=${payload.eventType}');
         _fetchStreakData();
       },
     ).subscribe();
@@ -451,6 +457,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _messages.clear();
           _messages.addAll(allMessages);
         });
+        debugPrint('MESSAGE_LIST_COUNT: count=${_messages.length}');
       }
 
       // Mark text messages as delivered/read if we have any incoming ones
@@ -534,11 +541,22 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     
     final repliedToId = _replyingTo?.id;
+    final repliedToMsg = _replyingTo;
     
     _textController.clear();
     setState(() => _replyingTo = null);
@@ -549,12 +567,47 @@ class _ChatScreenState extends State<ChatScreen> {
       if (user == null) return;
 
       debugPrint('CHAT_SEND inserting: $text');
-      await supabase.from('messages').insert({
+      
+      // 1. Optimistic UI update: add message locally immediately
+      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+      final newMessage = SnapMessage(
+        id: tempId,
+        senderId: user.id,
+        receiverId: widget.userId,
+        text: text,
+        createdAt: DateTime.now(),
+        repliedToId: repliedToId,
+        repliedToMessage: repliedToMsg,
+      );
+
+      if (mounted) {
+        setState(() {
+          _messages.insert(0, newMessage);
+        });
+        _scrollToBottom();
+        debugPrint('LOCAL_MESSAGE_ADDED: tempId=$tempId, count=${_messages.length}');
+      }
+
+      // 2. Perform DB insert
+      final response = await supabase.from('messages').insert({
         'sender_id': user.id,
         'receiver_id': widget.userId,
         'message': text,
         'replied_to_id': repliedToId,
-      });
+      }).select().single();
+
+      debugPrint('SEND_MESSAGE_SUCCESS: DB ID=${response['id']}');
+
+      // 3. Update the message ID locally to avoid duplicates when realtime triggers refresh
+      if (mounted) {
+        setState(() {
+          final index = _messages.indexWhere((m) => m.id == tempId);
+          if (index != -1) {
+            _messages[index] = _messages[index].copyWith(id: response['id'].toString());
+          }
+        });
+        debugPrint('LOCAL_MESSAGE_ID_UPDATED: DB ID=${response['id']}');
+      }
 
       // Fetch sender username for notification
       final profileRes = await supabase
@@ -575,9 +628,10 @@ class _ChatScreenState extends State<ChatScreen> {
         },
       );
 
-      // Realtime will pick it up
+      // Realtime will trigger _loadMessages, which will refresh all messages with their final status
     } catch (e) {
       debugPrint("Error sending message: $e");
+      // Optional: remove optimistic message on failure
     }
   }
 
@@ -639,7 +693,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           },
                           child: StreakBadge(
                             streakData: _currentStreakData,
-                            fontSize: 14,
+                            fontSize: 12,
                           ),
                         ),
                       ],
@@ -669,6 +723,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator(color: Colors.green))
               : ListView.builder(
+                  controller: _scrollController,
                   reverse: true,
                   padding: const EdgeInsets.all(16),
                   itemCount: _messages.length,

@@ -641,7 +641,7 @@ class _SnapChatsScreenState extends State<SnapChatsScreen> with RouteAware {
                       },
                       child: StreakBadge(
                         streakData: streakData,
-                        fontSize: 13,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
                         activeColor: isUnread ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white38 : Colors.grey[600]),
                         brokenColor: Colors.redAccent,

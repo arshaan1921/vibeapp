@@ -54,11 +54,12 @@ class SnapMessage {
   bool get isSnap => imageUrl != null;
 
   SnapMessage copyWith({
+    String? id,
     SnapMessage? repliedToMessage,
     List<MessageReaction>? reactions,
   }) {
     return SnapMessage(
-      id: id,
+      id: id ?? this.id,
       snapId: snapId,
       senderId: senderId,
       receiverId: receiverId,

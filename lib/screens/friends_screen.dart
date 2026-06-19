@@ -147,7 +147,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                               ),
                               if (streakData != null) ...[
                                 const SizedBox(width: 4),
-                                StreakBadge(streakData: streakData, fontSize: 14),
+                                StreakBadge(streakData: streakData, fontSize: 12),
                               ],
                             ],
                           ),

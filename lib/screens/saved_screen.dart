@@ -205,7 +205,7 @@ class _FriendsListScreenState extends State<FriendsListScreen> {
                                     PremiumUtils.buildBadge(plan),
                                     if (streakData != null) ...[
                                       const SizedBox(width: 4),
-                                      StreakBadge(streakData: streakData, fontSize: 14),
+                                      StreakBadge(streakData: streakData, fontSize: 12),
                                     ],
                                   ],
                                 ),
