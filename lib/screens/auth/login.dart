@@ -68,10 +68,16 @@ class _LoginScreenState extends State<LoginScreen> {
           const SnackBar(content: Text("Password reset email sent! ✅")),
         );
       }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error: $e")),
+          const SnackBar(content: Text("Error: Could not reset password")),
         );
       }
     } finally {
@@ -133,10 +139,16 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Login failed: $e")),
+          const SnackBar(content: Text("Login failed. Please try again.")),
         );
       }
     } finally {

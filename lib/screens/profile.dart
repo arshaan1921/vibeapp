@@ -25,7 +25,6 @@ import '../services/safety_service.dart';
 import 'saved_screen.dart';
 import '../services/friend_service.dart';
 import '../utils/link_utils.dart';
-import '../features/snap/models/streak.dart';
 import '../features/snap/screens/chat_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -759,29 +758,37 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       const SizedBox(height: 16),
                       if (profileData!['show_social_links'] != false)
                         _buildSocialLinksRow(),
-                      const SizedBox(height: 16),
+                      
+                      // Streak Restore Card (if applicable)
                       if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0)
-                        _buildRestoreStreakCard(),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: _buildRestoreStreakCard(),
+                        ),
+                      
                       if (isMe)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withOpacity(isDarkMode ? 0.2 : 0.08),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.bolt_rounded, size: 20, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
-                              const SizedBox(width: 10),
-                              Text(
-                                PremiumUtils.getQuestionLimit(plan) >= 999999
-                                    ? "Unlimited questions"
-                                    : "${_remainingQuestions + (PremiumUtils.getQuestionLimit(plan) - 20)} questions left today",
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
-                              ),
-                            ],
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withOpacity(isDarkMode ? 0.2 : 0.08),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.bolt_rounded, size: 20, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
+                                const SizedBox(width: 10),
+                                Text(
+                                  PremiumUtils.getQuestionLimit(plan) >= 999999
+                                      ? "Unlimited questions"
+                                      : "${_remainingQuestions + (PremiumUtils.getQuestionLimit(plan) - 20)} questions left today",
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       const SizedBox(height: 24),
@@ -924,7 +931,6 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
   }
 
   Widget _buildRestoreStreakCard() {
-    final theme = Theme.of(context);
     final deadline = _currentStreakData?.timeUntilDeadline;
     final countdownText = deadline != null 
         ? "${deadline.inHours}h ${deadline.inMinutes % 60}m remaining"
@@ -932,7 +938,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFF9D42), Color(0xFFFF6B00)],
@@ -949,25 +955,37 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 32),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   "Restore ${_currentStreakData?.brokenStreakCount} Day Streak!",
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(
+                    color: Colors.white, 
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 15,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (countdownText.isNotEmpty)
                   Text(
                     countdownText,
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9), 
+                      fontSize: 12,
+                    ),
                   ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () {
               if (widget.userId != null) {
@@ -987,11 +1005,15 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: Colors.orange,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: const Text("RESTORE", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              "RESTORE", 
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
           ),
         ],
       ),

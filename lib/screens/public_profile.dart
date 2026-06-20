@@ -16,7 +16,6 @@ import '../widgets/streak_badge.dart';
 import '../features/snap/models/streak.dart';
 import '../services/block_service.dart';
 import '../services/friend_service.dart';
-import '../features/snap/models/streak.dart';
 import '../features/snap/screens/chat_screen.dart';
 
 class PublicProfileScreen extends StatefulWidget {
@@ -512,105 +511,122 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       child: Column(
         children: [
           const SizedBox(height: 20),
-          Center(
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
+          // Profile Header
+          Column(
+            children: [
+              GestureDetector(
+                onTap: () => ImageUtils.showImagePreview(context, avatarUrl),
+                child: CircleAvatar(
+                  radius: 55,
+                  backgroundColor: Colors.white,
                   child: CircleAvatar(
-                    radius: 55,
-                    backgroundColor: Colors.white,
-                    child: CircleAvatar(
-                      radius: 52,
-                      backgroundColor: Colors.grey,
-                      backgroundImage: ImageUtils.getImageProvider(avatarUrl),
-                      child: (avatarUrl == null || avatarUrl == '') ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
-                    ),
+                    radius: 52,
+                    backgroundColor: Colors.grey,
+                    backgroundImage: ImageUtils.getImageProvider(avatarUrl),
+                    child: (avatarUrl == null || avatarUrl == '') ? const Icon(Icons.person, size: 60, color: Colors.white) : null,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  profileData!['name'] ?? "No Name",
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                profileData!['name'] ?? "No Name",
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "@${profileData!['username'] ?? 'username'}",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    if (_currentStreakData != null) ...[
-                      const SizedBox(width: 4),
-                      StreakBadge(streakData: _currentStreakData, fontSize: 14),
-                    ],
-                    if (profileData!['youtube_verified'] == true || (profileData!['premium_plan'] != null && profileData!['premium_plan'] != 'free'))
-                      const Padding(
-                        padding: EdgeInsets.only(left: 4),
-                        child: Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
-                      ),
-                  ],
-                ),
-                if (_mutualFriendsCount > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      "$_mutualFriendsCount mutual ${_mutualFriendsCount == 1 ? 'friend' : 'friends'}",
-                      style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: Linkify(
-                    onOpen: (link) async {
-                      await LinkUtils.handleLinkClick(context, link);
-                    },
-                    text: profileData!['bio'] ?? "Ready to HIGH5",
-                    textAlign: TextAlign.center,
-                    linkifiers: const [
-                      UrlLinkifier(),
-                      EmailLinkifier(),
-                      UserLinkifier(),
-                    ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "@${profileData!['username'] ?? 'username'}",
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 16,
                       color: Colors.grey,
                     ),
-                    linkStyle: const TextStyle(
-                      color: Colors.blueAccent,
-                      fontWeight: FontWeight.bold,
-                      decoration: TextDecoration.none,
+                  ),
+                  if (_currentStreakData != null) ...[
+                    const SizedBox(width: 4),
+                    StreakBadge(streakData: _currentStreakData, fontSize: 14),
+                  ],
+                  if (profileData!['youtube_verified'] == true || (profileData!['premium_plan'] != null && profileData!['premium_plan'] != 'free'))
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
                     ),
+                ],
+              ),
+              if (_mutualFriendsCount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    "$_mutualFriendsCount mutual ${_mutualFriendsCount == 1 ? 'friend' : 'friends'}",
+                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
                   ),
                 ),
-                const SizedBox(height: 12),
-                if (profileData!['show_gmail'] == true &&
-                    profileData!['gmail_address'] != null && 
-                    profileData!['gmail_address'].toString().isNotEmpty)
-                  _buildContactEmailRow(),
-                const SizedBox(height: 16),
-                if (profileData!['show_social_links'] != false)
-                  _buildSocialLinksRow(),
-                if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24, left: 24, right: 24),
-                    child: _buildRestoreStreakCard(),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Linkify(
+                  onOpen: (link) async {
+                    await LinkUtils.handleLinkClick(context, link);
+                  },
+                  text: profileData!['bio'] ?? "Ready to HIGH5",
+                  textAlign: TextAlign.center,
+                  linkifiers: const [
+                    UrlLinkifier(),
+                    EmailLinkifier(),
+                    UserLinkifier(),
+                  ],
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
                   ),
-              ],
-            ),
+                  linkStyle: const TextStyle(
+                    color: Colors.blueAccent,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (profileData!['show_gmail'] == true &&
+                  profileData!['gmail_address'] != null && 
+                  profileData!['gmail_address'].toString().isNotEmpty)
+                _buildContactEmailRow(),
+              const SizedBox(height: 16),
+              if (profileData!['show_social_links'] != false)
+                _buildSocialLinksRow(),
+              
+              // Streak Restore Card (if applicable)
+              if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 24, left: 24, right: 24),
+                  child: _buildRestoreStreakCard(),
+                ),
+            ],
           ),
 
           const SizedBox(height: 32),
 
+          // Stats Section (Moved above buttons to match screenshot better)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildStat(
+                (profileData!['friends_count'] ?? 0) == 1 ? "Friend" : "Friends", 
+                "${profileData!['friends_count'] ?? 0}"
+              ),
+              _buildStat("Likes", "${profileData!['likes_count'] ?? 0}"),
+              _buildStat("Answers", "${profileData!['answers_count'] ?? 0}"),
+            ],
+          ),
+
+          const SizedBox(height: 32),
+
+          // Action Buttons Section
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
@@ -667,22 +683,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           ),
 
           const SizedBox(height: 32),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildStat(
-                (profileData!['friends_count'] ?? 0) == 1 ? "Friend" : "Friends", 
-                "${profileData!['friends_count'] ?? 0}"
-              ),
-              _buildStat("Likes", "${profileData!['likes_count'] ?? 0}"),
-              _buildStat("Answers", "${profileData!['answers_count'] ?? 0}"),
-            ],
-          ),
-
-          const SizedBox(height: 32),
           const Divider(height: 1),
 
+          // Answers Section
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -762,7 +765,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFF9D42), Color(0xFFFF6B00)],
@@ -779,25 +782,38 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 32),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   "Restore ${_currentStreakData?.brokenStreakCount} Day Streak!",
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(
+                    color: Colors.white, 
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 15,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (countdownText.isNotEmpty)
                   Text(
                     countdownText,
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9), 
+                      fontSize: 12,
+                    ),
                   ),
               ],
             ),
+            flex: 1,
           ),
+          const SizedBox(width: 8),
           ElevatedButton(
             onPressed: () {
               Navigator.push(
@@ -815,11 +831,15 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: Colors.orange,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: const Text("RESTORE", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              "RESTORE", 
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
           ),
         ],
       ),
