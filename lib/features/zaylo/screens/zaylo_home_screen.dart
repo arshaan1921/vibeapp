@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/zaylo_widgets.dart';
+import '../services/zaylo_service.dart';
 import 'matching_screen.dart';
 import 'zaylo_settings_screen.dart';
 
@@ -106,10 +107,15 @@ class _ZayloHomeScreenState extends State<ZayloHomeScreen> {
               const SizedBox(height: 50),
               ZayloGradientButton(
                 text: 'Start Matching',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MatchingScreen()),
-                ),
+                onTap: () async {
+                  await zayloService.joinZayloQueue();
+                  if (mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MatchingScreen()),
+                    );
+                  }
+                },
               ),
               const SizedBox(height: 40),
               _buildSafetyCard(isDark),
@@ -134,10 +140,17 @@ class _ZayloHomeScreenState extends State<ZayloHomeScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('👥', style: TextStyle(fontSize: 20)),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Colors.greenAccent,
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 12),
           Text(
-            '12,547 Online',
+            'Online Now',
             style: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w600,

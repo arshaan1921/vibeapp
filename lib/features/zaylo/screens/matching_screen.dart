@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/zaylo_widgets.dart';
+import '../services/zaylo_service.dart';
 import 'video_chat_screen.dart';
 
 class MatchingScreen extends StatefulWidget {
@@ -11,82 +12,208 @@ class MatchingScreen extends StatefulWidget {
   State<MatchingScreen> createState() => _MatchingScreenState();
 }
 
-class _MatchingScreenState extends State<MatchingScreen> {
-  Timer? _timer;
+class _MatchingScreenState extends State<MatchingScreen> with SingleTickerProviderStateMixin {
+  Timer? _matchingTimer;
+  late AnimationController _pulseController;
+  bool _isNavigating = false;
+  bool _isPolling = false;
 
   @override
   void initState() {
     super.initState();
-    _startMatching();
+    // Pulse animation created once in initState
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+    
+    _startMatchingLoop();
   }
 
-  void _startMatching() {
-    _timer = Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const VideoChatScreen()),
-        );
+  void _startMatchingLoop() {
+    // Prevent multiple Timer.periodic instances by ensuring we only start it once
+    if (_matchingTimer != null) return;
+
+    _matchingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      // Polling should not rebuild the entire screen. We don't call setState here.
+      if (_isPolling || _isNavigating) return;
+      
+      _isPolling = true;
+      debugPrint('ZAYLO: Poll started');
+      
+      try {
+        final bool isMatched = await zayloService.findZayloMatch();
+        debugPrint('ZAYLO: Poll finished. Match found: $isMatched');
+        
+        if (isMatched && mounted && !_isNavigating) {
+          debugPrint('ZAYLO: Match found');
+          _isNavigating = true;
+          _matchingTimer?.cancel();
+          
+          debugPrint('ZAYLO: Navigation triggered');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const VideoChatScreen()),
+          );
+        }
+      } catch (e) {
+        debugPrint('ZAYLO: Poll error: $e');
+      } finally {
+        _isPolling = false;
       }
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _matchingTimer?.cancel();
+    _pulseController.dispose();
+    zayloService.leaveZayloQueue();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    // The build method is clean and doesn't recreate controllers
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0A0A0A) : Colors.white,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(),
-            const RadarAnimation(),
-            const SizedBox(height: 60),
-            Text(
-              'Finding your match...',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // Background Glow
+          Center(
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: ZayloColors.primaryGradient[0].withOpacity(0.1),
+                    blurRadius: 100,
+                    spreadRadius: 50,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'This usually takes a few seconds.',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 40),
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cancel',
+          ),
+          
+          // Main Content - Wrapped in Positioned.fill to ensure full width/height and static layout
+          Positioned.fill(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Spacer(),
+                // Animated Pulse Circle - Smooth animation remains smooth while polling
+                // Fixed size container prevents layout jitter
+                SizedBox(
+                  width: 350,
+                  height: 350,
+                  child: _buildPulseCircle(),
+                ),
+                const SizedBox(height: 60),
+                Text(
+                  'Finding someone...',
                   style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    color: Colors.redAccent,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
                   ),
                 ),
+                const SizedBox(height: 12),
+                Text(
+                  'Based on your interests',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    color: Colors.white54,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                // Cancel Button - Fixed position
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 60),
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPulseCircle() {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            ...List.generate(3, (index) {
+              final double delay = index * 0.4;
+              final double value = (_pulseController.value + delay) % 1.0;
+              return Opacity(
+                opacity: (1.0 - value) * 0.5,
+                child: Container(
+                  width: 150 + (200 * value),
+                  height: 150 + (200 * value),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: ZayloColors.electricBlue,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: ZayloColors.primaryGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: ZayloColors.primaryGradient[0].withOpacity(0.5),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.bolt_rounded,
+                color: Colors.white,
+                size: 60,
               ),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
