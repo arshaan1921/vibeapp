@@ -8,7 +8,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'theme.dart';
 import 'screens/feed.dart';
 import 'screens/trending_screen.dart';
-import 'screens/saved_screen.dart';
 import 'screens/profile.dart';
 import 'services/notification_service.dart';
 import 'screens/splash_screen.dart';
@@ -19,6 +18,7 @@ import 'widgets/update_popup.dart';
 import 'services/update_service.dart';
 import 'features/ai_companion/screens/ai_companion_screen.dart';
 import 'features/snap/screens/snap_chats_screen.dart';
+import 'features/zaylo/screens/zaylo_home_screen.dart';
 
 final ValueNotifier<int> tabIndexNotifier = ValueNotifier(0);
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
@@ -150,7 +150,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   final List<Widget> _screens = const [
     FeedScreen(),
-    TrendingScreen(),
+    ZayloHomeScreen(),
     AiCompanionScreen(),
     SnapChatsScreen(),
     ProfileScreen(),
@@ -219,9 +219,9 @@ class _MainScaffoldState extends State<MainScaffold> {
                     label: "Home",
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.local_fire_department_outlined),
-                    selectedIcon: Icon(Icons.local_fire_department_rounded),
-                    label: "Trending",
+                    icon: Icon(Icons.flash_on_outlined),
+                    selectedIcon: Icon(Icons.flash_on_rounded),
+                    label: "Zaylo",
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.auto_awesome_outlined),
