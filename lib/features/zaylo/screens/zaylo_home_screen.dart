@@ -17,16 +17,43 @@ class _ZayloHomeScreenState extends State<ZayloHomeScreen> {
     'Gaming', 'Anime', 'Movies', 'Music', 'Travel',
     'Sports', 'Fitness', 'Technology', 'Food', 'Fashion'
   ];
-  final Set<String> _selectedInterests = {};
+  Set<String> _selectedInterests = {};
+  bool _isLoading = true;
 
-  void _toggleInterest(String interest) {
-    setState(() {
-      if (_selectedInterests.contains(interest)) {
-        _selectedInterests.remove(interest);
-      } else {
-        _selectedInterests.add(interest);
-      }
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadInterests();
+  }
+
+  Future<void> _loadInterests() async {
+    final prefs = await zayloService.getUserPreferences();
+    if (mounted && prefs != null) {
+      setState(() {
+        _selectedInterests = Set<String>.from(prefs['interests'] ?? []);
+        _isLoading = false;
+      });
+    } else if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _toggleInterest(String interest) async {
+    final newInterests = Set<String>.from(_selectedInterests);
+    if (newInterests.contains(interest)) {
+      newInterests.remove(interest);
+    } else {
+      if (newInterests.length >= 10) return;
+      newInterests.add(interest);
+    }
+
+    setState(() => _selectedInterests = newInterests);
+    
+    try {
+      await zayloService.updatePreference('interests', newInterests.toList());
+    } catch (e) {
+      debugPrint('Error updating interests from home: $e');
+    }
   }
 
   @override
@@ -69,10 +96,13 @@ class _ZayloHomeScreenState extends State<ZayloHomeScreen> {
                     ],
                   ),
                   IconButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const ZayloSettingsScreen()),
-                    ),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ZayloSettingsScreen()),
+                      );
+                      _loadInterests(); // Refresh interests when coming back
+                    },
                     icon: Icon(
                       Icons.settings_outlined,
                       color: isDark ? Colors.white : Colors.black87,
@@ -93,17 +123,19 @@ class _ZayloHomeScreenState extends State<ZayloHomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: _allInterests.map((interest) {
-                  return ZayloInterestChip(
-                    label: interest,
-                    isSelected: _selectedInterests.contains(interest),
-                    onTap: () => _toggleInterest(interest),
-                  );
-                }).toList(),
-              ),
+              _isLoading 
+                ? const Center(child: CircularProgressIndicator())
+                : Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: _allInterests.map((interest) {
+                      return ZayloInterestChip(
+                        label: interest,
+                        isSelected: _selectedInterests.contains(interest),
+                        onTap: () => _toggleInterest(interest),
+                      );
+                    }).toList(),
+                  ),
               const SizedBox(height: 50),
               ZayloGradientButton(
                 text: 'Start Matching',

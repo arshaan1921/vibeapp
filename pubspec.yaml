@@ -1,7 +1,7 @@
 name: high5
 description: "Ask anonymous questions and answer honestly with friends."
 publish_to: 'none'
-version: 1.0.47+48
+version: 1.0.48+49
 
 environment:
   sdk: ^3.11.0
@@ -40,6 +40,7 @@ dependencies:
   flutter_image_compress: ^2.3.0
   confetti: ^0.7.0
   gal: ^2.3.2
+  agora_rtc_engine: ^6.3.2
 
 dev_dependencies:
   flutter_test:

@@ -21,7 +21,6 @@ class _MatchingScreenState extends State<MatchingScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    // Pulse animation created once in initState
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -31,30 +30,36 @@ class _MatchingScreenState extends State<MatchingScreen> with SingleTickerProvid
   }
 
   void _startMatchingLoop() {
-    // Prevent multiple Timer.periodic instances by ensuring we only start it once
     if (_matchingTimer != null) return;
 
     _matchingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
-      // Polling should not rebuild the entire screen. We don't call setState here.
       if (_isPolling || _isNavigating) return;
       
       _isPolling = true;
       debugPrint('ZAYLO: Poll started');
       
       try {
-        final bool isMatched = await zayloService.findZayloMatch();
-        debugPrint('ZAYLO: Poll finished. Match found: $isMatched');
+        final result = await zayloService.findZayloMatch();
+        final bool isMatched = result['matched'] == true;
+        final String? matchId = result['match_id'];
         
-        if (isMatched && mounted && !_isNavigating) {
-          debugPrint('ZAYLO: Match found');
+        // CRITICAL: Verify both matched=true AND match_id exists
+        if (isMatched && matchId != null && mounted && !_isNavigating) {
+          debugPrint('ZAYLO: Match confirmed with match_id: $matchId');
           _isNavigating = true;
           _matchingTimer?.cancel();
           
-          debugPrint('ZAYLO: Navigation triggered');
+          debugPrint('ZAYLO: navigation triggered');
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const VideoChatScreen()),
           );
+        } else {
+          if (isMatched && matchId == null) {
+            debugPrint('ZAYLO: ERROR - Match reported true but match_id is null. Staying in Finding Someone screen.');
+          } else if (!isMatched) {
+            debugPrint('ZAYLO: No match yet. Staying on Finding Someone screen.');
+          }
         }
       } catch (e) {
         debugPrint('ZAYLO: Poll error: $e');
@@ -74,12 +79,10 @@ class _MatchingScreenState extends State<MatchingScreen> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    // The build method is clean and doesn't recreate controllers
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Background Glow
           Center(
             child: Container(
               width: 300,
@@ -97,15 +100,12 @@ class _MatchingScreenState extends State<MatchingScreen> with SingleTickerProvid
             ),
           ),
           
-          // Main Content - Wrapped in Positioned.fill to ensure full width/height and static layout
           Positioned.fill(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Spacer(),
-                // Animated Pulse Circle - Smooth animation remains smooth while polling
-                // Fixed size container prevents layout jitter
                 SizedBox(
                   width: 350,
                   height: 350,
@@ -131,7 +131,6 @@ class _MatchingScreenState extends State<MatchingScreen> with SingleTickerProvid
                   ),
                 ),
                 const Spacer(),
-                // Cancel Button - Fixed position
                 Padding(
                   padding: const EdgeInsets.only(bottom: 60),
                   child: GestureDetector(
