@@ -7,9 +7,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'theme.dart';
 import 'screens/feed.dart';
-import 'screens/trending_screen.dart';
-import 'screens/saved_screen.dart';
 import 'screens/profile.dart';
+import 'screens/trending_screen.dart';
 import 'services/notification_service.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/reset_password_page.dart';

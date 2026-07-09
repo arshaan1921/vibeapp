@@ -442,7 +442,7 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                 ),
                 actions: [
                   _buildBadgeIcon(Icons.favorite_border_rounded, likesCount, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => LikesActivityScreen())).then((_) => fetchNotificationCounts());
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const LikesActivityScreen())).then((_) => fetchNotificationCounts());
                   }),
                   _buildBadgeIcon(Icons.help_outline_rounded, questionsCount, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const QuestionsScreen())).then((_) => fetchNotificationCounts());
