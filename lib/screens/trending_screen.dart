@@ -305,7 +305,7 @@ class _TrendingScreenState extends State<TrendingScreen> with RouteAware {
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          "Trending 🔥",
+          "Trending",
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 24,

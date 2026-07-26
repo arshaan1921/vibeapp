@@ -526,7 +526,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildSocialField({
     required TextEditingController controller,
     required String label,
-    required IconData icon,
+    required dynamic icon,
     required bool isDark,
     required String hint,
   }) {
@@ -537,7 +537,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         labelText: label,
         hintText: hint,
         hintStyle: TextStyle(color: isDark ? Colors.white24 : Colors.black26, fontSize: 13),
-        prefixIcon: Icon(icon, size: 18, color: isDark ? Colors.white70 : Colors.black54),
+        prefixIcon: icon is IconData 
+            ? Icon(icon, size: 18, color: isDark ? Colors.white70 : Colors.black54)
+            : FaIcon(icon, size: 18, color: isDark ? Colors.white70 : Colors.black54),
         labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
         fillColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         filled: true,

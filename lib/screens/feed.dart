@@ -294,20 +294,20 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
   }
 
   Future<void> _fetchFeed() async {
-    print('FEED_TRACE: START');
+    debugPrint('FEED_TRACE: START');
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       final currentUserId = user?.id;
       
-      print('FEED_TRACE: Querying Supabase...');
+      debugPrint('FEED_TRACE: Querying Supabase...');
       final response = await supabase
           .from('answers')
           .select(_answerSelectQuery)
           .order('created_at', ascending: false);
           
       final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(response as List);
-      print('FEED_TRACE: ROWS = ${rawData.length}');
+      debugPrint('FEED_TRACE: ROWS = ${rawData.length}');
       
       Set<String> likedIds = {};
       if (user != null) {
@@ -327,18 +327,18 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
             .where((item) => !blockService.isBlocked(item.userId))
             .toList();
             
-            print('FEED ANSWERS = ${_feedItems.length}');
+            debugPrint('FEED ANSWERS = ${_feedItems.length}');
           } catch (e, st) {
-            print('FEED_TRACE: PARSE ERROR: $e');
-            print(st);
+            debugPrint('FEED_TRACE: PARSE ERROR: $e');
+            debugPrint(st.toString());
           }
           _sortFeed();
           _isLoading = false;
         });
       }
     } catch (e, st) {
-      print('FEED_TRACE: GLOBAL ERROR: $e');
-      print(st);
+      debugPrint('FEED_TRACE: GLOBAL ERROR: $e');
+      debugPrint(st.toString());
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -451,10 +451,6 @@ class _FeedScreenState extends State<FeedScreen> with RouteAware, WidgetsBinding
                   _buildBadgeIcon(Icons.reply_rounded, answersCount, () {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const AnswersActivityScreen())).then((_) => fetchNotificationCounts());
                   }),
-                  IconButton(
-                    icon: Icon(Icons.local_fire_department_rounded, size: 26, color: Colors.orangeAccent),
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrendingScreen())),
-                  ),
                   IconButton(
                     icon: Icon(Icons.add_circle_outline_rounded, size: 26, color: theme.colorScheme.onSurface),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AskAnyUserScreen())),

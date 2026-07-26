@@ -906,10 +906,23 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 color: Colors.black.withAlpha(13),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                s['icon'] as IconData,
-                size: 18,
-                color: Colors.black87,
+              child: Builder(
+                builder: (context) {
+                  final dynamic icon = s['icon'];
+                  if (icon is IconData) {
+                    return Icon(
+                      icon,
+                      size: 18,
+                      color: Colors.black87,
+                    );
+                  } else {
+                    return FaIcon(
+                      icon,
+                      size: 18,
+                      color: Colors.black87,
+                    );
+                  }
+                },
               ),
             ),
           );

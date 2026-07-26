@@ -54,20 +54,17 @@ class NotificationService {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
 
-    await _localNotificationsPlugin.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: (details) {
-        debugPrint("👆 Local notification clicked: ${details.payload}");
-        if (details.payload != null) {
-          try {
-            final data = jsonDecode(details.payload!);
-            _handleNavigation(data);
-          } catch (e) {
-            debugPrint("❌ Error parsing notification payload: $e");
-          }
+    await _localNotificationsPlugin.initialize(settings: initSettings, onDidReceiveNotificationResponse: (details) {
+      debugPrint("👆 Local notification clicked: ${details.payload}");
+      if (details.payload != null) {
+        try {
+          final data = jsonDecode(details.payload!);
+          _handleNavigation(data);
+        } catch (e) {
+          debugPrint("❌ Error parsing notification payload: $e");
         }
-      },
-    );
+      }
+    });
 
     const channel = AndroidNotificationChannel(
       'high5_channel',
@@ -355,13 +352,13 @@ class NotificationService {
       showWhen: true,
     );
 
-    const details = NotificationDetails(android: androidDetails);
+    const notificationDetails = NotificationDetails(android: androidDetails);
 
     await _localNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000,
-      title,
-      body,
-      details,
+      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title: title,
+      body: body,
+      notificationDetails: notificationDetails,
       payload: payload != null ? jsonEncode(payload) : null,
     );
   }

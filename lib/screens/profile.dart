@@ -1089,10 +1089,23 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
               color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              s['icon'] as IconData,
-              size: 18,
-              color: Theme.of(context).colorScheme.onSurface,
+            child: Builder(
+              builder: (context) {
+                final dynamic icon = s['icon'];
+                if (icon is IconData) {
+                  return Icon(
+                    icon,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  );
+                } else {
+                  return FaIcon(
+                    icon,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  );
+                }
+              },
             ),
           ),
         );
