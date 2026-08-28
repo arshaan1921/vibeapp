@@ -206,6 +206,21 @@ class NotificationService {
       debugPrint("👻 Friend accepted/Snap/Chat notification tapped");
       tabIndexNotifier.value = 3; // Navigate to SnapChats tab
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    } else if (type == 'mention') {
+      final originalType = data['original_type'];
+      final sourceId = data['source_id']?.toString();
+      debugPrint("🏷️ Mention notification tapped. Source: $originalType, ID: $sourceId");
+      
+      if (originalType == 'reply' || originalType == 'answer') {
+        if (sourceId != null) {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(builder: (_) => AnswerDetailScreen(answerId: sourceId)),
+          );
+        }
+      } else if (originalType == 'question') {
+        navigatorKey.currentState?.popUntil((route) => route.isFirst);
+        navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const QuestionsScreen()));
+      }
     } else if (type == 'streak_milestone') {
       final milestone = int.tryParse(data['milestone']?.toString() ?? '0') ?? 0;
       final streakId = data['streak_id']?.toString();

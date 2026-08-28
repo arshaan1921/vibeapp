@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../utils/image_utils.dart';
+import '../widgets/mention_input.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'onboarding/onboarding.dart';
 
@@ -662,10 +663,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
+                  MentionInput(
                     controller: _bioController,
-                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     maxLines: 3,
+                    style: TextStyle(color: isDark ? Colors.white : Colors.black87),
                     decoration: InputDecoration(
                       labelText: "Bio",
                       labelStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),

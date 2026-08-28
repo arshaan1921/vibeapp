@@ -11,6 +11,8 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/link_utils.dart';
 import 'profile.dart';
+import '../services/mention_service.dart';
+import '../widgets/mention_input.dart';
 import '../services/notification_service.dart';
 
 class AnswerViewScreen extends StatefulWidget {
@@ -185,81 +187,76 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 20,
-                right: 20,
-                top: 20,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Reply to @${_answer!['profiles']?['username']}",
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Reply to @${_answer!['profiles']?['username']}",
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _answer!['questions']?['text'] ?? "",
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _answer!['answer_text'] ?? "",
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _answer!['questions']?['text'] ?? "",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _answer!['answer_text'] ?? "",
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: replyController,
-                    maxLines: 3,
-                    autofocus: true,
-                    decoration: const InputDecoration(
+                    const SizedBox(height: 16),
+                    MentionInput(
+                      controller: replyController,
+                      maxLines: 3,
                       hintText: "Write a reply...",
-                      border: OutlineInputBorder(),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  PrimaryButton(
-                    text: "SEND REPLY",
-                    onPressed: isSending ? () {} : () {
-                      final text = replyController.text.trim();
-                      if (text.isEmpty) return;
-                      
-                      setModalState(() => isSending = true); // Step 3: Update sending logic
-                      
-                      _performSubmitReply(text).then((_) {
-                        if (mounted) {
-                          Navigator.pop(context);
-                          _fetchReplyCount();
-                          if (_showReplies) _fetchReplies();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Reply sent!")),
-                          );
-                        }
-                      }).catchError((e) {
-                        debugPrint("Error: $e");
-                      }).whenComplete(() {
-                        if (mounted) {
-                          setModalState(() => isSending = false);
-                        }
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                    const SizedBox(height: 16),
+                    PrimaryButton(
+                      text: "SEND REPLY",
+                      onPressed: isSending ? () {} : () {
+                        final text = replyController.text.trim();
+                        if (text.isEmpty) return;
+                        
+                        setModalState(() => isSending = true); // Step 3: Update sending logic
+                        
+                        _performSubmitReply(text).then((_) {
+                          if (mounted) {
+                            Navigator.pop(context);
+                            _fetchReplyCount();
+                            if (_showReplies) _fetchReplies();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Reply sent!")),
+                            );
+                          }
+                        }).catchError((e) {
+                          debugPrint("Error: $e");
+                        }).whenComplete(() {
+                          if (mounted) {
+                            setModalState(() => isSending = false);
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -323,6 +320,14 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
     } else {
       debugPrint("💬 REPLY_NOTIFICATION: ℹ️ Skipping notification: Self-reply or owner not found (ID: $answerOwnerId)");
     }
+
+    // 🔥 Notify Mentioned Users
+    await MentionService.notifyMentionedUsers(
+      text: text,
+      sourceId: widget.answerId,
+      type: 'reply',
+      sourceUser: user.id,
+    );
   }
 
   void _navigateToProfile(String? userId) {
@@ -688,8 +693,16 @@ class _AnswerViewScreenState extends State<AnswerViewScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 2),
-                                            Text(
-                                              reply['reply'] ?? "",
+                                            Linkify(
+                                              onOpen: (link) async {
+                                                await LinkUtils.handleLinkClick(context, link);
+                                              },
+                                              text: reply['reply'] ?? "",
+                                              linkifiers: const [
+                                                UrlLinkifier(),
+                                                EmailLinkifier(),
+                                                UserLinkifier(),
+                                              ],
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 color: isDark ? Colors.grey[300] : Colors.black87,

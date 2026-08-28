@@ -5,6 +5,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/question.dart';
 import '../utils/link_utils.dart';
 import '../services/notification_service.dart';
+import '../services/mention_service.dart';
+import '../widgets/mention_input.dart';
 
 class AnswerScreen extends StatefulWidget {
   final Question question;
@@ -145,6 +147,14 @@ class _AnswerScreenState extends State<AnswerScreen> {
         );
       }
 
+      // 🔥 Notify Mentioned Users
+      await MentionService.notifyMentionedUsers(
+        text: answerController.text.trim(),
+        sourceId: answerResponse['id'],
+        type: 'answer',
+        sourceUser: user.id,
+      );
+
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -259,7 +269,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            TextField(
+            MentionInput(
               controller: answerController,
               maxLines: 6,
               style: TextStyle(color: theme.textTheme.bodyLarge?.color),

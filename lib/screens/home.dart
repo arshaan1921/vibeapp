@@ -21,7 +21,7 @@ class HomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Hey ${currentUser.username}!',
+              'Hey there!',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -39,7 +39,7 @@ class HomeScreen extends StatelessWidget {
               color: Colors.deepPurple[400]!,
               onTap: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const AskQuestionScreen()),
+                MaterialPageRoute(builder: (context) => const AskScreen()),
               ),
             ),
             _HomeCard(
@@ -116,7 +116,7 @@ class _HomeCard extends StatelessWidget {
                   color: color,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(icon, color: Colors.white, size: 28),
+                child: Icon(icon, color: Colors.white, size: 28),
               ),
               const SizedBox(width: 20),
               Expanded(

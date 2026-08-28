@@ -82,7 +82,7 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> with Rout
       ),
       callback: (payload) async {
         final type = payload.newRecord['type'];
-        if (type != 'answer' && type != 'like' && type != 'reply') return;
+        if (type != 'answer' && type != 'like' && type != 'reply' && type != 'mention') return;
 
         final senderId = payload.newRecord['source_user'];
 
@@ -150,7 +150,7 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> with Rout
           .from('notifications')
           .update({'seen': true})
           .eq('user_id', user.id)
-          .inFilter('type', ['answer', 'like', 'reply'])
+          .inFilter('type', ['answer', 'like', 'reply', 'mention'])
           .eq('seen', false);
     } catch (e) {
       debugPrint("Error marking seen: $e");
@@ -169,7 +169,7 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> with Rout
           .from('notifications')
           .select()
           .eq('user_id', user.id)
-          .inFilter('type', ['answer', 'like', 'reply'])
+          .inFilter('type', ['answer', 'like', 'reply', 'mention'])
           .order('created_at', ascending: false);
 
       if (notifications.isEmpty) {
@@ -270,6 +270,10 @@ class _AnswersActivityScreenState extends State<AnswersActivityScreen> with Rout
             String actionText = " answered your question";
             if (type == 'like') actionText = " liked your answer";
             if (type == 'reply') actionText = " replied on your answer";
+            if (type == 'mention') {
+              final originalType = item['data']?['original_type'] ?? 'post';
+              actionText = " mentioned you in a $originalType";
+            }
 
             return Container(
               color: isNew

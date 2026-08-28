@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/notification_service.dart';
 import '../services/image_optimizer_service.dart';
+import '../services/mention_service.dart';
+import '../widgets/mention_input.dart';
 import 'premium.dart';
 
 class AskAnyUserScreen extends StatefulWidget {
@@ -99,13 +101,15 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
       }
 
       await supabase.rpc('register_question', params: {'uid': currentUser.id});
-      await supabase.from('questions').insert({
+      final questionRes = await supabase.from('questions').insert({
         'from_user': isAnonymous ? null : currentUser.id, 
         'to_user': selectedUserId, 
         'text': text,
         'is_anonymous': isAnonymous,
         'image_url': imageUrl,
-      });
+      }).select('id').single();
+
+      final String questionId = questionRes['id'].toString();
 
       // Send Push Notification
       try {
@@ -116,8 +120,18 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
           userId: selectedUserId!,
           title: "New Question 📥",
           body: isAnonymous ? "You got a new anonymous question!" : "@$senderName asked you a question",
-          data: {"type": "question"},
+          data: {"type": "question", "question_id": questionId},
         );
+
+        // 🔥 Notify Mentioned Users
+        if (!isAnonymous) {
+          await MentionService.notifyMentionedUsers(
+            text: text,
+            sourceId: questionId,
+            type: 'question',
+            sourceUser: currentUser.id,
+          );
+        }
       } catch (e) {
         debugPrint("Error sending question notification: $e");
       }
@@ -147,11 +161,10 @@ class _AskAnyUserScreenState extends State<AskAnyUserScreen> {
               decoration: const InputDecoration(hintText: "Username", prefixText: "@"),
             ),
             const SizedBox(height: 16),
-            TextField(
+            MentionInput(
               controller: questionController,
-              minLines: 5,
-              maxLines: null,
-              decoration: const InputDecoration(hintText: "Type your question here..."),
+              maxLines: 5,
+              hintText: "Type your question here...",
             ),
             const SizedBox(height: 16),
             Row(

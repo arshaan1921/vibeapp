@@ -18,6 +18,8 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/link_utils.dart';
 import '../services/notification_service.dart';
+import '../services/mention_service.dart';
+import '../widgets/mention_input.dart';
 
 class AnswerCard extends StatefulWidget {
   final AnswerModel answer;
@@ -406,43 +408,40 @@ class _AnswerCardState extends State<AnswerCard> with AutomaticKeepAliveClientMi
           builder: (context, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                left: 20,
-                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Reply to @${widget.answer.username}",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: replyController,
-                    maxLines: null,
-                    autofocus: true,
-                    decoration: const InputDecoration(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Reply to @${widget.answer.username}",
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    MentionInput(
+                      controller: replyController,
+                      maxLines: 3,
                       hintText: "Write a reply...",
-                      border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: isSending ? null : () {
-                      final text = replyController.text.trim();
-                      if (text.isEmpty) return;
-                      setModalState(() => isSending = true);
-                      _submitReply(text, setModalState);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: isSending ? null : () {
+                        final text = replyController.text.trim();
+                        if (text.isEmpty) return;
+                        setModalState(() => isSending = true);
+                        _submitReply(text, setModalState);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: isSending ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("SEND REPLY"),
                     ),
-                    child: isSending ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text("SEND REPLY"),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -507,6 +506,14 @@ class _AnswerCardState extends State<AnswerCard> with AutomaticKeepAliveClientMi
       } else {
         debugPrint("💬 REPLY_NOTIFICATION: ℹ️ Skipping notification: Self-reply or owner not found (ID: $answerOwnerId)");
       }
+
+      // 🔥 Notify Mentioned Users
+      await MentionService.notifyMentionedUsers(
+        text: text,
+        sourceId: widget.answer.id,
+        type: 'reply',
+        sourceUser: user.id,
+      );
 
       if (mounted) {
         Navigator.pop(context);
@@ -834,7 +841,16 @@ class _AnswerCardState extends State<AnswerCard> with AutomaticKeepAliveClientMi
                       ),
                   ],
                 ),
-                Text(reply['reply'] ?? "", style: const TextStyle(fontSize: 12)),
+                Linkify(
+                  onOpen: _onOpen,
+                  text: reply['reply'] ?? "",
+                  linkifiers: const [
+                    UrlLinkifier(),
+                    EmailLinkifier(),
+                    UserLinkifier(),
+                  ],
+                  style: const TextStyle(fontSize: 12),
+                ),
               ],
             ),
           ),

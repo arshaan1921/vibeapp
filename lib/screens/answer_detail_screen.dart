@@ -6,6 +6,10 @@ import 'profile.dart';
 import '../widgets/primary_button.dart';
 import '../services/block_service.dart';
 import '../services/like_service.dart';
+import 'package:flutter_linkify/flutter_linkify.dart';
+import '../utils/link_utils.dart';
+import '../widgets/mention_input.dart';
+import '../services/mention_service.dart';
 import '../services/notification_service.dart';
 import '../main.dart';
 
@@ -182,64 +186,59 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 20,
-                right: 20,
-                top: 20,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Reply to @${_answer!['profiles']?['username']}",
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Reply to @${_answer!['profiles']?['username']}",
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _answer!['questions']?['text'] ?? "",
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _answer!['answer_text'] ?? "",
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _answer!['questions']?['text'] ?? "",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _answer!['answer_text'] ?? "",
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: replyController,
-                    maxLines: 3,
-                    autofocus: true,
-                    decoration: const InputDecoration(
+                    const SizedBox(height: 16),
+                    MentionInput(
+                      controller: replyController,
+                      maxLines: 3,
                       hintText: "Write a reply...",
-                      border: OutlineInputBorder(),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  PrimaryButton(
-                    text: isSending ? "SENDING..." : "SEND REPLY",
-                    onPressed: isSending ? () {} : () {
-                      final text = replyController.text.trim();
-                      if (text.isEmpty) return;
-                      setModalState(() => isSending = true);
-                      _submitReply(text, setModalState);
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                ],
+                    const SizedBox(height: 16),
+                    PrimaryButton(
+                      text: isSending ? "SENDING..." : "SEND REPLY",
+                      onPressed: isSending ? () {} : () {
+                        final text = replyController.text.trim();
+                        if (text.isEmpty) return;
+                        setModalState(() => isSending = true);
+                        _submitReply(text, setModalState);
+                      },
+                    ),
+                  ],
+                ),
               ),
             );
           },
@@ -306,6 +305,14 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
       } else {
         debugPrint("💬 REPLY_NOTIFICATION: ℹ️ Skipping notification: Self-reply or owner not found (ID: $answerOwnerId)");
       }
+
+      // 🔥 Notify Mentioned Users
+      await MentionService.notifyMentionedUsers(
+        text: text,
+        sourceId: widget.answerId,
+        type: 'reply',
+        sourceUser: user.id,
+      );
 
       if (mounted) {
         Navigator.pop(context);
@@ -417,8 +424,16 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            _answer!['answer_text'] ?? "",
+                          Linkify(
+                            onOpen: (link) async {
+                              await LinkUtils.handleLinkClick(context, link);
+                            },
+                            text: _answer!['answer_text'] ?? "",
+                            linkifiers: const [
+                              UrlLinkifier(),
+                              EmailLinkifier(),
+                              UserLinkifier(),
+                            ],
                             style: const TextStyle(fontSize: 14, color: Colors.black87),
                             softWrap: true,
                           ),
@@ -530,8 +545,16 @@ class _AnswerDetailScreenState extends State<AnswerDetailScreen> with RouteAware
                                           ],
                                         ),
                                         const SizedBox(height: 2),
-                                        Text(
-                                          reply['reply'] ?? "",
+                                        Linkify(
+                                          onOpen: (link) async {
+                                            await LinkUtils.handleLinkClick(context, link);
+                                          },
+                                          text: reply['reply'] ?? "",
+                                          linkifiers: const [
+                                            UrlLinkifier(),
+                                            EmailLinkifier(),
+                                            UserLinkifier(),
+                                          ],
                                           style: const TextStyle(fontSize: 13),
                                         ),
                                       ],
