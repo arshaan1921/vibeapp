@@ -18,7 +18,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.v1be.v1be"
-    compileSdk = 36 
+    compileSdk = 36
     ndkVersion = "28.0.12433566"
 
     compileOptions {
@@ -88,8 +88,8 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-    implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
-    implementation("androidx.activity:activity-ktx:1.9.3")
+    implementation(platform("com.google.firebase:firebase-bom:34.18.0"))
+    implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.datastore:datastore-android:1.1.2")
+    implementation("androidx.datastore:datastore-android:1.1.3")
 }

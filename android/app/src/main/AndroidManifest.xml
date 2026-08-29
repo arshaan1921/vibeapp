@@ -17,7 +17,8 @@
         android:label="High5"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:resizeableActivity="true">
+        android:resizeableActivity="true"
+        android:extractNativeLibs="false">
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
