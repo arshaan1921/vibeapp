@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../main.dart';
+import '../theme.dart';
 import '../models/answer.dart';
 import 'settings_screen.dart';
 import 'streak_achievement_screen.dart';
@@ -26,6 +27,8 @@ import 'saved_screen.dart';
 import '../services/friend_service.dart';
 import '../utils/link_utils.dart';
 import '../features/snap/screens/chat_screen.dart';
+import '../features/admin/services/admin_access_service.dart';
+import '../features/admin/screens/admin_dashboard_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -107,44 +110,48 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
     _realtimeChannel = supabase.channel('profile_realtime_$targetId');
 
-    _realtimeChannel!.onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'answers',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'user_id',
-        value: targetId,
-      ),
-      callback: (payload) {
-        if (payload.eventType == PostgresChangeEvent.insert || 
-            payload.eventType == PostgresChangeEvent.delete) {
-          _fetchAnswers();
-        } else if (payload.eventType == PostgresChangeEvent.update) {
-          if (mounted) {
-            setState(() {
-              final index = _answers.indexWhere((a) => a.id == payload.newRecord['id'].toString());
-              if (index != -1) {
-                _answers[index] = _answers[index].copyWith(
-                  likeCount: payload.newRecord['likes_count'],
-                  isPinned: payload.newRecord['is_pinned'],
-                );
-                _sortAnswers();
+    _realtimeChannel!
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'answers',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: targetId,
+          ),
+          callback: (payload) {
+            if (payload.eventType == PostgresChangeEvent.insert ||
+                payload.eventType == PostgresChangeEvent.delete) {
+              _fetchAnswers();
+            } else if (payload.eventType == PostgresChangeEvent.update) {
+              if (mounted) {
+                setState(() {
+                  final index = _answers.indexWhere(
+                      (a) => a.id == payload.newRecord['id'].toString());
+                  if (index != -1) {
+                    _answers[index] = _answers[index].copyWith(
+                      likeCount: payload.newRecord['likes_count'],
+                      isPinned: payload.newRecord['is_pinned'],
+                    );
+                    _sortAnswers();
+                  }
+                });
               }
-            });
-          }
-        }
-      },
-    ).onPostgresChanges(
-      event: PostgresChangeEvent.all,
-      schema: 'public',
-      table: 'friends',
-      callback: (payload) {
-        debugPrint('FRIEND_AUDIT: Friends table changed, refreshing count');
-        _fetchFriendsCount();
-        _checkFriendship();
-      },
-    ).subscribe();
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'friends',
+          callback: (payload) {
+            debugPrint('FRIEND_AUDIT: Friends table changed, refreshing count');
+            _fetchFriendsCount();
+            _checkFriendship();
+          },
+        )
+        .subscribe();
   }
 
   void _sortAnswers() {
@@ -155,13 +162,30 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     });
   }
 
+  bool _isAdmin = false;
+
+  Future<void> _checkAdminAccess() async {
+    final isMe = widget.userId == null ||
+        widget.userId == Supabase.instance.client.auth.currentUser?.id;
+    if (!isMe) {
+      if (mounted) setState(() => _isAdmin = false);
+      return;
+    }
+    final isAdmin = await AdminAccessService().checkIsAdmin();
+    if (mounted) {
+      setState(() {
+        _isAdmin = isAdmin;
+      });
+    }
+  }
+
   Future<void> _loadData() async {
     if (widget.userId != null && blockService.isBlocked(widget.userId!)) {
-       setState(() {
-          errorMessage = "This user is blocked or has blocked you.";
-          isLoading = false;
-       });
-       return;
+      setState(() {
+        errorMessage = "This user is blocked or has blocked you.";
+        isLoading = false;
+      });
+      return;
     }
 
     await Future.wait<dynamic>([
@@ -171,18 +195,20 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       _fetchRemainingQuestions(),
       _fetchFriendsCount(),
       _fetchStreak(),
+      _checkAdminAccess(),
     ]);
   }
 
   Future<void> _fetchFriendsCount() async {
     try {
-      final targetId = widget.userId ?? Supabase.instance.client.auth.currentUser?.id;
+      final targetId =
+          widget.userId ?? Supabase.instance.client.auth.currentUser?.id;
       if (targetId == null) return;
 
       debugPrint('FRIEND_AUDIT: Fetching friends count for $targetId');
       final count = await friendService.getFriendsCount(targetId);
       debugPrint('FRIEND_AUDIT: Friends count for $targetId = $count');
-      
+
       if (mounted) {
         setState(() {
           _friendsCount = count;
@@ -203,7 +229,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       debugPrint('FRIEND_AUDIT: Checking friendship status for $targetId');
       final status = await friendService.getFriendshipStatus(targetId);
       final mutual = await friendService.getMutualFriendsCount(targetId);
-      debugPrint('FRIEND_AUDIT: Friend status for $targetId = $status, mutual = $mutual');
+      debugPrint(
+          'FRIEND_AUDIT: Friend status for $targetId = $status, mutual = $mutual');
 
       if (mounted) {
         setState(() {
@@ -223,7 +250,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
     try {
       final supabase = Supabase.instance.client;
-      
+
       // 1. Check if user is a Century Club Member (streak >= 100 with anyone)
       final profileTargetId = targetId ?? currentUser.id;
       final clubRes = await supabase
@@ -233,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           .gte('streak_count', 100)
           .order('streak_count', ascending: false)
           .limit(1);
-      
+
       final List<dynamic> clubData = clubRes as List;
       if (mounted) {
         setState(() {
@@ -250,9 +277,10 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       if (targetId != null && targetId != currentUser.id) {
         final streaksRes = await supabase
             .from('snap_streaks')
-            .select('*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
+            .select(
+                '*, id, user1_id, user2_id, streak_count, broken_streak_count, is_restoreable, restore_deadline, last_exchange_at')
             .or('user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}');
-        
+
         final streaks = List<dynamic>.from(streaksRes as List);
         final streakRow = streaks.firstWhere(
           (s) =>
@@ -263,7 +291,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
         if (streakRow != null) {
           final streak = SnapStreak.fromMap(streakRow);
-          debugPrint('STREAK_DEBUG: friendId=$targetId, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
+          debugPrint(
+              'STREAK_DEBUG: friendId=$targetId, streakId=${streak.id}, streakCount=${streak.streakCount}, brokenStreakCount=${streak.brokenStreakCount}, isRestoreable=${streak.isRestoreable}, canBeRestored=${streak.canBeRestored}');
           if (mounted) {
             setState(() {
               _currentStreakData = streak;
@@ -280,7 +309,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
   Future<void> _handleFriendAction() async {
     if (widget.userId == null) return;
-    
+
     try {
       if (_friendshipStatus == 'friends') {
         _showUnfriendOptions();
@@ -289,12 +318,14 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
       if (_friendshipStatus == 'none' || _friendshipStatus == 'declined') {
         await friendService.sendFriendRequest(widget.userId!);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request sent!")));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Friend request sent!")));
       } else if (_friendshipStatus == 'pending_sent') {
         await friendService.cancelFriendRequest(widget.userId!);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request cancelled")));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Friend request cancelled")));
       } else if (_friendshipStatus == 'pending_received') {
-        // Find the request ID and accept it. 
+        // Find the request ID and accept it.
         // For simplicity in this UI, we can navigate to the requests screen or handle it here.
         // Let's just fetch the request ID.
         final res = await Supabase.instance.client
@@ -304,19 +335,21 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
             .eq('receiver_id', Supabase.instance.client.auth.currentUser!.id)
             .eq('status', 'pending')
             .maybeSingle();
-        
+
         if (res != null) {
           await friendService.acceptFriendRequest(res['id'], widget.userId!);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend request accepted!")));
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Friend request accepted!")));
         }
       }
-      
+
       await _checkFriendship();
       await _fetchFriendsCount();
     } catch (e) {
       debugPrint('Error handling friend action: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Action failed: $e")));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Action failed: $e")));
       }
     }
   }
@@ -325,15 +358,19 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.person_remove_rounded, color: Colors.redAccent),
-                title: const Text("Remove Friend", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                leading: const Icon(Icons.person_remove_rounded,
+                    color: Colors.redAccent),
+                title: const Text("Remove Friend",
+                    style: TextStyle(
+                        color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 onTap: () {
                   Navigator.pop(context);
                   _confirmUnfriend();
@@ -341,7 +378,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
               ),
               ListTile(
                 leading: const Icon(Icons.block_rounded),
-                title: const Text("Block User", style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text("Block User",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 onTap: () {
                   Navigator.pop(context);
                   _confirmBlock();
@@ -349,7 +387,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
               ),
               ListTile(
                 leading: const Icon(Icons.cancel_rounded),
-                title: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text("Cancel",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 onTap: () => Navigator.pop(context),
               ),
               const SizedBox(height: 12),
@@ -365,15 +404,20 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Remove Friend?"),
-        content: const Text("You will no longer appear in each other's friend lists."),
+        content: const Text(
+            "You will no longer appear in each other's friend lists."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("CANCEL")),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _unfriendUser();
             },
-            child: const Text("REMOVE FRIEND", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text("REMOVE FRIEND",
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -385,10 +429,11 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     try {
       debugPrint('FRIEND_AUDIT: Unfriending user ${widget.userId}');
       await friendService.unfriend(widget.userId!);
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Friend removed")));
-        
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("Friend removed")));
+
         // Immediate UI update
         setState(() {
           _friendshipStatus = 'none';
@@ -408,11 +453,19 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       final targetId = widget.userId ?? supabase.auth.currentUser?.id;
 
       if (targetId == null) {
-        if (mounted) setState(() { isLoading = false; errorMessage = "Not logged in"; });
+        if (mounted)
+          setState(() {
+            isLoading = false;
+            errorMessage = "Not logged in";
+          });
         return;
       }
 
-      final data = await supabase.from('profiles').select().eq('id', targetId).maybeSingle();
+      final data = await supabase
+          .from('profiles')
+          .select()
+          .eq('id', targetId)
+          .maybeSingle();
 
       if (mounted) {
         setState(() {
@@ -435,7 +488,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       final targetId = widget.userId ?? user?.id;
 
       debugPrint('PROFILE TARGET ID = $targetId');
-      debugPrint('CURRENT USER ID = ${Supabase.instance.client.auth.currentUser?.id}');
+      debugPrint(
+          'CURRENT USER ID = ${Supabase.instance.client.auth.currentUser?.id}');
 
       if (targetId == null) {
         print('PROFILE_TRACE: NO TARGET ID');
@@ -447,23 +501,32 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       // Reverted to more reliable table-only join syntax
       final response = await supabase
           .from('answers')
-          .select('*, profiles!user_id(username, avatar_url, premium_plan), questions!question_id(text, image_url, is_anonymous, from_user, asker:profiles!from_user(id, username))')
+          .select(
+              '*, profiles!user_id(username, avatar_url, premium_plan), questions!question_id(text, image_url, is_anonymous, from_user, asker:profiles!from_user(id, username))')
           .eq('user_id', targetId)
           .order('created_at', ascending: false);
 
       final responseList = response as List;
       print('PROFILE_TRACE: ROWS = ${responseList.length}');
       if (mounted) {
-        final List<Map<String, dynamic>> rawData = List<Map<String, dynamic>>.from(responseList);
-        
+        final List<Map<String, dynamic>> rawData =
+            List<Map<String, dynamic>>.from(responseList);
+
         Set<String> likedIds = {};
         if (user != null) {
-          final likesRes = await supabase.from('answer_likes').select('answer_id').eq('user_id', user.id);
-          likedIds = (likesRes as List).map((l) => l['answer_id'].toString()).toSet();
+          final likesRes = await supabase
+              .from('answer_likes')
+              .select('answer_id')
+              .eq('user_id', user.id);
+          likedIds =
+              (likesRes as List).map((l) => l['answer_id'].toString()).toSet();
         }
 
         try {
-          final answers = rawData.map((map) => AnswerModel.fromMap(map, isLiked: likedIds.contains(map['id'].toString()))).toList();
+          final answers = rawData
+              .map((map) => AnswerModel.fromMap(map,
+                  isLiked: likedIds.contains(map['id'].toString())))
+              .toList();
 
           int totalLikes = 0;
           for (var a in answers) {
@@ -493,7 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     try {
       final supabase = Supabase.instance.client;
       await supabase.from('answers').delete().eq('id', answerId);
-      
+
       // Update UI immediately
       if (mounted) {
         setState(() {
@@ -503,7 +566,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           const SnackBar(content: Text("Answer deleted")),
         );
       }
-      
+
       // Refresh to sync counts and logic
       _fetchAnswers();
       _fetchFriendsCount();
@@ -524,7 +587,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      final response = await supabase.rpc('get_total_remaining_questions', params: {'uid': user.id});
+      final response = await supabase
+          .rpc('get_total_remaining_questions', params: {'uid': user.id});
       if (mounted) {
         setState(() {
           _remainingQuestions = response as int;
@@ -540,15 +604,19 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.block_rounded, color: Colors.redAccent),
-                title: const Text("Block User", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                leading:
+                    const Icon(Icons.block_rounded, color: Colors.redAccent),
+                title: const Text("Block User",
+                    style: TextStyle(
+                        color: Colors.redAccent, fontWeight: FontWeight.bold)),
                 onTap: () {
                   Navigator.pop(context);
                   _confirmBlock();
@@ -556,7 +624,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
               ),
               ListTile(
                 leading: const Icon(Icons.report_problem_outlined),
-                title: const Text("Report User", style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text("Report User",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 onTap: () {
                   Navigator.pop(context);
                   // _showReportModal();
@@ -575,15 +644,20 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Block User"),
-        content: const Text("Are you sure you want to block this user? You won't see their content, and they won't see yours."),
+        content: const Text(
+            "Are you sure you want to block this user? You won't see their content, and they won't see yours."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("CANCEL")),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("CANCEL")),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _blockUser();
             },
-            child: const Text("BLOCK", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text("BLOCK",
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -602,21 +676,30 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint("PROFILE_BUILD: answers=${_answers.length}, loading=$_loadingAnswers");
-    if (isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (errorMessage != null) return const Scaffold(body: Center(child: Text("Error loading profile")));
+    debugPrint(
+        "PROFILE_BUILD: answers=${_answers.length}, loading=$_loadingAnswers");
+    if (isLoading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (errorMessage != null)
+      return const Scaffold(body: Center(child: Text("Error loading profile")));
 
     final theme = Theme.of(context);
     final bool isDarkMode = theme.brightness == Brightness.dark;
-    final isMe = widget.userId == null || widget.userId == Supabase.instance.client.auth.currentUser?.id;
+    final isMe = widget.userId == null ||
+        widget.userId == Supabase.instance.client.auth.currentUser?.id;
     final plan = profileData!['premium_plan'] ?? 'free';
-    final joinedAt = profileData!['created_at'] != null 
-        ? DateFormat('MMMM yyyy').format(DateTime.parse(profileData!['created_at']))
+    final joinedAt = profileData!['created_at'] != null
+        ? DateFormat('MMMM yyyy')
+            .format(DateTime.parse(profileData!['created_at']))
         : 'Unknown';
-    
+
     return Scaffold(
       appBar: AppBar(
-        title: Text("@${profileData!['username'] ?? 'user'}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        title: Text("@${profileData!['username'] ?? 'user'}",
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -625,14 +708,40 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
             icon: Icon(Icons.share_rounded, color: theme.colorScheme.onSurface),
             onPressed: () {
               final username = profileData?['username'] ?? 'user';
-              Share.share("Check out @$username on High5! https://v1beapp.page.link/profile");
+              Share.share(
+                  "Check out @$username on High5! https://v1beapp.page.link/profile");
             },
           ),
           if (isMe) ...[
-            IconButton(icon: Icon(Icons.search_rounded, color: theme.colorScheme.onSurface), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchScreen()))),
-            IconButton(icon: Icon(Icons.settings_outlined, color: theme.colorScheme.onSurface), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())).then((_) => _loadData())),
+            if (_isAdmin)
+              IconButton(
+                icon: const Icon(Icons.admin_panel_settings_rounded,
+                    color: AppTheme.accentColor),
+                tooltip: 'Admin Dashboard',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const AdminDashboardScreen()),
+                ).then((_) => _loadData()),
+              ),
+            IconButton(
+                icon: Icon(Icons.search_rounded,
+                    color: theme.colorScheme.onSurface),
+                onPressed: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const SearchScreen()))),
+            IconButton(
+                icon: Icon(Icons.settings_outlined,
+                    color: theme.colorScheme.onSurface),
+                onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const SettingsScreen()))
+                    .then((_) => _loadData())),
           ] else ...[
-            IconButton(icon: Icon(Icons.more_horiz_rounded, color: theme.colorScheme.onSurface), onPressed: _showEllipsisMenu),
+            IconButton(
+                icon: Icon(Icons.more_horiz_rounded,
+                    color: theme.colorScheme.onSurface),
+                onPressed: _showEllipsisMenu),
           ],
           const SizedBox(width: 8),
         ],
@@ -645,7 +754,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -653,12 +763,15 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           GestureDetector(
-                            onTap: () => ImageUtils.showImagePreview(context, profileData!['avatar_url']),
+                            onTap: () => ImageUtils.showImagePreview(
+                                context, profileData!['avatar_url']),
                             child: Container(
                               padding: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: PremiumUtils.getRingColor(plan), width: 2.5),
+                                border: Border.all(
+                                    color: PremiumUtils.getRingColor(plan),
+                                    width: 2.5),
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(21.5),
@@ -672,13 +785,22 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                   placeholder: (context, url) => Container(
                                     width: 78,
                                     height: 78,
-                                    color: isDarkMode ? Colors.white10 : Colors.grey[200],
+                                    color: isDarkMode
+                                        ? Colors.white10
+                                        : Colors.grey[200],
                                   ),
-                                  errorWidget: (context, url, error) => Container(
+                                  errorWidget: (context, url, error) =>
+                                      Container(
                                     width: 78,
                                     height: 78,
-                                    color: isDarkMode ? Colors.white10 : Colors.grey[200],
-                                    child: Icon(Icons.person, size: 40, color: isDarkMode ? Colors.white38 : Colors.white),
+                                    color: isDarkMode
+                                        ? Colors.white10
+                                        : Colors.grey[200],
+                                    child: Icon(Icons.person,
+                                        size: 40,
+                                        color: isDarkMode
+                                            ? Colors.white38
+                                            : Colors.white),
                                   ),
                                 ),
                               ),
@@ -690,8 +812,12 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  profileData!['name'] ?? "No Name", 
-                                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5, color: theme.colorScheme.onSurface),
+                                  profileData!['name'] ?? "No Name",
+                                  style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: -0.5,
+                                      color: theme.colorScheme.onSurface),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -700,22 +826,32 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        "@${profileData!['username']}", 
-                                        style: theme.textTheme.bodyMedium?.copyWith(color: isDarkMode ? Colors.white70 : Colors.grey[700], fontWeight: FontWeight.w600),
+                                        "@${profileData!['username']}",
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                                color: isDarkMode
+                                                    ? Colors.white70
+                                                    : Colors.grey[700],
+                                                fontWeight: FontWeight.w600),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (!isMe && _currentStreakData != null) ...[
+                                    if (!isMe &&
+                                        _currentStreakData != null) ...[
                                       const SizedBox(width: 4),
-                                      StreakBadge(streakData: _currentStreakData, fontSize: 14),
+                                      StreakBadge(
+                                          streakData: _currentStreakData,
+                                          fontSize: 14),
                                     ],
                                     PremiumUtils.buildBadge(plan),
-                                    if (profileData!['is_verified'] == true) 
-                                      const Icon(Icons.verified_rounded, color: Colors.blue, size: 18),
+                                    if (profileData!['is_verified'] == true)
+                                      const Icon(Icons.verified_rounded,
+                                          color: Colors.blue, size: 18),
                                     if (profileData!['is_founder'] == true)
                                       const Padding(
                                         padding: EdgeInsets.only(left: 4),
-                                        child: Icon(Icons.star_rounded, color: Colors.orange, size: 18),
+                                        child: Icon(Icons.star_rounded,
+                                            color: Colors.orange, size: 18),
                                       ),
                                   ],
                                 ),
@@ -724,11 +860,17 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                     padding: const EdgeInsets.only(top: 4),
                                     child: Text(
                                       "$_mutualFriendsCount mutual ${_mutualFriendsCount == 1 ? 'friend' : 'friends'}",
-                                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey, fontWeight: FontWeight.bold),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                              color: Colors.grey,
+                                              fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 const SizedBox(height: 4),
-                                Text("Joined $joinedAt", style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey, fontWeight: FontWeight.w500)),
+                                Text("Joined $joinedAt",
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.w500)),
                               ],
                             ),
                           ),
@@ -737,7 +879,10 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       const SizedBox(height: 20),
                       Linkify(
                         text: profileData!['bio'] ?? "No bio yet",
-                        style: theme.textTheme.bodyLarge?.copyWith(height: 1.5, fontSize: 15, color: theme.colorScheme.onSurface),
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                            height: 1.5,
+                            fontSize: 15,
+                            color: theme.colorScheme.onSurface),
                         linkifiers: const [
                           UrlLinkifier(),
                           EmailLinkifier(),
@@ -745,47 +890,64 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                         ],
                         onOpen: _handleLinkClick,
                         linkStyle: TextStyle(
-                          color: isDarkMode ? Colors.lightBlueAccent : theme.colorScheme.primary,
+                          color: isDarkMode
+                              ? Colors.lightBlueAccent
+                              : theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
                           decoration: TextDecoration.none,
                         ),
                       ),
                       const SizedBox(height: 12),
                       if (profileData!['show_gmail'] == true &&
-                          profileData!['gmail_address'] != null && 
+                          profileData!['gmail_address'] != null &&
                           profileData!['gmail_address'].toString().isNotEmpty)
                         _buildContactEmailRow(),
                       const SizedBox(height: 16),
                       if (profileData!['show_social_links'] != false)
                         _buildSocialLinksRow(),
-                      
+
                       // Streak Restore Card (if applicable)
-                      if (_currentStreakData != null && _currentStreakData!.canBeRestored && _currentStreakData!.brokenStreakCount > 0)
+                      if (_currentStreakData != null &&
+                          _currentStreakData!.canBeRestored &&
+                          _currentStreakData!.brokenStreakCount > 0)
                         Padding(
                           padding: const EdgeInsets.only(top: 20),
                           child: _buildRestoreStreakCard(),
                         ),
-                      
+
                       if (isMe)
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withOpacity(isDarkMode ? 0.2 : 0.08),
+                              color: theme.colorScheme.primary
+                                  .withOpacity(isDarkMode ? 0.2 : 0.08),
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: theme.colorScheme.primary.withOpacity(0.1)),
+                              border: Border.all(
+                                  color: theme.colorScheme.primary
+                                      .withOpacity(0.1)),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.bolt_rounded, size: 20, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
+                                Icon(Icons.bolt_rounded,
+                                    size: 20,
+                                    color: isDarkMode
+                                        ? Colors.greenAccent
+                                        : theme.colorScheme.primary),
                                 const SizedBox(width: 10),
                                 Text(
                                   PremiumUtils.getQuestionLimit(plan) >= 999999
                                       ? "Unlimited questions"
                                       : "${_remainingQuestions + (PremiumUtils.getQuestionLimit(plan) - 20)} questions left today",
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.greenAccent : theme.colorScheme.primary),
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode
+                                          ? Colors.greenAccent
+                                          : theme.colorScheme.primary),
                                 ),
                               ],
                             ),
@@ -795,7 +957,9 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.05),
+                          color: isDarkMode
+                              ? Colors.white.withOpacity(0.05)
+                              : Colors.grey.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -803,21 +967,37 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                             Expanded(
                               child: InkWell(
                                 onTap: () {
-                                  final targetId = widget.userId ?? Supabase.instance.client.auth.currentUser?.id;
+                                  final targetId = widget.userId ??
+                                      Supabase
+                                          .instance.client.auth.currentUser?.id;
                                   if (targetId == null) return;
                                   Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (_) => FriendsListScreen(userId: targetId)),
+                                    MaterialPageRoute(
+                                        builder: (_) => FriendsListScreen(
+                                            userId: targetId)),
                                   ).then((_) => _loadData());
                                 },
                                 borderRadius: BorderRadius.circular(12),
-                                child: _buildStatItem(_friendsCount == 1 ? "Friend" : "Friends", _friendsCount.toString()),
+                                child: _buildStatItem(
+                                    _friendsCount == 1 ? "Friend" : "Friends",
+                                    _friendsCount.toString()),
                               ),
                             ),
-                            Container(width: 1, height: 30, color: Colors.grey.withOpacity(0.2)),
-                            Expanded(child: _buildStatItem("Likes", _likesCount.toString())),
-                            Container(width: 1, height: 30, color: Colors.grey.withOpacity(0.2)),
-                            Expanded(child: _buildStatItem("Answers", _answers.length.toString())),
+                            Container(
+                                width: 1,
+                                height: 30,
+                                color: Colors.grey.withOpacity(0.2)),
+                            Expanded(
+                                child: _buildStatItem(
+                                    "Likes", _likesCount.toString())),
+                            Container(
+                                width: 1,
+                                height: 30,
+                                color: Colors.grey.withOpacity(0.2)),
+                            Expanded(
+                                child: _buildStatItem(
+                                    "Answers", _answers.length.toString())),
                           ],
                         ),
                       ),
@@ -828,14 +1008,23 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                             Expanded(
                               flex: 5,
                               child: ElevatedButton(
-                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AskAnyUserScreen(userId: widget.userId))).then((_) => _loadData()),
+                                onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) => AskAnyUserScreen(
+                                                userId: widget.userId)))
+                                    .then((_) => _loadData()),
                                 style: ElevatedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(56),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
                                   elevation: 0,
                                 ),
                                 child: const FittedBox(
-                                  child: Text("ASK QUESTION", style: TextStyle(letterSpacing: 1, fontWeight: FontWeight.bold)),
+                                  child: Text("ASK QUESTION",
+                                      style: TextStyle(
+                                          letterSpacing: 1,
+                                          fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ),
@@ -846,21 +1035,25 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                                 onPressed: _handleFriendAction,
                                 style: OutlinedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(56),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  side: BorderSide(
+                                      color: theme.colorScheme.primary,
+                                      width: 1.5),
                                 ),
                                 child: FittedBox(
                                   child: Text(
-                                    _friendshipStatus == 'friends' 
-                                        ? "FRIENDS" 
+                                    _friendshipStatus == 'friends'
+                                        ? "FRIENDS"
                                         : _friendshipStatus == 'pending_sent'
                                             ? "REQUESTED"
-                                            : _friendshipStatus == 'pending_received'
+                                            : _friendshipStatus ==
+                                                    'pending_received'
                                                 ? "ACCEPT"
                                                 : "ADD FRIEND",
                                     style: TextStyle(
-                                      color: theme.colorScheme.primary, 
-                                      fontWeight: FontWeight.bold, 
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
                                       fontSize: 14,
                                       letterSpacing: 1,
                                     ),
@@ -875,26 +1068,46 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen())).then((_) => _loadData()),
+                                onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const EditProfileScreen()))
+                                    .then((_) => _loadData()),
                                 style: OutlinedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(56),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  side: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  side: BorderSide(
+                                      color: theme.colorScheme.primary,
+                                      width: 1.5),
                                 ),
-                                child: Text("EDIT PROFILE", style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                                child: Text("EDIT PROFILE",
+                                    style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold)),
                               ),
                             ),
                             if (plan == 'free') ...[
                               const SizedBox(width: 12),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen())).then((_) => _loadData()),
+                                  onPressed: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const PremiumScreen()))
+                                      .then((_) => _loadData()),
                                   style: ElevatedButton.styleFrom(
                                     minimumSize: const Size.fromHeight(56),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(16)),
                                     elevation: 0,
                                   ),
-                                  child: const Text("UPGRADE", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  child: const Text("UPGRADE",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ],
@@ -905,11 +1118,14 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: Divider(height: 1, thickness: 0.5)),
+              const SliverToBoxAdapter(
+                  child: Divider(height: 1, thickness: 0.5)),
               if (_loadingAnswers)
-                const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+                const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()))
               else if (_answers.isEmpty)
-                const SliverFillRemaining(child: Center(child: Text("No answers yet.")))
+                const SliverFillRemaining(
+                    child: Center(child: Text("No answers yet.")))
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
@@ -932,7 +1148,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
   Widget _buildRestoreStreakCard() {
     final deadline = _currentStreakData?.timeUntilDeadline;
-    final countdownText = deadline != null 
+    final countdownText = deadline != null
         ? "${deadline.inHours}h ${deadline.inMinutes % 60}m remaining"
         : "";
 
@@ -957,7 +1173,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.local_fire_department_rounded, color: Colors.white, size: 32),
+          const Icon(Icons.local_fire_department_rounded,
+              color: Colors.white, size: 32),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -967,8 +1184,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                 Text(
                   "Restore ${_currentStreakData?.brokenStreakCount} Day Streak!",
                   style: const TextStyle(
-                    color: Colors.white, 
-                    fontWeight: FontWeight.bold, 
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                     fontSize: 15,
                   ),
                   maxLines: 1,
@@ -978,7 +1195,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
                   Text(
                     countdownText,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9), 
+                      color: Colors.white.withOpacity(0.9),
                       fontSize: 12,
                     ),
                   ),
@@ -1007,11 +1224,12 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
               foregroundColor: Colors.orange,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: const Size(0, 36),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
             child: const Text(
-              "RESTORE", 
+              "RESTORE",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
           ),
@@ -1025,9 +1243,17 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
     final bool isDarkMode = theme.brightness == Brightness.dark;
     return Column(
       children: [
-        Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface)),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(color: isDarkMode ? Colors.white38 : Colors.grey, fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(label,
+            style: TextStyle(
+                color: isDarkMode ? Colors.white38 : Colors.grey,
+                fontSize: 12,
+                fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -1042,7 +1268,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.mail_outline_rounded, size: 16, color: Theme.of(context).colorScheme.primary),
+            Icon(Icons.mail_outline_rounded,
+                size: 16, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),
             Text(
               email,
@@ -1061,18 +1288,56 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
   Widget _buildSocialLinksRow() {
     final socials = [
-      {'platform': 'instagram', 'icon': FontAwesomeIcons.instagram, 'handle': profileData!['instagram_handle']},
-      {'platform': 'twitter', 'icon': FontAwesomeIcons.xTwitter, 'handle': profileData!['twitter_handle']},
-      {'platform': 'facebook', 'icon': FontAwesomeIcons.facebook, 'handle': profileData!['facebook_handle']},
-      {'platform': 'linkedin', 'icon': FontAwesomeIcons.linkedin, 'handle': profileData!['linkedin_handle']},
-      {'platform': 'youtube', 'icon': FontAwesomeIcons.youtube, 'handle': profileData!['youtube_handle']},
-      {'platform': 'tiktok', 'icon': FontAwesomeIcons.tiktok, 'handle': profileData!['tiktok_handle']},
-      {'platform': 'snapchat', 'icon': FontAwesomeIcons.snapchat, 'handle': profileData!['snapchat_handle']},
-      {'platform': 'whatsapp', 'icon': FontAwesomeIcons.whatsapp, 'handle': profileData!['whatsapp_handle']},
-      {'platform': 'telegram', 'icon': FontAwesomeIcons.telegram, 'handle': profileData!['telegram_handle']},
+      {
+        'platform': 'instagram',
+        'icon': FontAwesomeIcons.instagram,
+        'handle': profileData!['instagram_handle']
+      },
+      {
+        'platform': 'twitter',
+        'icon': FontAwesomeIcons.xTwitter,
+        'handle': profileData!['twitter_handle']
+      },
+      {
+        'platform': 'facebook',
+        'icon': FontAwesomeIcons.facebook,
+        'handle': profileData!['facebook_handle']
+      },
+      {
+        'platform': 'linkedin',
+        'icon': FontAwesomeIcons.linkedin,
+        'handle': profileData!['linkedin_handle']
+      },
+      {
+        'platform': 'youtube',
+        'icon': FontAwesomeIcons.youtube,
+        'handle': profileData!['youtube_handle']
+      },
+      {
+        'platform': 'tiktok',
+        'icon': FontAwesomeIcons.tiktok,
+        'handle': profileData!['tiktok_handle']
+      },
+      {
+        'platform': 'snapchat',
+        'icon': FontAwesomeIcons.snapchat,
+        'handle': profileData!['snapchat_handle']
+      },
+      {
+        'platform': 'whatsapp',
+        'icon': FontAwesomeIcons.whatsapp,
+        'handle': profileData!['whatsapp_handle']
+      },
+      {
+        'platform': 'telegram',
+        'icon': FontAwesomeIcons.telegram,
+        'handle': profileData!['telegram_handle']
+      },
     ];
 
-    final activeSocials = socials.where((s) => s['handle'] != null && (s['handle'] as String).isNotEmpty).toList();
+    final activeSocials = socials
+        .where((s) => s['handle'] != null && (s['handle'] as String).isNotEmpty)
+        .toList();
 
     if (activeSocials.isEmpty) return const SizedBox.shrink();
 
@@ -1081,12 +1346,15 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
       runSpacing: 12,
       children: activeSocials.map((s) {
         return InkWell(
-          onTap: () => _launchSocial(s['platform'] as String, s['handle'] as String),
+          onTap: () =>
+              _launchSocial(s['platform'] as String, s['handle'] as String),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.1),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.grey.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Builder(
@@ -1115,7 +1383,7 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
 
   Future<void> _launchSocial(String platform, String handle) async {
     if (handle.isEmpty) return;
-    
+
     Uri url;
     if (handle.startsWith('http')) {
       url = Uri.parse(handle);
@@ -1134,15 +1402,21 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           url = Uri.parse('https://linkedin.com/in/$handle');
           break;
         case 'youtube':
-          url = Uri.parse(handle.startsWith('@') ? 'https://youtube.com/$handle' : 'https://youtube.com/@$handle');
+          url = Uri.parse(handle.startsWith('@')
+              ? 'https://youtube.com/$handle'
+              : 'https://youtube.com/@$handle');
           break;
         case 'tiktok':
-          url = Uri.parse(handle.startsWith('@') ? 'https://tiktok.com/$handle' : 'https://tiktok.com/@$handle');
+          url = Uri.parse(handle.startsWith('@')
+              ? 'https://tiktok.com/$handle'
+              : 'https://tiktok.com/@$handle');
           break;
         case 'snapchat':
-          final username = handle.startsWith('http') 
-              ? handle.split('/').last.split('?').first 
-              : handle.replaceFirst('snapchat.com/add/', '').replaceFirst('@', '');
+          final username = handle.startsWith('http')
+              ? handle.split('/').last.split('?').first
+              : handle
+                  .replaceFirst('snapchat.com/add/', '')
+                  .replaceFirst('@', '');
           url = Uri.parse('snapchat://add/$username');
           // If app fails, fallback to web URL
           if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
@@ -1157,7 +1431,8 @@ class _ProfileScreenState extends State<ProfileScreen> with RouteAware {
           url = Uri.parse('https://wa.me/$phone');
           break;
         case 'telegram':
-          final username = handle.replaceFirst('t.me/', '').replaceFirst('@', '');
+          final username =
+              handle.replaceFirst('t.me/', '').replaceFirst('@', '');
           url = Uri.parse('https://t.me/$username');
           break;
         default:

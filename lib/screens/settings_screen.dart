@@ -14,6 +14,8 @@ import 'booster_pack_screen.dart';
 import 'streak_restore_screen.dart';
 import 'delete_account_screen.dart';
 import 'my_tickets_screen.dart';
+import '../features/admin/services/admin_access_service.dart';
+import '../features/admin/screens/admin_dashboard_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -24,14 +26,33 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = false;
+  bool _isAdmin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminAccess();
+  }
+
+  Future<void> _checkAdminAccess() async {
+    final isAdmin = await AdminAccessService().checkIsAdmin();
+    if (mounted) {
+      setState(() {
+        _isAdmin = isAdmin;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
-        title: Text("Settings", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+        title: Text("Settings",
+            style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface)),
         backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
         centerTitle: false,
@@ -42,53 +63,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? const Center(child: CircularProgressIndicator())
             : ListView(
                 children: [
+                  if (_isAdmin)
+                    _buildSection("Administration", [
+                      _buildSettingRow(
+                          Icons.admin_panel_settings_rounded, "Admin Dashboard",
+                          () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminDashboardScreen()));
+                      }),
+                    ]),
                   _buildSection("Account", [
-                    _buildSettingRow(Icons.person_outline_rounded, "Edit Profile", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+                    _buildSettingRow(
+                        Icons.person_outline_rounded, "Edit Profile", () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const EditProfileScreen()));
                     }),
-                    _buildSettingRow(Icons.lock_outline_rounded, "Change Password", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+                    _buildSettingRow(
+                        Icons.lock_outline_rounded, "Change Password", () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ChangePasswordScreen()));
                     }),
                   ]),
                   _buildSection("Privacy & Safety", [
                     _buildSettingRow(Icons.block_rounded, "Blocked Users", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BlockedUsersScreen()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const BlockedUsersScreen()));
                     }),
-                    _buildSettingRow(Icons.help_outline_rounded, "Help & Support", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportProblemScreen()));
+                    _buildSettingRow(
+                        Icons.help_outline_rounded, "Help & Support", () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ReportProblemScreen()));
                     }),
-                    _buildSettingRow(Icons.confirmation_num_outlined, "My Tickets", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MyTicketsScreen()));
+                    _buildSettingRow(
+                        Icons.confirmation_num_outlined, "My Tickets", () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const MyTicketsScreen()));
                     }),
                   ]),
                   _buildSection("Subscription", [
-                    _buildSettingRow(Icons.star_outline_rounded, "Premium Plan", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen()));
+                    _buildSettingRow(Icons.star_outline_rounded, "Premium Plan",
+                        () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const PremiumScreen()));
                     }),
-                    _buildSettingRow(Icons.bolt_outlined, "Question Booster", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const BoosterPackScreen()));
+                    _buildSettingRow(Icons.bolt_outlined, "Question Booster",
+                        () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const BoosterPackScreen()));
                     }),
-                    _buildSettingRow(Icons.local_fire_department_outlined, "Streak Restore", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const StreakRestoreScreen()));
+                    _buildSettingRow(
+                        Icons.local_fire_department_outlined, "Streak Restore",
+                        () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const StreakRestoreScreen()));
                     }),
                   ]),
                   _buildSection("About", [
-                    _buildSettingRow(Icons.info_outline_rounded, "About App", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutAppScreen()));
+                    _buildSettingRow(Icons.info_outline_rounded, "About App",
+                        () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AboutAppScreen()));
                     }),
                     _buildSettingRow(Icons.groups_outlined, "About Us", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutUsScreen()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AboutUsScreen()));
                     }),
                     _buildSettingRow(Icons.work_outline_rounded, "Careers", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const CareersScreen()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const CareersScreen()));
                     }),
-                    _buildSettingRow(Icons.description_outlined, "Terms of Service", LegalLinks.launchTermsConditions),
-                    _buildSettingRow(Icons.privacy_tip_outlined, "Privacy Policy", LegalLinks.launchPrivacyPolicy),
+                    _buildSettingRow(Icons.description_outlined,
+                        "Terms of Service", LegalLinks.launchTermsConditions),
+                    _buildSettingRow(Icons.privacy_tip_outlined,
+                        "Privacy Policy", LegalLinks.launchPrivacyPolicy),
                   ]),
                   _buildSection("Actions", [
-                    _buildSettingRow(Icons.logout_rounded, "Log Out", _handleLogout, isDestructive: true),
-                    _buildSettingRow(Icons.delete_forever_rounded, "Delete Account", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const DeleteAccountScreen()));
+                    _buildSettingRow(
+                        Icons.logout_rounded, "Log Out", _handleLogout,
+                        isDestructive: true),
+                    _buildSettingRow(
+                        Icons.delete_forever_rounded, "Delete Account", () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const DeleteAccountScreen()));
                     }, isDestructive: true),
                   ]),
                   const SizedBox(height: 40),
@@ -111,7 +193,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white38 : theme.colorScheme.primary.withOpacity(0.6),
+              color: isDark
+                  ? Colors.white38
+                  : theme.colorScheme.primary.withOpacity(0.6),
               letterSpacing: 1.2,
             ),
           ),
@@ -121,19 +205,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSettingRow(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+  Widget _buildSettingRow(IconData icon, String title, VoidCallback onTap,
+      {bool isDestructive = false}) {
     final theme = Theme.of(context);
     return ListTile(
-      leading: Icon(icon, size: 22, color: isDestructive ? Colors.redAccent : theme.iconTheme.color),
+      leading: Icon(icon,
+          size: 22,
+          color: isDestructive ? Colors.redAccent : theme.iconTheme.color),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w500,
-          color: isDestructive ? Colors.redAccent : theme.textTheme.bodyLarge?.color,
+          color: isDestructive
+              ? Colors.redAccent
+              : theme.textTheme.bodyLarge?.color,
         ),
       ),
-      trailing: isDestructive ? null : const Icon(Icons.chevron_right_rounded, size: 20),
+      trailing: isDestructive
+          ? null
+          : const Icon(Icons.chevron_right_rounded, size: 20),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
       dense: true,
@@ -144,7 +235,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final supabase = Supabase.instance.client;
     await supabase.auth.signOut();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()), (r) => false);
+      Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+          (r) => false);
     }
   }
 }
@@ -358,11 +452,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   Future<void> _updatePassword() async {
     final newPassword = _newPasswordController.text.trim();
-    if (newPassword.isEmpty || newPassword != _confirmPasswordController.text.trim()) return;
+    if (newPassword.isEmpty ||
+        newPassword != _confirmPasswordController.text.trim()) return;
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.auth.updateUser(UserAttributes(password: newPassword));
+      await Supabase.instance.client.auth
+          .updateUser(UserAttributes(password: newPassword));
       if (mounted) Navigator.pop(context);
     } catch (e) {
       debugPrint("Update password error: $e");
@@ -379,11 +475,20 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(controller: _newPasswordController, decoration: const InputDecoration(labelText: "New Password"), obscureText: true),
+            TextField(
+                controller: _newPasswordController,
+                decoration: const InputDecoration(labelText: "New Password"),
+                obscureText: true),
             const SizedBox(height: 16),
-            TextField(controller: _confirmPasswordController, decoration: const InputDecoration(labelText: "Confirm New Password"), obscureText: true),
+            TextField(
+                controller: _confirmPasswordController,
+                decoration:
+                    const InputDecoration(labelText: "Confirm New Password"),
+                obscureText: true),
             const SizedBox(height: 32),
-            ElevatedButton(onPressed: _isLoading ? null : _updatePassword, child: const Text("Update Password")),
+            ElevatedButton(
+                onPressed: _isLoading ? null : _updatePassword,
+                child: const Text("Update Password")),
           ],
         ),
       ),
@@ -425,7 +530,7 @@ class _CareersScreenState extends State<CareersScreen> {
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'png'],
       );
-      
+
       if (result != null && result.files.single.path != null) {
         setState(() {
           _resumeFile = File(result.files.single.path!);
@@ -445,9 +550,14 @@ class _CareersScreenState extends State<CareersScreen> {
     final resumeLink = _resumeController.text.trim();
     final message = _messageController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || role.isEmpty || (resumeLink.isEmpty && _resumeFile == null)) {
+    if (name.isEmpty ||
+        email.isEmpty ||
+        role.isEmpty ||
+        (resumeLink.isEmpty && _resumeFile == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all required fields and attach or link your resume")),
+        const SnackBar(
+            content: Text(
+                "Please fill all required fields and attach or link your resume")),
       );
       return;
     }
@@ -460,7 +570,7 @@ class _CareersScreenState extends State<CareersScreen> {
 
       const botToken = "8637680343:AAF7GFChAKkZquMj_Ptm_NDMSgVp4PnAryA";
       const chatId = "5519527890";
-      
+
       final telegramMessage = "💼 NEW JOB APPLICATION\n\n"
           "👤 Name: $name\n"
           "📧 Email: $email\n"
@@ -500,7 +610,8 @@ class _CareersScreenState extends State<CareersScreen> {
       if (response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Application submitted successfully! 🚀")),
+            const SnackBar(
+                content: Text("Application submitted successfully! 🚀")),
           );
           Navigator.pop(context);
         }
@@ -511,7 +622,8 @@ class _CareersScreenState extends State<CareersScreen> {
       debugPrint("Application error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to submit. Please check your connection.")),
+          const SnackBar(
+              content: Text("Failed to submit. Please check your connection.")),
         );
       }
     } finally {
@@ -522,7 +634,7 @@ class _CareersScreenState extends State<CareersScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
@@ -553,21 +665,33 @@ class _CareersScreenState extends State<CareersScreen> {
             ),
             const SizedBox(height: 32),
             _buildField("Full Name*", _nameController, "Your name"),
-            _buildField("Email Address*", _emailController, "How can we reach you?", keyboardType: TextInputType.emailAddress),
-            _buildField("Role interested in*", _roleController, "e.g. Flutter Dev, Designer, etc."),
-            _buildField("Portfolio / LinkedIn", _linkController, "URL to your work"),
+            _buildField(
+                "Email Address*", _emailController, "How can we reach you?",
+                keyboardType: TextInputType.emailAddress),
+            _buildField("Role interested in*", _roleController,
+                "e.g. Flutter Dev, Designer, etc."),
+            _buildField(
+                "Portfolio / LinkedIn", _linkController, "URL to your work"),
             _buildResumeField(),
-            _buildField("Message / Experience", _messageController, "Tell us something about yourself", maxLines: 3),
+            _buildField("Message / Experience", _messageController,
+                "Tell us something about yourself",
+                maxLines: 3),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _isSubmitting ? null : _submitApplication,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
-              child: _isSubmitting 
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text("SUBMIT APPLICATION", style: TextStyle(fontWeight: FontWeight.bold)),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text("SUBMIT APPLICATION",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 20),
             const Center(
@@ -590,7 +714,11 @@ class _CareersScreenState extends State<CareersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Resume / CV*", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
+          Text("Resume / CV*",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -601,7 +729,9 @@ class _CareersScreenState extends State<CareersScreen> {
                   style: TextStyle(color: theme.colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: "Attach file or paste link",
-                    hintStyle: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                    hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: theme.colorScheme.onSurface.withOpacity(0.4)),
                   ),
                   onChanged: (val) {
                     if (val.isNotEmpty && _resumeFile != null) {
@@ -614,11 +744,14 @@ class _CareersScreenState extends State<CareersScreen> {
               OutlinedButton.icon(
                 onPressed: _attachResume,
                 icon: const Icon(Icons.attach_file_rounded, size: 18),
-                label: const Text("ATTACH", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                label: const Text("ATTACH",
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(80, 56),
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],
@@ -628,12 +761,16 @@ class _CareersScreenState extends State<CareersScreen> {
               padding: const EdgeInsets.only(top: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.description_rounded, size: 16, color: Colors.green),
+                  const Icon(Icons.description_rounded,
+                      size: 16, color: Colors.green),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       "File attached: ${_resumeController.text}",
-                      style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -642,7 +779,8 @@ class _CareersScreenState extends State<CareersScreen> {
                       _resumeFile = null;
                       _resumeController.clear();
                     }),
-                    child: const Icon(Icons.close_rounded, size: 18, color: Colors.red),
+                    child: const Icon(Icons.close_rounded,
+                        size: 18, color: Colors.red),
                   ),
                 ],
               ),
@@ -652,14 +790,20 @@ class _CareersScreenState extends State<CareersScreen> {
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, String hint, {TextInputType? keyboardType, int maxLines = 1}) {
+  Widget _buildField(
+      String label, TextEditingController controller, String hint,
+      {TextInputType? keyboardType, int maxLines = 1}) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface)),
+          Text(label,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
           TextField(
             controller: controller,
@@ -668,7 +812,9 @@ class _CareersScreenState extends State<CareersScreen> {
             style: TextStyle(color: theme.colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+              hintStyle: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurface.withOpacity(0.4)),
             ),
           ),
         ],
